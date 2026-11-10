@@ -1,0 +1,24 @@
+2 Player Games – PWA-Dateien
+
+Enthalten:
+- index.html: deine ursprüngliche Website mit PWA-Einbindung
+- manifest.webmanifest: App-Name, Startadresse und Icons
+- service-worker.js: speichert die App-Seite für den Offline-Start
+- icons/: App-Symbole
+
+Einbau in GitHub Pages:
+1. Entpacke dieses ZIP.
+2. Kopiere ALLE enthaltenen Dateien und den Ordner "icons" in den Hauptordner deines bestehenden GitHub-Repositories.
+3. Ersetze dabei die alte index.html durch die neue. Den vorhandenen .git-Ordner NICHT löschen oder ersetzen.
+4. Öffne GitHub Desktop, committe die Änderungen und klicke auf "Push origin".
+5. Warte, bis GitHub Pages die neue Version veröffentlicht hat, und öffne die Website über ihre HTTPS-Adresse.
+6. Installiere sie:
+   - Chrome/Edge am PC: Installieren-Symbol in der Adressleiste oder Menü → App installieren.
+   - Android: Browser-Menü → App installieren / Zum Startbildschirm hinzufügen.
+   - iPhone/iPad: Safari → Teilen → Zum Home-Bildschirm.
+
+Hinweise:
+- Die App benötigt für die Installation eine HTTPS-Adresse. GitHub Pages stellt HTTPS bereit.
+- Der Offline-Modus speichert die Website-Seite selbst. Funktionen, die externe APIs oder das Internet benötigen, sind offline weiterhin nicht verfügbar.
+- Bereits gespeicherte Browserdaten bleiben erhalten, solange du dieselbe Website-Adresse verwendest und die Browserdaten nicht löschst.
+- Der Service Worker aktualisiert die gespeicherte Seite beim nächsten Online-Aufruf.

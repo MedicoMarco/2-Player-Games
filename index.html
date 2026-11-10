@@ -34,7 +34,16 @@ canvas{width:100%;aspect-ratio:5/3;display:block;border-radius:20px;box-shadow:v
 .sw{width:36px;height:36px;border-radius:50%;margin:4px;border:3px solid var(--card);box-shadow:var(--sh);padding:0}.sw.on{border-color:var(--tx)}
 h2.pt{margin:22px 0 6px;font-size:20px}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#000d;color:#fff;padding:10px 16px;border-radius:14px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9}
-</style></head><body>
+</style>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#3b82f6">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="2 Player Games">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<meta name="application-name" content="2 Player Games">
+</head><body>
 <div class="w" id="menu"><h1><b>2</b> Player <i>Games</i></h1>
 <div class="bar"><div class="seg" id="sm"></div><div class="seg" id="sd"></div><div class="seg" id="st"></div><div class="seg"><button id="bs"></button><button id="ba"></button><button id="bf">⛶</button></div></div>
 <div class="bar"><button class="btn" id="cup">🏆 Cup starten</button><span id="cinfo" style="color:var(--mu)"></span></div>
@@ -766,4 +775,55 @@ $('#bs').onclick=()=>{S.snd^=1;save();menu();snd(600,.08)};$('#ba').onclick=()=>
 $('#bf').onclick=()=>{try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen().catch(()=>{})}catch(e){}};
 $('#back').onclick=toMenu;$('#rs').onclick=()=>start(gdef.id,1);
 skin();menu();requestAnimationFrame(loop);
-</script></body></html>
+</script>
+<script>
+(() => {
+  const runningStandalone = () =>
+    window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+    });
+  }
+
+  let installPrompt = null;
+  let installButton = null;
+
+  function showInstallButton(label) {
+    if (installButton || runningStandalone()) return;
+    installButton = document.createElement('button');
+    installButton.type = 'button';
+    installButton.textContent = label;
+    installButton.setAttribute('aria-label', 'App installieren');
+    installButton.style.cssText = [
+      'position:fixed','right:16px','bottom:calc(16px + env(safe-area-inset-bottom, 0px))',
+      'z-index:2147483000','padding:11px 16px','border:0','border-radius:999px',
+      'background:#3b82f6','color:#fff','font:600 14px system-ui,sans-serif',
+      'box-shadow:0 4px 18px #0005','cursor:pointer'
+    ].join(';');
+    document.body.appendChild(installButton);
+    installButton.addEventListener('click', async () => {
+      if (installPrompt) {
+        installPrompt.prompt();
+        try { await installPrompt.userChoice; } catch (_) {}
+        installPrompt = null;
+        installButton?.remove();
+        installButton = null;
+      } else {
+        alert('So installierst du die App: Tippe in Safari auf „Teilen“ und anschließend auf „Zum Home-Bildschirm“.');
+      }
+    });
+  }
+
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    installPrompt = event;
+    showInstallButton('＋ App installieren');
+  });
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  if (isIOS && !runningStandalone()) showInstallButton('＋ Zum Home-Bildschirm');
+})();
+</script>
+</body></html>
