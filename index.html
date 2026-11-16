@@ -216,6 +216,7 @@ body.onl #rs,body.onl-guest #rs{display:none}
 .lurow i{width:14px;height:14px;border-radius:50%;flex:none}.lurow b{flex:1}.lurow small{opacity:.7}.lurow em{opacity:.6}
 .luwrap{margin:auto;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0}.luwrap h2{font-size:24px;margin:0}.luwrap .btn{padding:6px 16px;font-size:15px}.lurow .seg button{padding:3px 10px;font-size:13px}
 .lusetup{width:min(430px,94%)}
+.lufrw{width:100%;max-width:420px;display:flex;flex-direction:column;gap:2px;margin-top:2px}.lufrw>b{font-size:12px;opacity:.8;text-transform:uppercase;letter-spacing:.06em;text-align:left}#lufr{max-height:92px;overflow:auto}.mini:disabled{opacity:.5;cursor:default}
 .luon{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;margin-top:8px}
 .luon input{width:92px;text-transform:uppercase;text-align:center;font:700 18px system-ui;padding:7px;border-radius:8px;border:2px solid #fff6;background:#0006;color:#fff;letter-spacing:.15em}
 .lucode{font:900 40px system-ui;letter-spacing:.25em;background:#ffffff1a;padding:2px 18px;border-radius:12px;margin:4px 0}
@@ -1547,7 +1548,7 @@ function luHostMake(st,emit){
 }
 
 /* ---- Online-Raum ---- */
-const LUN={code:'',role:'',seat:-1,ref:null,g:null,room:null,left:0,lastAct:{},actN:0,lastSeq:0};
+const LUN={code:'',role:'',seat:-1,ref:null,g:null,room:null,left:0,lastAct:{},actN:0,lastSeq:0,inv:{}};
 const luCode=()=>{const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<5;i++)s+=A[Math.random()*A.length|0];return s};
 async function luLogin(){
   try{if(!OL.db)await olInit()}catch(e){}
@@ -1559,6 +1560,7 @@ async function luLogin(){
 const luErr=e=>{const m=String(e&&(e.code||e.message)||e);return /PERMISSION/i.test(m)?'Zugriff verweigert: In den Firebase-Regeln fehlt der Pfad „rooms“ (siehe Hinweis).':'Online-Fehler: '+m};
 function luCleanup(){
   const r=LUN.ref;
+  try{if(OL.me&&OL.db)for(const u in LUN.inv)OL.db.ref('invites/'+u+'/'+OL.me).remove()}catch(e){}LUN.inv={};
   if(r){try{r.off()}catch(e){}
     try{
       if(LUN.role=='host'){r.onDisconnect().cancel();r.remove()}
@@ -1616,6 +1618,27 @@ function luMk(){
 <p class=luhint>Mit einer 6 kommst du raus. Ohne Figur auf dem Feld hast du 3 Versuche. Wer schlagen kann, muss schlagen.</p></div>`
   }
   const showSetup=()=>{mode='setup';st=demo();ani=[];showOv(setupHTML())};
+  function frHTML(room){
+    const seats=luSeatsOf(room||LUN.room),inRoom=seats.filter(x=>x.k=='p').map(x=>x.uid),fr=Object.keys(OL.F||{}).filter(u=>!inRoom.includes(u));
+    if(!fr.length)return Object.keys(OL.F||{}).length?'<span class=luhint>Alle deine Freunde sind schon im Raum.</span>':'<span class=luhint>Noch keine Freunde. <button class=mini data-lu=frs>Freunde hinzufügen</button></span>';
+    const st_=u=>!OL.P[u]?0:OL.P[u].g?1:2;
+    return fr.sort((a,b)=>st_(b)-st_(a)||olNameOf(a).localeCompare(olNameOf(b))).map(u=>{
+      const k=st_(u),sent=LUN.inv[u]&&Date.now()-LUN.inv[u]<45000,col=['#9ca3af','#f59e0b','#22c55e'][k];
+      const btn=k==2?(sent?'<button class=mini disabled>Eingeladen ✓</button>':`<button class=mini data-lu=inv data-u=${u}>Einladen</button>`):`<button class=mini disabled>${k?'Beschäftigt':'Offline'}</button>`;
+      return`<div class=lurow><i style="background:${col}"></i><b>${luHtml(olNameOf(u))}</b>${btn}</div>`}).join('')
+  }
+  const refreshFr=()=>{const e=$('#lufr');if(e&&mode=='lobby'&&LUN.role=='host'&&LUN.room&&LUN.room.status=='lobby')e.innerHTML=frHTML(LUN.room)};
+  window.luFr=refreshFr;
+  async function invite(u){
+    if(LUN.role!='host'||!LUN.room||LUN.room.status!='lobby'||!u)return;
+    if(!OL.P[u]||OL.P[u].g){toast(olNameOf(u)+' ist gerade nicht frei.');refreshFr();return}
+    try{
+      const r=OL.db.ref('invites/'+u+'/'+OL.me);
+      await r.set({mid:'room:'+LUN.code,name:OL.name,game:'ludo',t:0,ts:olTS()});
+      r.onDisconnect().remove();LUN.inv[u]=Date.now();
+      toast('Einladung an '+olNameOf(u)+' gesendet');refreshFr();setTimeout(refreshFr,45500)
+    }catch(e){toast(luErr(e))}
+  }
   function lobbyHTML(room){
     const seats=luSeatsOf(room),isHost=LUN.role=='host',L=room.cfg||{};
     const rows=seats.map((x,s)=>{
@@ -1626,7 +1649,8 @@ function luMk(){
       return`<div class=lurow><i style="background:${LU.COL[s]}"></i><b>${lab}</b>${ctl}</div>`}).join('');
     const nAct=seats.filter(x=>x.k=='p'||x.k=='cpu').length,nOpen=seats.filter(x=>x.k=='open').length;
     const ok=nAct>=2&&!nOpen;
-    return`<div class=luwrap><div class=kick>Online-Raum</div><div class=lucode>${LUN.code}</div><p class=luhint>Freunde öffnen das Spiel, wählen „Mit Code beitreten“ und geben diesen Code ein.</p><div class=lusetup>${rows}</div>
+    return`<div class=luwrap><div class=kick>Online-Raum</div><div class=lucode>${LUN.code}</div><p class=luhint>${isHost?'Lade Freunde unten direkt ein – oder sie geben diesen Code unter „Beitreten“ ein.':'Freunde öffnen das Spiel, wählen „Beitreten“ und geben diesen Code ein.'}</p><div class=lusetup>${rows}</div>
+${isHost&&nOpen?`<div class=lufrw><b>Freunde einladen</b><div id=lufr>${frHTML(room)}</div></div>`:''}
 ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten</button></div><p class=luhint>${ok?'Alle Plätze sind belegt.':nOpen?'Offene Plätze auf „Computer“ oder „Aus“ stellen, sobald niemand mehr kommt.':'Mindestens 2 Spieler nötig.'}</p>`:'<p class=luhint>Warte auf den Host …</p>'}
 <div><button class="btn r" data-lu=leave>Raum verlassen</button></div></div>`
   }
@@ -1658,35 +1682,45 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     LUN.ref.update({status:'play'}).catch(e=>toast(luErr(e)));
     ovHide();onSnap(JSON.parse(JSON.stringify(st)),null);
     LUN.ref.child('snap').set(JSON.stringify({snap:st,ev:null}));
-    host.start();olSetGame('ludo')
+    host.start();olSetGame('ludo');
+    try{for(const u in LUN.inv)OL.db.ref('invites/'+u+'/'+OL.me).remove()}catch(e){}LUN.inv={}
   }
   async function create(){
     if(!await luLogin())return;
     const cfg=cfgOf(),code=luCode(),ref=OL.db.ref('rooms/'+code);
     try{
-      await ref.set({host:OL.me,hn:OL.name,ts:olTS(),status:'lobby',cfg,seats:{0:{k:'p',uid:OL.me,name:OL.name},1:{k:'open'},2:{k:'cpu'},3:{k:'off'}}});
+      await ref.set({host:OL.me,hn:OL.name,ts:olTS(),status:'lobby',cfg,seats:{0:{k:'p',uid:OL.me,name:OL.name},1:{k:'open'},2:{k:'open'},3:{k:'open'}}});
       ref.onDisconnect().remove()
     }catch(e){toast(luErr(e));return}
     LUN.code=code;LUN.role='host';LUN.seat=0;LUN.ref=ref;LUN.left=0;LUN.g=api;LUN.lastAct={};
     mode='lobby';listen();olSetGame('ludo')
   }
-  async function join(){
-    const code=(($('#lucode')||{}).value||'').trim().toUpperCase();
+  async function join(codeArg){
+    const code=String(codeArg||(($('#lucode')||{}).value)||'').trim().toUpperCase();
+    if(host&&mode!='lobby'){host.stop();host=null}
     if(code.length<4){toast('Bitte den Raumcode eingeben.');return}
     if(!await luLogin())return;
     const ref=OL.db.ref('rooms/'+code);let room;
     try{room=(await ref.once('value')).val()}catch(e){toast(luErr(e));return}
     if(!room){toast('Raum nicht gefunden.');return}
-    if(room.status!='lobby'){toast('Das Spiel läuft schon.');return}
+    if(room.status!=='lobby'){toast('Das Spiel läuft schon.');return}
     let got=-1;
     try{
-      const r=await ref.child('seats').transaction(cur=>{
-        if(!cur)return cur;got=-1;const sx=[0,1,2,3].map(i=>cur[i]||{k:'off'});
-        const mi=sx.findIndex(x=>x.k=='p'&&x.uid==OL.me);if(mi>=0){got=mi;return}
-        const i=sx.findIndex(x=>x.k=='open');if(i<0)return;
-        got=i;const n={};sx.forEach((x,j)=>n[j]=x);n[i]={k:'p',uid:OL.me,name:OL.name};return n
-      });
-      if(!r.committed||got<0){toast('Der Raum ist voll.');return}
+      const seats=room.seats||{};
+      // Bei erneutem Verbinden den bereits eigenen Platz wiederverwenden.
+      for(let i=0;i<4;i++){const seat=seats[i];if(seat&&seat.k==='p'&&seat.uid===OL.me){got=i;break}}
+      // Jeden Platz separat und atomar reservieren, damit mehrere Gäste gleichzeitig beitreten können.
+      if(got<0){
+        for(let i=0;i<4;i++){
+          const result=await ref.child('seats/'+i).transaction(cur=>{
+            if(!cur||cur.k!=='open')return;
+            return {k:'p',uid:OL.me,name:OL.name};
+          });
+          const reserved=result.snapshot&&result.snapshot.val();
+          if(result.committed&&reserved&&reserved.k==='p'&&reserved.uid===OL.me){got=i;break}
+        }
+      }
+      if(got<0){toast('Der Raum ist voll.');return}
     }catch(e){toast(luErr(e));return}
     LUN.code=code;LUN.role='guest';LUN.seat=got;LUN.ref=ref;LUN.left=0;LUN.g=api;LUN.actN=0;
     ref.child('seats/'+got).onDisconnect().set({k:'gone',uid:OL.me,name:OL.name});
@@ -1735,6 +1769,8 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     else if(a=='again')startLocal();
     else if(a=='create')create();
     else if(a=='join')join();
+    else if(a=='inv')invite(b.dataset.u);
+    else if(a=='frs')olOpen();
     else if(a=='sk'&&LUN.role=='host'){LUN.ref.child('seats/'+s).set({k:v})}
     else if(a=='start'&&LUN.role=='host'&&LUN.room)startHostOnline(LUN.room);
     else if(a=='rematch'&&LUN.role=='host'){LUN.ref.update({status:'lobby',snap:null,act:null})}
@@ -1888,7 +1924,8 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
       spark(250,240,LU.COL[st.rk[0]],40);showOv(endHTML())}
   }
   const api={update,draw,click,key,luClick,showSetup,
-    leave(){if(host){host.stop();host=null}LUN.left=1;luCleanup();$('#game').style.removeProperty('--tb')}};
+    canJoin(){return !LUN.ref&&(mode=='setup'||mode=='local')},joinCode(c){return join(c)},
+    leave(){window.luFr=null;if(host){host.stop();host=null}LUN.left=1;luCleanup();$('#game').style.removeProperty('--tb')}};
   return api
 }
 
@@ -2122,8 +2159,8 @@ const olSetGame=g=>{if(OL.me)OL.db.ref('presence/'+OL.me+'/g').set(g||null)};
 function olListen(){
   const d=OL.db,me=OL.me,offs=[];
   const on=(p,f)=>{const r=d.ref(p);r.on('value',s=>f(s.val()||{}));offs.push(()=>r.off())};
-  on('presence',v=>{OL.P=v;olUpd()});
-  on('friends/'+me,v=>{OL.F=v;olNames(Object.keys(v));olUpd()});
+  on('presence',v=>{OL.P=v;olUpd();window.luFr&&luFr()});
+  on('friends/'+me,v=>{OL.F=v;olNames(Object.keys(v));olUpd();window.luFr&&luFr()});
   on('requests/'+me,v=>{OL.RQ=v;olUpd();olBadge()});
   on('invites/'+me,v=>{OL.INV=v;olInvites();olBadge()});
   offs.push(()=>d.ref('.info/connected').off());
@@ -2271,11 +2308,12 @@ async function olAddName(){
 }
 
 /* ---- Herausfordern (Absender = Host = Spieler 1) ---- */
+const olIsRoom=v=>!!v&&/^room:/.test(String(v.mid||''));
 function olCards(){
   let h='';
   if(OL.out)h+=`<div class=olinv><b>Herausforderung an ${olEsc(olNameOf(OL.out.uid))}</b><span>${olEsc(olGameName(OL.out.gid))}${goalOf(OL.out.gid,OL.out.t)?' · '+goalOf(OL.out.gid,OL.out.t):''} – warte auf Antwort…</span><div class=row><button class="btn g" data-o=cx>Abbrechen</button></div></div>`;
   if(OL.sess&&!OL.sess.live)h+=`<div class=olinv><b>Verbinde mit ${olEsc(OL.sess.names[OL.sess.role?0:1])}…</b><span>${olEsc(olGameName(OL.sess.gid))}</span><div class=row><button class="btn g" data-o=lv>Abbrechen</button></div></div>`;
-  for(const u in OL.INV){const v=OL.INV[u];h+=`<div class=olinv><b>${olEsc(v.name)} fordert dich heraus!</b><span>${olEsc(olGameName(v.game))}${goalOf(v.game,+v.t||5)?' · '+goalOf(v.game,+v.t||5):''}</span><div class=row><button class=btn data-o=acc data-u=${u}>Annehmen</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button></div></div>`}
+  for(const u in OL.INV){const v=OL.INV[u];if(olIsRoom(v)){h+=`<div class=olinv><b>${olEsc(v.name)} lädt dich zu „Mensch ärgere dich nicht“ ein!</b><span>Online-Raum ${olEsc(String(v.mid).slice(5))}</span><div class=row><button class=btn data-o=acc data-u=${u}>Beitreten</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button></div></div>`;continue}h+=`<div class=olinv><b>${olEsc(v.name)} fordert dich heraus!</b><span>${olEsc(olGameName(v.game))}${goalOf(v.game,+v.t||5)?' · '+goalOf(v.game,+v.t||5):''}</span><div class=row><button class=btn data-o=acc data-u=${u}>Annehmen</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button></div></div>`}
   $('#oli').innerHTML=h;
 }
 function olInvites(){
@@ -2312,12 +2350,16 @@ function olCancelOut(msg){
 }
 async function olDecline(u,quiet){
   const v=OL.INV[u];if(!v)return;
-  try{await OL.db.ref('matches/'+v.mid+'/state').set('declined')}catch(e){}
+  if(!olIsRoom(v))try{await OL.db.ref('matches/'+v.mid+'/state').set('declined')}catch(e){}
   try{await OL.db.ref('invites/'+OL.me+'/'+u).remove()}catch(e){}
   if(!quiet)olCards();
 }
 async function olAccept(u){
   const v=OL.INV[u];if(!v||OL.sess||OL.out)return;
+  if(olIsRoom(v)){
+    try{await OL.db.ref('invites/'+OL.me+'/'+u).remove()}catch(e){}
+    olClose();olCards();olJoinRoom(String(v.mid).slice(5));return
+  }
   try{
     const m=(await OL.db.ref('matches/'+v.mid).once('value')).val();
     OL.db.ref('invites/'+OL.me+'/'+u).remove();
@@ -2326,6 +2368,17 @@ async function olAccept(u){
     await OL.db.ref('matches/'+v.mid+'/state').set('accepted');
     olGuest(v.mid,Object.assign(m,{gc}));
   }catch(e){toast(olMsg(e))}
+}
+
+/* Einladung in einen Mensch-ärgere-dich-nicht-Raum annehmen */
+async function olJoinRoom(code){
+  if(ON||OL.sess){toast('Beende zuerst dein aktuelles Online-Spiel.');return}
+  if(!(cur&&gdef&&gdef.id=='ludo'&&cur.canJoin&&cur.canJoin())){
+    if(cur&&gdef&&gdef.id=='ludo'&&cur.canJoin&&!cur.canJoin()){toast('Du bist schon in einem Raum.');return}
+    if(cur&&cur.leave)cur.leave();
+    cup=null;start('ludo')
+  }
+  if(cur&&cur.joinCode)await cur.joinCode(code)
 }
 
 /* ---- Klick-Verteilung ---- */
