@@ -2961,6 +2961,7 @@ function olBadge(){
 const olMsg=e=>({
   'functions/not-found':'Die Firebase-Funktion zum Löschen ist noch nicht bereitgestellt.',
   'functions/internal':'Serverfehler. Bitte erneut versuchen; es wurde kein erfolgreicher Abschluss bestätigt.',
+  'auth/network-request-failed':'Keine Verbindung. Bitte erneut versuchen.',
   'functions/unauthenticated':'Bitte erneut anmelden und nochmals versuchen.',
   'auth/requires-recent-login':'Bitte bestätige dein aktuelles Passwort erneut.',
   'auth/email-already-in-use':'Dieser Name ist schon vergeben.',
@@ -3107,10 +3108,24 @@ async function olDeleteAccount(){
     await user.getIdToken(true);
     olCancelOut();if(OL.sess)olLeave();if(cur&&cur.leave)toMenu();
     if(OL.unl)OL.unl();OL.unl=null;stopped=true;
-    await OL.db.ref('presence/'+user.uid).onDisconnect().cancel();
-    await firebase.app().functions('europe-west1').httpsCallable('deleteOwnAccount')({});
+    const uid=user.uid,db=OL.db;
+    try{await db.ref('presence/'+uid).onDisconnect().cancel()}catch(_){}
+    /* Ohne Cloud Function (kostenloser Spark-Plan): Daten im Browser entfernen, dann Account löschen. */
+    const rm=[],low=(OL.name||'').toLowerCase();
+    for(const p of ['friends','requests','invites','blocked']){
+      let kids=[];
+      try{const sn=await db.ref(p+'/'+uid).once('value');kids=sn.exists()&&typeof sn.val()=='object'?Object.keys(sn.val()):[]}catch(_){}
+      for(const o of kids){rm.push(db.ref(p+'/'+o+'/'+uid).remove().catch(()=>{}))}
+      rm.push(db.ref(p+'/'+uid).remove().catch(()=>{}));
+    }
+    rm.push(db.ref('presence/'+uid).remove().catch(()=>{}));
+    if(low)rm.push(db.ref('names/'+low).remove().catch(()=>{}));
+    rm.push(db.ref('users/'+uid).remove().catch(()=>{}));
+    await Promise.all(rm);
+    await user.delete();
     try{localStorage.removeItem('2pg_ol')}catch(e){}
-    await OL.auth.signOut();OL.deleting=false;olGone();toast('Dein Account und die zugehörigen Firebase-Daten wurden gelöscht.');
+    try{await OL.auth.signOut()}catch(_){}
+    OL.deleting=false;olGone();toast('Dein Account und deine Daten wurden gelöscht.');
   }catch(e){
     OL.deleting=false;OL.deleteError=olMsg(e)+' Die Löschung ist nicht als abgeschlossen bestätigt. Du kannst sie erneut versuchen.';
     if(stopped){OL.blocksReady=false;/* Bei unklarem Serverstatus keine Präsenz/Daten neu anlegen. */}
