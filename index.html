@@ -3118,10 +3118,10 @@ async function olDeleteAccount(){
       for(const o of kids){rm.push(db.ref(p+'/'+o+'/'+uid).remove().catch(()=>{}))}
       rm.push(db.ref(p+'/'+uid).remove().catch(()=>{}));
     }
-    rm.push(db.ref('presence/'+uid).remove().catch(()=>{}));
     if(low)rm.push(db.ref('names/'+low).remove().catch(()=>{}));
-    rm.push(db.ref('users/'+uid).remove().catch(()=>{}));
+    await db.ref('presence/'+uid).remove().catch(()=>{});
     await Promise.all(rm);
+    await db.ref('users/'+uid).remove().catch(()=>{}); /* zuletzt: Regeln für presence/friends prüfen, ob users/<uid> existiert */
     await user.delete();
     try{localStorage.removeItem('2pg_ol')}catch(e){}
     try{await OL.auth.signOut()}catch(_){}
