@@ -64,6 +64,11 @@ canvas{border:2px solid var(--ln);border-radius:10px;box-shadow:var(--sh)}
 .card h3{font-size:21px}
 .itile{width:112px;height:112px;display:grid;place-items:center;background:color-mix(in srgb,var(--k) 38%,#fffcf5);border:2px solid #f2ece0;border-radius:12px;box-shadow:4px 4px 0 #000}.itile .gi{width:84px;height:84px}
 body.playing{overflow:hidden}
+html.lock,body.lock{overflow:hidden;overscroll-behavior:none;height:100%;-webkit-text-size-adjust:100%;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.lock input,body.lock textarea{-webkit-user-select:text;user-select:text}
+body.lock #game{touch-action:pan-y;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box;height:100dvh}
+body.lock.playing .stage{width:min(calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)),calc((100dvh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom))*1.6667));margin-top:30px}
+body.lock.playing.por .stage{width:min(calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right)),calc((100dvh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom))*.6))}
 body.playing #game{position:fixed;inset:0;max-width:none;padding:0;background:var(--tb,#0b0a08);transition:background .3s;display:flex!important;align-items:center;justify-content:center;z-index:5}
 body.playing .stage{width:min(calc(100vw - 32px),calc((100dvh - 96px)*1.6667));margin:24px 0 0;overflow:hidden;border-radius:14px;box-shadow:0 6px 24px #0006}
 body.playing canvas{border:0;border-radius:14px;box-shadow:none}
@@ -248,7 +253,7 @@ body.onl #rs,body.onl-guest #rs{display:none}
 <div class="stage"><canvas id="cv" width="800" height="480"></canvas><video id="gv" autoplay muted playsinline></video><canvas id="gc" width="800" height="480"></canvas><div class="ov" id="ov"></div></div><p id="hint" style="text-align:center;color:var(--mu);font-size:14px"></p></div>
 <script>
 const $=s=>document.querySelector(s),W=800,H=480,cl=(v,a,b)=>Math.max(a,Math.min(b,v)),rnd=(a,b)=>a+Math.random()*(b-a),now=()=>performance.now();
-let S={cpu:0,d:1,t:5,snd:1,anim:1,theme:'auto',ori:'l',side:0,st:{},fav:[],rec:[],cat:'all',ach:{},pl:0,sk:[0,0]},B='#3b82f6',R='#ef4444';
+let S={vm:'auto',cpu:0,d:1,t:5,snd:1,anim:1,theme:'auto',ori:'l',side:0,st:{},fav:[],rec:[],cat:'all',ach:{},pl:0,sk:[0,0]},B='#3b82f6',R='#ef4444';
 try{Object.assign(S,JSON.parse(localStorage.getItem('2pg')||'{}'))}catch(e){}
 let ON=null;const save=()=>{try{localStorage.setItem('2pg',JSON.stringify(ON&&ON.s0?{...S,...ON.s0}:S))}catch(e){}};
 const cv=$('#cv'),c=cv.getContext('2d');
@@ -275,15 +280,18 @@ const K={},T=[{},{}],L={},PT={};
 /* Adaptiver Bot: Schwierigkeit 3. Ein stiller Faehigkeitswert (0 = Einfach ... 2 = Schwer) pro Spiel, der sich nach jedem Match
    und waehrend des Matches leicht dem Spielstand anpasst. LV/LI ersetzen die Stufen-Tabellen und mischen fliessend. */
 const AD={lo:0};
-const adR=()=>{const a=S.ar&&gdef&&S.ar[gdef.id];return a!=null?a:(S.ag!=null?S.ag:1)};
-const adEff=()=>Math.max(0,Math.min(2,adR()+AD.lo));
+const adNum=(v,d)=>Number.isFinite(v)?v:d;
+const adR=()=>{const a=S.ar&&gdef&&S.ar[gdef.id];return adNum(a!=null?a:(S.ag!=null?S.ag:1),1)};
+const adEff=()=>Math.max(0,Math.min(2,adNum(adR()+adNum(AD.lo,0),1)));
+/* Vorsprung aus dem Spielstand LS (Zahlen oder Prozent-Texte wie '45%'), immer eine endliche Zahl in -1..1 */
+const adLead=()=>{const n=v=>{const x=parseFloat(v);return Number.isFinite(x)?x:0},a=n(LS[0]),b=n(LS[1]),pc=typeof LS[0]=='string'&&LS[0].includes('%');return Math.max(-1,Math.min(1,(a-b)/(pc?25:Math.max(3,S.t))))};
 const DI=()=>S.d==3?Math.round(adEff()):S.d;
 const LV=a=>{if(S.d!=3)return a[S.d];const r=adEff(),i=Math.min(a.length-2,Math.floor(r)),f=r-i;return a[i]+(a[i+1]-a[i])*f};
 const LI=a=>a[DI()];
-const adSet=(v,w)=>{if(!gdef)return;S.ar=S.ar||{};const o=adR();v=Math.max(0,Math.min(2,v));S.ar[gdef.id]=v;S.ag=(S.ag!=null?S.ag:1)+(v-(S.ag!=null?S.ag:1))*.25;save()};
+const adSet=(v,w)=>{if(!gdef||!Number.isFinite(v))return;S.ar=S.ar||{};const o=adR();v=Math.max(0,Math.min(2,v));S.ar[gdef.id]=v;S.ag=(S.ag!=null?S.ag:1)+(v-(S.ag!=null?S.ag:1))*.25;save()};
 const adTick=dt=>{if(S.d!=3||S.cpu!==1||ON||over||idle||!gdef||gdef.id=='chess'||gdef.id=='ludo'){if(AD.lo&&(over||S.d!=3))AD.lo*=.9;return}
-  const lead=Math.max(-1,Math.min(1,(LS[0]-LS[1])/Math.max(3,S.t)));AD.lo+=(lead*.35-AD.lo)*Math.min(1,dt*.12)};
-const adLearn=w=>{if(S.d!=3||S.cpu!==1||ON||!gdef||(w!=1&&w!=2))return;const m=Math.min(1,Math.abs(LS[0]-LS[1])/Math.max(3,S.t));adSet(adR()+(w==1?1:-1)*(.12+.1*m));AD.lo=0};
+  const lead=adLead();AD.lo=adNum(AD.lo,0);AD.lo+=(lead*.35-AD.lo)*Math.min(1,dt*.12)};
+const adLearn=w=>{if(S.d!=3||S.cpu!==1||ON||!gdef||(w!=1&&w!=2))return;const m=Math.abs(adLead());adSet(adR()+(w==1?1:-1)*(.12+.1*m));AD.lo=0};
 const adSolo=(score,old)=>{if(S.d!=3||!gdef||!(old>0))return;adSet(adR()+Math.max(-.1,Math.min(.1,(score/old-.8)*.3)))};
 const isSolo=()=>S.cpu===2&&!ON&&!!gdef?.solo;
 const clearInput=()=>{Object.keys(K).forEach(k=>delete K[k]);Object.keys(PT).forEach(k=>delete PT[k]);T[0]={};T[1]={};Object.keys(L).forEach(k=>delete L[k])};
@@ -668,8 +676,27 @@ const goalLbl=(g,v)=>g.id=='snakes'&&isSolo()?null:goalOf(g.id,v);
 function intro(){if(gdef.id=='ludo'){idle=0;$('#hint').textContent=gdef.h;cur.showSetup();return}idle=1;const g=gdef,again=()=>{clearInput();PA=[];cur=g.mk();intro();$('#hint').textContent=g.h+(isSolo()?' · Solo: spiele auf Highscore':'')};
 showOv(`<div class=intro style='--k:${KC[g.cat]||"#888"}'><div class=ipic>${g.th?'<img alt="" src="'+g.th+'">':g.ic}</div><div class=itx><div class=kick>${g.cat} · 1–2 Spieler</div><h2>${g.n}</h2><p class=lead>${g.d}</p><h4>So funktioniert’s</h4><p>${isSolo()?(g.soloRules||RULES[g.id]):RULES[g.id]}</p><h4>Steuerung</h4><p>${g.h}</p><h4>Einstellungen</h4><div class=bar style='justify-content:flex-start'><div class=seg id=im></div><div class=seg id=id></div><div class=seg id=it${goalLbl(g,3)?'':' style=display:none'}></div></div><button class=btn id=ig>Spiel starten</button></div></div>`);
 seg('im','cpu',[[0,'2 Spieler'],[1,'Gegen Computer'],...(g.solo&&!cup?[[2,'Solo']]:[])],again);seg('id','d',[[0,'Einfach'],[1,'Normal'],[2,'Schwer']],again);if(goalLbl(g,3))seg('it','t',[3,5,7].map(v=>[v,goalLbl(g,v)]),again);bd('ig',go)}
-const fsOn=()=>{document.body.classList.add('playing');const e=document.documentElement;try{if(!document.fullscreenElement&&e.requestFullscreen)e.requestFullscreen({navigationUI:'hide'}).catch(()=>{});else if(e.webkitRequestFullscreen&&!document.webkitFullscreenElement)e.webkitRequestFullscreen()}catch(x){}};
-const fsOff=()=>{document.body.classList.remove('playing');try{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});else if(document.webkitFullscreenElement)document.webkitExitFullscreen()}catch(x){}};
+/* Spielansicht: Auto = auf Touch-Geräten (Handy/Tablet/iPad) Bildschirm ausfüllen + Scrollen/Zoomen sperren, am PC Vollbild */
+const isTouchDev=()=>{try{return matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>1}catch(e){return false}};
+const vmFit=()=>S.vm=='fit'||(S.vm!='full'&&isTouchDev());
+const LOCK={meta:null,last:0,on:0};
+(function(){const stop=e=>{if(LOCK.on)e.preventDefault()};
+  ['gesturestart','gesturechange','gestureend'].forEach(n=>document.addEventListener(n,stop,{passive:false}));
+  document.addEventListener('touchmove',e=>{if(LOCK.on&&(e.touches.length>1||(e.scale&&e.scale!==1)))e.preventDefault()},{passive:false});
+  document.addEventListener('touchend',e=>{if(!LOCK.on)return;const n=Date.now();if(n-LOCK.last<320&&!/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||''))e.preventDefault();LOCK.last=n},{passive:false});
+  document.addEventListener('wheel',e=>{if(LOCK.on&&e.ctrlKey)e.preventDefault()},{passive:false});
+})();
+function lockOn(){
+  if(LOCK.on)return;LOCK.on=1;document.body.classList.add('lock');document.documentElement.classList.add('lock');
+  const m=document.querySelector('meta[name=viewport]');if(m){LOCK.meta=m.content;m.content='width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover'}
+  try{window.scrollTo(0,0)}catch(e){}
+}
+function lockOff(){
+  if(!LOCK.on)return;LOCK.on=0;document.body.classList.remove('lock');document.documentElement.classList.remove('lock');
+  const m=document.querySelector('meta[name=viewport]');if(m&&LOCK.meta)m.content=LOCK.meta;LOCK.meta=null
+}
+const fsOn=()=>{document.body.classList.add('playing');if(vmFit()){lockOn();return}const e=document.documentElement;try{if(!document.fullscreenElement&&e.requestFullscreen)e.requestFullscreen({navigationUI:'hide'}).catch(()=>{});else if(e.webkitRequestFullscreen&&!document.webkitFullscreenElement)e.webkitRequestFullscreen()}catch(x){}};
+const fsOff=()=>{document.body.classList.remove('playing');lockOff();try{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});else if(document.webkitFullscreenElement)document.webkitExitFullscreen()}catch(x){}};
 function thumbs(){window.NOFIN=1;const sv=[S.snd,S.cpu,S.t],oc=cur,og=gdef,oo=over,oi=idle,op=PA;S.snd=0;S.cpu=0;S.t=5;
 GAMES.forEach(g=>{try{gdef=g;over=0;idle=0;PA=[];const o=g.mk();cur=o;for(let f=0;f<240;f++)o.update(.016);o.draw();const t=document.createElement('canvas');t.width=480;t.height=288;t.getContext('2d').drawImage(cv,0,0,480,288);g.th=t.toDataURL('image/jpeg',.82)}catch(e){g.th=''}
 c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.shadowBlur=0;c.shadowOffsetY=0;c.setLineDash([]);c.lineWidth=1;c.textAlign='center'});
@@ -1978,7 +2005,16 @@ GAMES.push({id:'micro',n:'Micro Racers',ic:'🏁',d:'Kompakte Rennstrecken mit d
 const ice=()=>{const LS=9000,PR=14,CPS=[0,2250,4500,6750];let sd=4242+(S.pl||0)*31;const rn=()=>(sd=sd*16807%2147483647)/2147483647,el=[];
 for(let x=520;x<LS-380;x+=190+rn()*70){const r=rn();if(r<.4){if(rn()<.3)el.push({t:0,x,y:28,w:44,h:44},{t:0,x,y:146,w:44,h:44});else el.push({t:0,x,y:30+rn()*130,w:44,h:44})}else if(r<.6)el.push({t:1,x,y:30+rn()*100,w:70,h:90});else if(r<.8)el.push({t:2,x,y:30+rn()*80,w:170,h:110});else el.push({t:3,x,y:40+rn()*120,w:60,h:44})}
 const P=[0,1].map(()=>({x:80,y:120,vx:0,vy:0,fl:0,cp:0,bt:0}));let w=3.2;
-const aiY=p=>{const nx=el.find(e=>e.t!=3&&e.x+e.w>p.x+30);if(!nx||nx.x-p.x>320)return 120;const cs=el.filter(e=>e.t!=3&&Math.abs(e.x-nx.x)<4),ok=[36,70,109,150,204].filter(y=>cs.every(e=>y+PR+6<e.y||y-PR-6>e.y+e.h));return ok.length?ok.reduce((a,y)=>Math.abs(y-p.y)<Math.abs(a-p.y)?y:a,ok[0]):120};
+/* Bot: wählt eine freie Bahn (y) vor sich, meidet Eisblöcke/Löcher mit Sicherheitsabstand, Schnee nur im Notfall, Boost-Pads gern */
+/* Neustart nach dem Sturz: nie mitten in ein Eisloch oder in einen Block setzen (sonst Endlos-Sturz) */
+const safeSpot=x0=>{for(let dx=0;dx<600;dx+=20)for(const y of [120,80,160,50,190,100,140]){const x=x0+dx;
+if(!el.some(e=>(e.t==0||e.t==1)&&x+PR+12>e.x&&x-PR-12<e.x+e.w&&y+PR+12>e.y&&y-PR-12<e.y+e.h))return[x,y]}return[x0,120]};
+const aiY=p=>{const look=260+Math.max(0,p.vx)*.9;let best=120,bc=1e18;
+for(let y=40;y<=202;y+=6){let c0=Math.abs(y-p.y)*.25;
+for(const e of el){if(e.x+e.w<p.x-PR-4||e.x>p.x+look)continue;const dx=Math.max(0,e.x-p.x),f=1/Math.pow(1+dx/150,2),m=e.t==1?-6+6*f:PR+6+8*f;
+if(y+m>e.y&&y-m<e.y+e.h){if(e.t==0||e.t==1)c0+=1e5*f;else if(e.t==2)c0+=60*f;else c0-=25*f}}
+if(y<22+PR+6||y>218-PR-6)c0+=40;if(c0<bc){bc=c0;best=y}}
+return best};
 const lane=i=>{const p=P[i],cx=p.x-250;c.save();c.translate(0,i*240);c.beginPath();c.rect(0,0,W,240);c.clip();
 const g=c.createLinearGradient(0,0,0,240);g.addColorStop(0,'#dbeafe');g.addColorStop(1,'#bfdbfe');c.fillStyle=g;c.fillRect(0,0,W,240);
 c.strokeStyle='#ffffff99';c.lineWidth=2;for(let k=-1;k<14;k++){const x=k*70-((cx%70)+70)%70;c.beginPath();c.moveTo(x,22);c.lineTo(x+30,218);c.stroke()}
@@ -1996,9 +2032,12 @@ if(p.bt>0){c.strokeStyle='#fb923c';c.lineWidth=3;for(let j=-1;j<2;j++){c.beginPa
 c.save();c.translate(sx,p.y);c.scale(k,k);c.rotate(p.fl>0?(.9-p.fl)*6:0);c.fillStyle='#0003';c.beginPath();c.ellipse(3,6,PR,PR*.55,0,0,7);c.fill();circ(0,0,PR,i?R:B);circ(3,2,PR*.62,'#fff');circ(5,-4,3,'#111');circ(6,-5,1,'#fff');c.fillStyle='#fb923c';c.beginPath();c.moveTo(PR-2,0);c.lineTo(PR+7,3);c.lineTo(PR-2,6);c.fill();c.restore();
 c.font='bold 16px system-ui';c.textAlign='left';c.fillStyle=i?R:B;c.fillText(i?n2():n1,12,40);c.fillStyle='#1e3a8a';c.fillText(Math.round(Math.hypot(p.vx,p.vy)/3.3)+' km/h',12,236);c.textAlign='center';c.restore()};
 return{update(dt){if(w>0){w-=dt;return}
-P.forEach((p,i)=>{if(p.fl>0){p.fl-=dt;if(p.fl<=0){p.x=CPS[p.cp]+80;p.y=120;p.vx=p.vy=0}return}
+P.forEach((p,i)=>{if(p.fl>0){if(p.fl>.89&&i){p.ff=(p.ff||0)+1;p.fx=p.x}p.fl-=dt;if(p.fl<=0){let sx=CPS[p.cp]+80;if(i&&S.cpu&&(p.ff||0)>=3){sx=Math.max(sx,p.fx+110);p.ff=0}/* Bot hängt an einer Stelle fest: ein Stück hinter die Gefahr setzen */const q=safeSpot(sx);p.x=q[0];p.y=q[1];p.vx=p.vy=0}return}
 let ix=0,iy=0;
-if(i&&S.cpu){const q=LV([.6,.85,1]);ix=p.vx<310*q?1:0;iy=cl((aiY(p)+Math.sin(now()/500)*LV([35,12,2])-p.y)/25,-1,1)}
+if(i&&S.cpu){const q=LV([.6,.85,1]);ix=p.vx<310*q*Math.max(.3,1-.22*(p.ff||0))?1:0;const ty=aiY(p);iy=cl((ty+Math.sin(now()/500)*LV([14,6,0])-p.y)*.045-p.vy*.02,-1,1);
+/* Zu knapp zum Ausweichen? Dann rechtzeitig bremsen statt ins Loch/gegen den Block zu rutschen */
+let bd=null;for(const e of el){if((e.t!=0&&e.t!=1)||e.x+e.w<p.x||e.x-p.x>420)continue;if(p.y>e.y-PR-6&&p.y<e.y+e.h+PR+6)bd=bd==null?e.x-p.x:Math.min(bd,e.x-p.x)}
+if(bd!=null&&p.vx>70){const t=Math.max(.05,(bd-PR)/p.vx),reach=150*t*t+Math.abs(p.vy)*t*.3;if(Math.abs(ty-p.y)>reach*.85)ix=-1}}
 else{ix=kx(i);iy=ky(i);for(const id in PT){const o=PT[id];if(!S.cpu&&(o.y0>=240?1:0)!=i)continue;const dx=o.x-o.x0,dy=o.y-o.y0,l=Math.hypot(dx,dy);if(l>10){const k=Math.min(1,l/55);ix+=dx/l*k;iy+=dy/l*k}}ix=cl(ix,-1,1);iy=cl(iy,-1,1)}
 let fr=.9;for(const e of el)if(e.t==2&&p.x>e.x-PR&&p.x<e.x+e.w+PR&&p.y>e.y-PR&&p.y<e.y+e.h+PR)fr=4.2;
 p.vx+=ix*(ix>0?300:450)*dt;p.vy+=iy*300*dt;const f=Math.exp(-fr*dt);p.vx*=f;p.vy*=f;p.x+=p.vx*dt;p.y+=p.vy*dt;
@@ -2007,7 +2046,7 @@ for(const e of el){if(Math.abs(e.x-p.x)>200)continue;
 if(e.t==0){const cx=cl(p.x,e.x,e.x+e.w),cy=cl(p.y,e.y,e.y+e.h),dx=p.x-cx,dy=p.y-cy,d=Math.hypot(dx,dy);if(d<PR){const nx=d?dx/d:-1,ny=d?dy/d:0;p.x=cx+nx*PR;p.y=cy+ny*PR;const vr=p.vx*nx+p.vy*ny;if(vr<0){p.vx-=1.5*vr*nx;p.vy-=1.5*vr*ny;snd(220,.05)}}}
 else if(e.t==1){if(p.x>e.x+10&&p.x<e.x+e.w-10&&p.y>e.y+10&&p.y<e.y+e.h-10){p.fl=.9;snd(120,.4,'sawtooth')}}
 else if(e.t==3&&p.x>e.x&&p.x<e.x+e.w&&p.y>e.y&&p.y<e.y+e.h&&!(p.bt>0)){p.vx+=350;p.bt=.5;snd(900,.1)}}
-if(p.bt>0)p.bt-=dt;while(p.cp<3&&p.x>CPS[p.cp+1]){p.cp++;snd(700,.08)}
+if(p.bt>0)p.bt-=dt;while(p.cp<3&&p.x>CPS[p.cp+1]){p.cp++;p.ff=0;snd(700,.08)}
 if(p.x>=LS&&!over)fin(i+1)})},
 draw(){lane(0);lane(1);c.fillStyle='#1e293b';c.fillRect(0,238,W,4);
 if(w>0){c.font='bold 90px system-ui';c.fillStyle='#fff';gl('#1e3a8a',14);c.fillText(Math.ceil(w),W/2,H/2+30);ng()}
@@ -2221,11 +2260,8 @@ function luMoves(st,s,d){
     else{const o=occ[luAbs(s,to)];if(o){if(o[0]==s)continue;cap=o}}
     out.push({p,from:q,to,cap})
   }
-  if(pw.some(q=>q<0)){
-    const a=out.filter(m=>m.from==0);if(pw.includes(0)&&a.length)return a;
-    if(d==6){const b=out.filter(m=>m.from<0);if(b.length)return b}
-  }
-  if(st.cfg.force){const k=out.filter(m=>m.cap);if(k.length)return k}
+  /* Freie Wahl: bei einer 6 rauskommen ODER ziehen, Schlagen ist freiwillig, das Startfeld muss nicht freigemacht werden.
+     Rauskommen geht nur, wenn dort keine eigene Figur steht (oben bereits ausgeschlossen). */
   return out
 }
 function luNew(sp,nm,cfg){
@@ -2234,6 +2270,8 @@ function luNew(sp,nm,cfg){
   st.msg=st.nm[st.t]+' beginnt';return st
 }
 function luPick(st,s,mv){
+  const caps=mv.filter(m=>m.cap);
+  if(caps.length){if(Math.random()<.75)mv=caps;else if(caps.length<mv.length)mv=mv.filter(m=>!m.cap)}
   const d=st.cfg.d;if(d==0&&Math.random()<.3)return mv[Math.random()*mv.length|0];
   const noise=[40,14,3][d];
   const danger=a=>{let n=0;for(let o=0;o<4;o++){if(o==s||st.sp[o]=='x')continue;for(const q of st.pw[o])if(q>=0&&q<40){const dd=(a-luAbs(o,q)+40)%40;if(dd>=1&&dd<=6)n++}}return n};
@@ -2272,10 +2310,10 @@ function luHostMake(st,emit){
     const s=st.t,d=1+(Math.random()*6|0);st.d=d;
     const mv=luMoves(st,s,d);st.lg=mv.map(m=>m.p);
     if(!mv.length){
-      st.tr--;st.ph='anim';st.msg=nm(s)+' würfelt eine '+d+' – kein Zug möglich';out({k:'roll',s,d,none:1});
+      st.tr--;st.ph='anim';st.msg='Kein Zug möglich';out({k:'roll',s,d,none:1});
       later(()=>{if(st.tr>0){st.ph='roll';st.msg=nm(s)+' würfelt nochmal ('+st.tr+(st.tr==1?' Versuch':' Versuche')+' übrig)'}else advance();out();prompt()},1700);
     }else{
-      st.ph='move';st.msg=nm(s)+' würfelt eine '+d+(mv.length>1?' – wähle eine Figur':'');out({k:'roll',s,d});
+      st.ph='move';st.msg=mv.length>1?'Wähle eine Figur':'';out({k:'roll',s,d});
       if(mv.length==1)later(()=>move(mv[0].p),1400);
       else if(st.sp[s]=='c')later(()=>move(luPick(st,s,mv).p),1500)
     }
@@ -2376,7 +2414,6 @@ function luMk(){
     const rows=[0,1,2,3].map(s=>`<div class=lurow><i style="background:${LU.COL[s]}"></i><b>${LU.NAME[s]}</b><div class=seg>${sg('seat',s,[['h','Mensch'],['c','Computer'],['x','Aus']],L.sp[s])}</div></div>`).join('');
     return`<div class=luwrap><h2>Mensch ärgere dich nicht</h2><div class=lusetup>${rows}
 <div class=lurow><b>Computer</b><div class=seg>${sg('diff',null,[[0,'Einfach'],[1,'Normal'],[2,'Schwer'],[3,'Adaptiv']],S.d)}</div></div>
-<div class=lurow><b>Schlagzwang</b><div class=seg>${sg('force',null,[[1,'An'],[0,'Aus']],L.force)}</div></div>
 <div class=lurow><b>Ende</b><div class=seg>${sg('all',null,[[1,'Alle platzieren'],[0,'Erster gewinnt']],L.all)}</div></div></div>
 <div><button class=btn data-lu=go>Spiel starten</button></div>
 <div class=luon><b>🌐 Online</b><button class=btn data-lu=create>Raum erstellen</button><input id=lucode maxlength=5 placeholder="CODE" autocomplete=off autocapitalize=characters><button class="btn r" data-lu=join>Beitreten</button></div>
@@ -2698,7 +2735,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
 }
 
 GAMES.push({id:'ludo',n:'Mensch ärgere dich nicht',ic:'\ud83c\udfb2',d:'Würfeln, ziehen, rauswerfen: 2–4 Spieler, auch online.',cat:'Geschick',h:'Würfeln und mit allen vier Figuren ins Ziel kommen',sub:'2–4 Spieler · Computer · Online',mk:luMk});
-RULES.ludo='Jeder hat vier Figuren. Mit einer 6 kommt eine Figur aufs Startfeld; nach jeder 6 würfelst du nochmal. Ohne Figur auf dem Feld hast du drei Versuche. Wer auf ein besetztes Feld zieht, schmeißt die Figur raus (Schlagzwang). Das eigene Startfeld muss freigemacht werden. Im Zielhaus wird nicht gesprungen, du brauchst die genaue Augenzahl. Wer zuerst alle vier Figuren im Ziel hat, gewinnt.';
+RULES.ludo='Jeder hat vier Figuren. Mit einer 6 kommt eine Figur aufs Startfeld; nach jeder 6 würfelst du nochmal. Ohne Figur auf dem Feld hast du drei Versuche. Wer auf ein besetztes Feld zieht, schmeißt die Figur raus – das ist freiwillig, du darfst den anderen auch verschonen (Computer schlagen meistens). Bei einer 6 darfst du wählen: rauskommen oder mit einer Figur ziehen. Rauskommen geht nicht, solange eine eigene Figur auf dem Startfeld steht. Im Zielhaus wird nicht gesprungen, du brauchst die genaue Augenzahl. Wer zuerst alle vier Figuren im Ziel hat, gewinnt.';
 GAMES.forEach(g=>{const m=NM[g.id];if(m){g.n=m[0];g.d=m[1]}g.ic=ICON[g.id]||g.ic});
 const revised={
   snakes:{n:'Snake Garden',d:'Wischen, Äpfel sammeln, immer länger werden.',solo:true,soloRules:'Eine Schlange, das ganze Feld: Sammle Äpfel für Punkte und wachse. Jede Schwierigkeit hat einen eigenen Highscore. Wände und dein eigener Körper beenden die Runde. Wische in die gewünschte Richtung; eine direkte Kehrtwende ist nicht möglich.',h:'Wischen: direkt in die gewünschte Richtung · Spieler 1: WASD, Spieler 2: Pfeile · Solo: ganzes Feld und beide Tastensätze'},
@@ -2733,7 +2770,10 @@ else b=ON?'<button class=btn data-a=again>Revanche</button>':'<button class=btn 
 setTimeout(()=>{if(!over)return;showOv(h+'<div>'+b+(cup&&!ON?' <button class="btn r" id=ce>Cup beenden</button>':' <button class="btn r" id=mn'+(ON?' data-a=leave>Beenden':'>Menü')+'</button>')+'</div>');bd('nx',()=>start(cupNext()));$('#ov').querySelectorAll('[data-cg]').forEach(x=>x.onclick=()=>{cup.last=x.dataset.cg;start(x.dataset.cg)});bd('ce',cupEnd);bd('ag',()=>start(gdef.id,1));bd('mn',toMenu)},900)
 }
 function cupEnd(){const a=cup.w;showOv(`<div class=kick>Cup beendet</div><h2>${a[0]==a[1]?'Unentschieden':(a[0]>a[1]?n1:n2())+' gewinnt den Cup!'}</h2><p style='font-size:44px;font-weight:800'><span style='color:${B}'>${a[0]}</span> : <span style='color:${R}'>${a[1]}</span></p><p style='opacity:.8'>${cup.i} ${cup.i==1?'Spiel':'Spiele'} gespielt</p><div><button class=btn id=nc>Neuer Cup</button> <button class="btn r" id=mn>Menü</button></div>`);bd('nc',()=>{cup=newCup(cup.pool,S.t);start(cupNext())});bd('mn',toMenu)}
-function toMenu(){clearInput();if(ON&&ON.leave){ON.leave();return}fsOff();if(cur&&cur.leave)cur.leave();cur=null;TBw=9;pageTurn(9);setView(1);cup=null;$('#game').style.display='none';$('#menu').style.display='block';menu()}
+/* Scrollposition der Spielliste merken, damit man nach dem Spiel wieder dort landet, wo man hineingegangen ist */
+let MENUY=0;
+addEventListener('scroll',()=>{const m=document.getElementById('menu'),g=document.getElementById('game');if(!document.body.classList.contains('playing')&&m&&m.style.display!='none'&&(!g||g.style.display=='none'))MENUY=window.scrollY||0},{passive:true});
+function toMenu(){clearInput();if(ON&&ON.leave){ON.leave();return}fsOff();if(cur&&cur.leave)cur.leave();cur=null;TBw=9;pageTurn(9);setView(1);cup=null;$('#game').style.display='none';$('#menu').style.display='block';menu();const y=MENUY,go=()=>{try{window.scrollTo(0,y)}catch(e){}};go();requestAnimationFrame(go);setTimeout(go,120)}
 const sel=new Set(GAMES.map(g=>g.id));sel.delete('ludo');S.lu=S.lu||{sp:['h','c','c','c'],force:1,all:1};
 function seg(id,key,o,cb){const el=$('#'+id);el.innerHTML='';o.forEach(([v,l])=>{const b=document.createElement('button');b.textContent=l;b.className=S[key]==v?'on':'';b.onclick=()=>{S[key]=v;save();(cb||menu)()};el.append(b)})}
 function menu(){tabs();seg('sm','cpu',[[0,'2 Spieler'],[1,'Gegen Computer'],[2,'Solo']]);seg('sd','d',[[0,'Einfach'],[1,'Normal'],[2,'Schwer'],[3,'Adaptiv']]);seg('st','t',[[3,'Ziel 3'],[5,'Ziel 5'],[7,'Ziel 7']]);
@@ -2803,6 +2843,7 @@ function spSet(){
   +spRow('Effekte','Partikel, Wackeln, Leuchten und Animationen.','anim',[[0,'Aus'],[1,'An']],['#9a9384','#2fa84f'])
   +spRow('Ton','Soundeffekte im Spiel.','snd',[[0,'Aus'],[1,'An']],['#9a9384','#2fa84f'])
   +`<div class=spr><div class=spl><b>Vollbild</b><small>Nicht auf allen Geräten verfügbar (z. B. iPhone).</small></div>${spTrack('fs',full?1:0,['#9a9384','#2fa84f'],[['Aus','data-fs=0'],['An','data-fs=1']],'Vollbild')}</div>`
+  +spRow('Spielansicht','Auto: Handy/Tablet füllen den Bildschirm und sperren Scrollen/Zoomen, am PC Vollbild. „Anpassen“ erzwingt Bildschirmfüllung mit Sperre, „Vollbild“ den Browser-Vollbildmodus.','vm',[['auto','Auto'],['fit','Anpassen'],['full','Vollbild']],['#8a5cd0','#2c8c7e','#3a7bd5'])
   +`<div class=spg>Ping Pong &amp; Air Hockey</div>`
   +spRow('Ausrichtung','Spielfeld quer oder hochkant.','ori',[['l','Quer'],['p','Hochkant']],['#2c8c7e','#3a7bd5'])
   +spRow('Meine Seite','Gilt gegen den Computer.','side',[[0,por?'Unten':'Links'],[1,por?'Oben':'Rechts']],['#3a7bd5','#e0533d'])
