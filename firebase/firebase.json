@@ -1,0 +1,4 @@
+{
+  "functions": [{"source": "functions", "codebase": "account-tools"}],
+  "database": {"rules": "database.rules.json"}
+}
