@@ -2810,7 +2810,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
 GAMES.push({id:'ludo',n:'Mensch ärgere dich nicht',ic:'\ud83c\udfb2',d:'Würfeln, ziehen, rauswerfen: 2–4 Spieler, auch online.',cat:'Geschick',h:'Würfeln und mit allen vier Figuren ins Ziel kommen',sub:'2–4 Spieler · Computer · Online',mk:luMk});
 RULES.ludo='Jeder hat vier Figuren. Mit einer 6 kommt eine Figur aufs Startfeld; nach jeder 6 würfelst du nochmal. Ohne Figur auf dem Feld hast du drei Versuche. Wer auf ein besetztes Feld zieht, schmeißt die Figur raus – das ist freiwillig, du darfst den anderen auch verschonen (Computer schlagen meistens). Bei einer 6 darfst du wählen: rauskommen oder mit einer Figur ziehen. Rauskommen geht nicht, solange eine eigene Figur auf dem Startfeld steht. Im Zielhaus wird nicht gesprungen, du brauchst die genaue Augenzahl. Wer zuerst alle vier Figuren im Ziel hat, gewinnt.';
 ICON.maumau=GI(`<rect x="6" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(-12 16 24)"/><rect x="20" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(10 30 24)"/><path d="M31 17c-3-4-8 0-5 5l5 5 5-5c3-5-2-9-5-5z" fill="${Rd}" stroke="none" transform="rotate(10 30 24)"/>`);
-NM.maumau=['Mau-Mau','Das Kartenspiel für 2–4 Spieler, auch online.'];
+NM.maumau=['Mau-Mau','Das Kartenspiel für 2–10 Spieler, auch online.'];
 const ROOMG=['ludo','maumau'];
 /* ===== Karten-Bibliothek (für alle Kartenspiele) =====
    Karte = Zahl 0..51: Farbe = id/13 (0 Pik, 1 Herz, 2 Karo, 3 Kreuz), Rang = id%13 (0 = 2 ... 8 = 10, 9 = Bube, 10 = Dame, 11 = König, 12 = Ass).
@@ -2843,8 +2843,68 @@ function cdSprite(id){
     idx();g.save();g.translate(W,H);g.rotate(Math.PI);idx();g.restore();
     if(r==12)cdSuit(g,s,W/2,H/2+1,58);
     else if(r>=9){
-      g.strokeStyle=col;g.globalAlpha=.22;g.lineWidth=1.4;g.beginPath();g.roundRect(26,33,W-52,H-66,8);g.stroke();g.globalAlpha=1;
-      g.font='600 46px ui-serif,Georgia,"Times New Roman",serif';g.fillText(rk,W/2,H/2+8);cdSuit(g,s,W/2,H/2+27,18);cdSuit(g,s,W/2,H/2-27,18)
+      /* Bildkarte: Büste im Rahmen (Flat-Design). Figur wird am Rahmen abgeschnitten, oben steht die Kartenfarbe – nichts berührt den Eckindex */
+      const GOLD='#e2ac35',GD='#b9801a',CR='#fcfbf8',SK='#f6dfc7',INK='#2a2f3a';
+      g.save();
+      g.fillStyle=col;g.globalAlpha=.07;g.beginPath();g.roundRect(26,24,48,92,8);g.fill();g.globalAlpha=1;
+      g.beginPath();g.roundRect(26,24,48,92,8);g.clip();
+      const P=(d,f)=>{g.fillStyle=f;g.fill(new Path2D(d))};
+      const hairC=r==11?'#e8e4da':r==10?'#6b4430':'#4a3426';
+      /* Haare hinten (Dame) */
+      if(r==10)P('M38 66C36 80 37 93 42 98L58 98C63 93 64 80 62 66C60 55 40 55 38 66Z',hairC);
+      /* Schultern / Gewand */
+      P('M22 122L25 102C28 92 38 87 50 87C62 87 72 92 75 102L78 122Z',col);
+      g.fillStyle='#000';g.globalAlpha=.14;g.beginPath();g.moveTo(50,87);g.bezierCurveTo(62,87,72,92,75,102);g.lineTo(78,122);g.lineTo(50,122);g.closePath();g.fill();g.globalAlpha=1;
+      /* Hals */
+      P('M45 78H55V90C55 93 45 93 45 90Z','#e9c9ab');
+      if(r==11){ /* Hermelinkragen */
+        P('M27 101C32 91 41 88 50 91C59 88 68 91 73 101C66 98 58 99 50 102C42 99 34 98 27 101Z',CR);
+        [[35,97],[43,96],[57,96],[65,97]].forEach(([x,y])=>P('M'+(x-1.2)+' '+y+'l1.2 4l1.2-4Z',INK));
+        P('M47 102h6v20h-6Z',GOLD);
+      }else if(r==10){ /* Kragen + Kette */
+        P('M30 104C35 93 43 89 50 95C57 89 65 93 70 104C62 99 56 100 50 106C44 100 38 99 30 104Z',CR);
+        g.strokeStyle=GOLD;g.lineWidth=1.6;g.beginPath();g.moveTo(40,95);g.quadraticCurveTo(50,108,60,95);g.stroke();
+        g.fillStyle=GOLD;g.beginPath();g.arc(50,104.5,2.4,0,7);g.fill();
+      }else{ /* Kragen + Knöpfe */
+        P('M40 88L50 101L60 88L56 86L50 93L44 86Z',CR);
+        [106,112].forEach(y=>{g.fillStyle=GOLD;g.beginPath();g.arc(50,y,1.7,0,7);g.fill()});
+      }
+      /* Gesicht */
+      g.fillStyle=SK;g.beginPath();g.ellipse(50,70,9.6,11.2,0,0,7);g.fill();
+      /* Haare vorn / Bart */
+      if(r==11){
+        P('M40.4 64C38.6 70 39.6 75 41 77L42.6 66Z',hairC);P('M59.6 64C61.4 70 60.4 75 59 77L57.4 66Z',hairC);
+        P('M41 72C41 84 46 89 50 89C54 89 59 84 59 72C57.4 77 54 78.4 50 78.4C46 78.4 42.6 77 41 72Z',hairC);
+        P('M44.4 74.6Q50 71.6 55.6 74.6Q50 77.4 44.4 74.6Z',hairC);
+      }else if(r==10){
+        P('M39.6 66C41 57 59 57 60.4 66C56 61.4 46 61.4 39.6 66Z',hairC);
+      }else{
+        P('M40.4 64C38.8 69 40 73 41.4 75L42.6 66Z',hairC);P('M59.6 64C61.2 69 60 73 58.6 75L57.4 66Z',hairC);
+      }
+      /* Augen, Mund */
+      g.fillStyle=INK;[[45.6,69.6],[54.4,69.6]].forEach(([x,y])=>{g.beginPath();g.arc(x,y,1.1,0,7);g.fill()});
+      g.strokeStyle=r==11?'#b9805f':'#c4685a';g.lineWidth=1.1;g.lineCap='round';
+      if(r!=11){g.beginPath();g.moveTo(47.6,76.2);g.quadraticCurveTo(50,78,52.4,76.2);g.stroke()}
+      g.strokeStyle='#d9b79a';g.lineWidth=1;g.beginPath();g.moveTo(50,70.5);g.lineTo(49.2,73.6);g.lineTo(50.6,73.8);g.stroke();
+      /* Kopfschmuck */
+      if(r==11){
+        P('M39 63L37.6 46L44.4 53.6L50 43L55.6 53.6L62.4 46L61 63Z',GOLD);
+        P('M39 58.5H61L61.2 63H38.8Z',GD);
+        [[37.6,45.4],[50,42.4],[62.4,45.4]].forEach(([x,y])=>{g.fillStyle=GOLD;g.beginPath();g.arc(x,y,1.7,0,7);g.fill()});
+        g.fillStyle=CR;g.beginPath();g.arc(50,60.8,1.6,0,7);g.fill();
+      }else if(r==10){
+        P('M42 60L43 51L46.6 56L50 47.6L53.4 56L57 51L58 60Z',GOLD);
+        P('M42 57.4H58L58.1 60H41.9Z',GD);
+        g.fillStyle=CR;g.beginPath();g.arc(50,55,1.5,0,7);g.fill();
+      }else{
+        P('M37.4 64C35 52 43 45.6 53 46.4C62 47 65.6 54 62.4 61.6C57 57.6 46 58.4 37.4 64Z',col);
+        g.fillStyle='#000';g.globalAlpha=.16;g.beginPath();g.moveTo(37.4,64);g.bezierCurveTo(46,58.4,57,57.6,62.4,61.6);g.bezierCurveTo(63,59,62,56,60,54);g.bezierCurveTo(56,58,46,58,37.4,64);g.fill();g.globalAlpha=1;
+        g.strokeStyle=GOLD;g.lineWidth=2.8;g.lineCap='round';g.beginPath();g.moveTo(57,50.6);g.bezierCurveTo(63,43,70.4,46,70.6,54.6);g.stroke();
+        g.strokeStyle=GD;g.lineWidth=.9;g.beginPath();g.moveTo(58,49.8);g.bezierCurveTo(63.6,44.2,69,46.6,69.4,53.6);g.stroke();
+      }
+      g.restore();
+      g.strokeStyle=col;g.globalAlpha=.32;g.lineWidth=1.2;g.beginPath();g.roundRect(26,24,48,92,8);g.stroke();g.globalAlpha=1;
+      g.fillStyle=col;cdSuit(g,s,50,35.5,11);
     }else cdSuit(g,s,W/2,H/2+1,r>=6?46:42);
   }
   return cdCache[id]=k
@@ -2857,10 +2917,12 @@ function drawCard(x,y,w,id,o){o=o||{};const h=w*1.4,rd=w*.09;c.save();c.translat
   if(o.hl){c.strokeStyle=o.hl;c.lineWidth=3;c.beginPath();c.roundRect(-w/2,-h/2,w,h,rd);c.stroke()}
   c.restore()}
 
-/* ===== Mau-Mau: 2–4 Spieler, lokal gegen Computer oder online (Host berechnet, Hände bleiben privat) =====
-   Skat-Blatt (7 bis Ass). 7 = nächster zieht 2 (weitergeben mit einer 7), 8 = nächster setzt aus, Bube = Farbe wünschen (nicht auf Bube, nicht als letzte Karte), Ass = nochmal. */
+/* ===== Mau-Mau: 2–10 Spieler, lokal gegen Computer oder online (Host berechnet, Hände bleiben privat) =====
+   Skat-Blatt (7 bis Ass). 7 = nächster zieht 2 (weitergeben mit einer 7), 8 = nächster setzt aus, Bube = Farbe wünschen (nicht auf Bube, nicht als letzte Karte), Ass = normale Karte. */
+const MMN=10,MMS=[0,1,2,3,4,5,6,7,8,9],MMC=['#e0533d','#3a7bd5','#3f9b4f','#f2c94c','#9b59b6','#e67e22','#16a5a5','#e75480','#8d6e63','#7f8c8d'];
+const mmSeats=room=>MMS.map(i=>(room&&room.seats&&room.seats[i])||{k:'off'});
 const mmShuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
-const mmDeck=()=>{const d=[];for(let s=0;s<4;s++)for(let r=5;r<=12;r++)d.push(s*13+r);return mmShuf(d)};
+const mmDeck=k=>{const d=[];for(let q=0;q<k;q++)for(let s=0;s<4;s++)for(let r=5;r<=12;r++)d.push(s*13+r);return mmShuf(d)};
 /* Darf Karte c auf den Stapel? st = öffentlicher Zustand (top, suit, pend, dr), hand = Hand des Spielers, drc = soeben gezogene Karte */
 function mmOK(st,hand,c,drc){
   const r=cdR(c),s=cdS(c);
@@ -2871,12 +2933,12 @@ function mmOK(st,hand,c,drc){
   return s==st.suit||r==cdR(st.top)
 }
 function mmNew(sp,nm,cfg,seq0,rn){
-  const deck=mmDeck(),H=[[],[],[],[]],act=[0,1,2,3].filter(s=>sp[s]!='x');
+  const act=MMS.filter(s=>sp[s]!='x'),nd=act.length<=4?1:act.length<=7?2:3,deck=mmDeck(nd),H=MMS.map(()=>[]);
   for(let k=0;k<5;k++)for(const s of act)H[s].push(deck.pop());
   let top;const skip=[];
   for(;;){top=deck.pop();const r=cdR(top);if(r==7||r==8||r==10||r==11)break;skip.push(top)}
   deck.unshift(...skip);
-  const st={seq:seq0|0,rn:rn|0,sp:sp.slice(),nm:nm.slice(),hu:sp.map(x=>x=='h'||x=='o'?1:0),n:H.map(h=>h.length),t:act[Math.random()*act.length|0],top,suit:cdS(top),pend:0,dr:0,mau:[0,0,0,0],dk:deck.length,dcn:0,ph:'play',msg:'',rk:[],rm:[0,0,0,0],cfg:{d:cfg.d|0,mau:cfg.mau?1:0}};
+  const st={seq:seq0|0,rn:rn|0,sp:sp.slice(),nm:nm.slice(),hu:sp.map(x=>x=='h'||x=='o'?1:0),n:H.map(h=>h.length),t:act[Math.random()*act.length|0],top,suit:cdS(top),pend:0,dr:0,nd,mau:MMS.map(()=>0),dk:deck.length,dcn:0,ph:'play',msg:'',rk:[],rm:MMS.map(()=>0),cfg:{d:cfg.d|0,mau:cfg.mau?1:0}};
   st.msg=st.nm[st.t]+' beginnt';
   return{st,H,deck,disc:[]}
 }
@@ -2886,11 +2948,11 @@ function mmHostMake(G,emit,hooks){
   const later=(f,ms)=>{clearTimeout(tm);tm=setTimeout(()=>{if(!stopped)f()},ms)};
   const out=ev=>{
     st.n=H.map(h=>h.length);st.dk=deck.length;st.dcn=disc.length;
-    for(let s=0;s<4;s++)if(H[s].length>=3||!H[s].length)st.mau[s]=0;
+    for(let s=0;s<MMN;s++)if(H[s].length>=3||!H[s].length)st.mau[s]=0;
     st.seq++;emit(JSON.parse(JSON.stringify(st)),ev||null)
   };
   const nm=s=>st.nm[s];
-  const nextOf=s=>{let n=s;for(let i=0;i<4;i++){n=(n+1)%4;if(st.sp[n]!='x')return n}return s};
+  const nextOf=s=>{let n=s;for(let i=0;i<MMN;i++){n=(n+1)%MMN;if(st.sp[n]!='x')return n}return s};
   const drawN=(s,n)=>{let got=0;for(let i=0;i<n;i++){if(!deck.length&&disc.length){deck=mmShuf(disc);disc=[]}if(!deck.length)break;H[s].push(deck.pop());got++}return got};
   const ok=(s,c)=>mmOK(st,H[s],c,drc);
   const legalOf=s=>H[s].filter(c=>ok(s,c));
@@ -2905,7 +2967,6 @@ function mmHostMake(G,emit,hooks){
       if(hand.some(x=>x!==c&&cdR(x)==r))sc+=1.5;
       if(r==5)sc+=nn<=3?9:3;
       if(r==6)sc+=nn<=2?8:2;
-      if(r==12)sc+=5;
       if(r==9)sc+=hand.length<=3?2:-7;
       if(st.pend>0)sc+=50;
       if(sc>bs){bs=sc;best=c}
@@ -2915,7 +2976,6 @@ function mmHostMake(G,emit,hooks){
   function prompt(){
     if(stopped||st.ph!='play')return;const s=st.t;
     if(st.sp[s]=='c')later(()=>bot(s),650+Math.random()*750+(st.cfg.d==0?350:0));
-    else if(!st.dr&&st.pend>0&&!H[s].some(c=>cdR(c)==5))later(()=>{if(st.t==s&&st.ph=='play'&&!st.dr)draw(s)},1500);
     else if(st.sp[s]=='o')later(()=>bot(s),45000)
   }
   function bot(s){
@@ -2931,7 +2991,7 @@ function mmHostMake(G,emit,hooks){
     st.suit=r==9?(w>=0&&w<4?w:wishOf(s,c)):cdS(c);
     const pen=st.cfg.mau&&h.length==1&&!st.mau[s];
     st.dr=0;drc=-1;
-    const ev={k:'play',s,c,w:r==9?st.suit:-1};
+    const ev={k:'play',s,c,w:r==9?st.suit:-1,pe:r==5?st.pend+2:0};
     if(!h.length){win(s,ev);return}
     if(r==5)st.pend+=2;
     st.ph='anim';st.msg=nm(s)+' legt '+cdName(c)+(r==9?' und wünscht '+CD.SN[st.suit]:'');
@@ -2943,15 +3003,14 @@ function mmHostMake(G,emit,hooks){
   }
   function step(s,r){
     let t=nextOf(s),ev=null;
-    if(r==12){t=s;st.msg=nm(s)+' ist nochmal dran'}
-    else if(r==6){const sk=t;t=nextOf(sk);st.msg=nm(sk)+' setzt aus';ev={k:'skip',s:sk}}
+    if(r==6){const sk=t;t=nextOf(sk);st.msg=nm(sk)+' setzt aus';ev={k:'skip',s:sk}}
     else st.msg=nm(t)+(st.pend?': +'+st.pend+' ziehen oder eine 7 legen':' ist dran');
     st.t=t;st.ph='play';out(ev);prompt()
   }
   function draw(s){
     if(st.ph!='play'||st.t!=s||st.dr)return;
     if(st.pend>0){
-      const g=drawN(s,st.pend);st.pend=0;st.ph='anim';st.msg=nm(s)+' zieht '+g+' Karten';out({k:'draw',s,n:g});
+      const sv=st.pend/2,g=drawN(s,st.pend);st.pend=0;st.ph='anim';st.msg=nm(s)+' zieht '+g+' Karten';out({k:'draw',s,n:g,sv:sv});
       later(()=>endTurn(s),650+g*150);return
     }
     const g=drawN(s,1);
@@ -2963,13 +3022,13 @@ function mmHostMake(G,emit,hooks){
   function endTurn(s){st.dr=0;drc=-1;st.t=nextOf(s);st.ph='play';st.msg=nm(st.t)+(st.pend?': +'+st.pend+' ziehen oder eine 7 legen':' ist dran');out();prompt()}
   function win(s,ev){
     st.ph='end';
-    st.rk=[0,1,2,3].filter(x=>st.sp[x]!='x').sort((a,b)=>(a==s?-1:b==s?1:0)||H[a].length-H[b].length||a-b);
+    st.rk=MMS.filter(x=>st.sp[x]!='x').sort((a,b)=>(a==s?-1:b==s?1:0)||H[a].length-H[b].length||a-b);
     st.msg=nm(s)+' gewinnt!';
-    st.rm=[0,1,2,3].map(x=>st.hu[x]?(st.sp[x]=='c'?2:0):1);
+    st.rm=MMS.map(x=>st.hu[x]?(st.sp[x]=='c'?2:0):1);
     out(ev);
     if(hooks&&hooks.onRematch){rmT=setTimeout(()=>{if(!stopped)rmCheck(1)},25000);rmCheck()}
   }
-  const humans=()=>[0,1,2,3].filter(s=>st.hu[s]&&st.sp[s]!='x');
+  const humans=()=>MMS.filter(s=>st.hu[s]&&st.sp[s]!='x');
   function rmCheck(force){
     if(rmDone||!hooks||!hooks.onRematch)return;
     const hs=humans();
@@ -3002,13 +3061,13 @@ function mmHostMake(G,emit,hooks){
 }
 
 function mmMk(){
-  let st=null,mode='setup',host=null,my=0,myH=[],myDr=-1,ani=[],pile=[],dTop=0,endShown=0,rmSig='',lastTurn=-1,flash={},shake={},wishFor=-1,lastPlay=null,hsent={};
+  let ulS=0,ulV=0,ulBolts=[],ulBurst=[],ulP=[],ulShk=0,ulLast=0,st=null,mode='setup',host=null,my=0,myH=[],myDr=-1,ani=[],pile=[],dTop=0,endShown=0,rmSig='',lastTurn=-1,flash={},shake={},wishFor=-1,lastPlay=null,hsent={};
   const DXc=340,PXc=430,PYc=176,PW=78,HW=84,HY=352;
   const sortH=h=>h.slice().sort((a,b)=>a-b);
   const demo=()=>{
-    const G=mmNew(['h','c','c','c'],['Du','Computer 1','Computer 2','Computer 3'],{d:1,mau:1},0,0);
+    const G=mmNew(MMS.map((_,i)=>i<4?(i?'c':'h'):'x'),['Du','Computer 1','Computer 2','Computer 3',...MMS.slice(4).map(i=>'Platz '+(i+1))],{d:1,mau:1},0,0);
     while(G.H[0].length<7)G.H[0].push(G.deck.pop());
-    G.st.t=0;G.st.msg='Mau-Mau';myH=sortH(G.H[0]);myDr=-1;G.st.n=[7,5,4,6];
+    G.st.t=0;G.st.msg='Mau-Mau';myH=sortH(G.H[0]);myDr=-1;G.st.n=[7,5,4,6,0,0,0,0,0,0];
     pile=[{c:G.deck[0],rot:-.22,dx:-6,dy:4},{c:G.deck[1],rot:.17,dx:5,dy:-3},{c:G.st.top,rot:.04,dx:0,dy:0}];dTop=G.st.top;
     return G.st
   };
@@ -3016,32 +3075,40 @@ function mmMk(){
   const mine=s=>(mode=='local'||mode=='host'||mode=='guest')&&s==my;
   const myTurn=()=>!!st&&mine(st.t)&&st.ph=='play';
   const ok=c=>mmOK(st,myH,c,myDr);
-  const actSeats=()=>[0,1,2,3].filter(x=>st.sp[x]!='x');
+  const actSeats=()=>MMS.filter(x=>st.sp[x]!='x');
   /* Platz am Tisch: 0 unten (ich), 1 links, 2 oben, 3 rechts */
   const posOf=s=>{const a=actSeats(),n=a.length,i=a.indexOf(s),j=Math.max(0,a.indexOf(my));return({1:[0],2:[0,2],3:[0,1,3],4:[0,1,2,3]}[n]||[0,1,2,3])[(i-j+n)%n]};
   const handLay=h=>{const n=h.length,sp=n>1?Math.min(HW*.74,(724-HW)/(n-1)):0,x0=400-(sp*(n-1)+HW)/2;return h.map((c,i)=>({c,x:x0+i*sp,y:HY,w:HW,vis:i<n-1?sp:HW}))};
-  const ANCH=[[400,410],[36,235],[400,38],[764,235]];
-  const fan=(pos,n)=>{const w=40,o=[];if(pos==2){const sp=n>1?Math.min(w*.42,230/(n-1)):0;for(let i=0;i<n;i++)o.push({x:400-(n-1)*sp/2+i*sp,y:38,r:0,w})}
-    else{const sp=n>1?Math.min(w*.4,170/(n-1)):0;for(let i=0;i<n;i++)o.push({x:pos==1?36:764,y:235-(n-1)*sp/2+i*sp,r:pos==1?Math.PI/2:-Math.PI/2,w})}return o};
+  /* Gegner als Kacheln oben (1 oder 2 Reihen), passt für 1–9 Gegner */
+  const TILE_H=50;
+  function tiles(){
+    const opp=actSeats(),j=Math.max(0,opp.indexOf(my)),o=[];
+    for(let i=1;i<opp.length;i++)o.push(opp[(j+i)%opp.length]);
+    const k=o.length,rows=k>5?2:1,per=rows==2?Math.ceil(k/2):k,R={};
+    o.forEach((s,i)=>{const row=i<per?0:1,cnt=row==0?per:k-per,idx=row==0?i:i-per,w=Math.min(176,(780-(cnt-1)*8)/cnt);R[s]={x:400-(cnt*w+(cnt-1)*8)/2+idx*(w+8),y:6+row*(TILE_H+6),w,h:TILE_H}});
+    return R
+  }
+  const anchor=s=>{if(s==my)return[400,410];const t=tiles()[s];return t?[t.x+t.w/2,t.y+t.h/2]:[400,40]};
   /* ----- Zustand empfangen ----- */
   const syncMine=()=>{if(host){myH=sortH(host.hand(my));myDr=host.dr(my)}};
   function onSnap(snap,ev){
-    snap.rk=snap.rk||[];snap.rm=snap.rm||[0,0,0,0];
+    snap.rk=snap.rk||[];snap.rm=snap.rm||MMS.map(()=>0);
     const first=!st||mode=='setup'||!st.seq||st.rn!==snap.rn,jump=!!st&&snap.seq>st.seq+1;
     let from=null;
     if(ev&&ev.k=='play'&&ev.s==my&&!first&&!jump){const i=myH.indexOf(ev.c),L=handLay(myH);from=i>=0?L[i]:(lastPlay&&lastPlay.c==ev.c?lastPlay.p:null)}
     st=snap;syncMine();
-    if(first||jump){ani=[];dTop=st.top;pile=[{c:st.top,rot:rnd(-.12,.12),dx:0,dy:0}];flash={};wishFor=-1}
+    if(first||jump){ulS=ulV=st.pend/2;ulBolts=[];ulBurst=[];ulP=[];ani=[];dTop=st.top;pile=[{c:st.top,rot:rnd(-.12,.12),dx:0,dy:0}];flash={};wishFor=-1}
     else if(ev){
       const T=now();
       if(ev.k=='play'){
-        const pos=posOf(ev.s),a=fan(pos,Math.max(1,st.n[ev.s]+1)),mid=a[a.length>>1]||{x:ANCH[pos][0],y:ANCH[pos][1],w:40};
-        const sx=from?from.x+from.w/2:ev.s==my?400:mid.x,sy=from?from.y+from.w*.7:ev.s==my?420:mid.y,sw=from?from.w:ev.s==my?HW:mid.w*1.4,rot=ev.s==my?0:pos==1?Math.PI/2:pos==3?-Math.PI/2:0;
-        const e={k:'play',c:ev.c,x0:sx,y0:sy,w0:sw,x1:PXc,y1:PYc,w1:PW,r0:rot,r1:rnd(-.16,.16),t0:T,dur:430,done(){dTop=ev.c;pile.push({c:ev.c,rot:e.r1,dx:rnd(-4,4),dy:rnd(-3,3)});if(pile.length>5)pile.shift();snd(520+(ev.c%13)*8,.05,'triangle');if(ev.w>=0){flash.wish={t:now(),s:ev.w}}}};
+        const an=anchor(ev.s);
+        const sx=from?from.x+from.w/2:an[0],sy=from?from.y+from.w*.7:an[1],sw=from?from.w:ev.s==my?HW:30,rot=0;
+        const e={k:'play',c:ev.c,x0:sx,y0:sy,w0:sw,x1:PXc,y1:PYc,w1:PW,r0:rot,r1:rnd(-.16,.16),t0:T,dur:430,done(){dTop=ev.c;pile.push({c:ev.c,rot:e.r1,dx:rnd(-4,4),dy:rnd(-3,3)});if(pile.length>5)pile.shift();snd(520+(ev.c%13)*8,.05,'triangle');if(ev.w>=0){flash.wish={t:now(),s:ev.w}}if(ev.pe)ultiHit(ev.pe/2)}};
         ani.push(e)
       }else if(ev.k=='draw'){
-        const pos=posOf(ev.s);
-        for(let i=0;i<ev.n;i++)ani.push({k:'draw',c:-1,x0:DXc,y0:PYc,w0:PW,x1:ANCH[pos][0],y1:ANCH[pos][1],w1:pos==0?HW:40,r0:0,r1:pos==1?Math.PI/2:pos==3?-Math.PI/2:0,t0:T+i*130,dur:380,done(){snd(260,.03,'square')}});
+        const an=anchor(ev.s);
+        if(ev.sv)ultiPay(ev.sv,an,ev.n);
+        for(let i=0;i<Math.min(ev.n,6);i++)ani.push({k:'draw',c:-1,x0:DXc,y0:PYc,w0:PW,x1:an[0],y1:an[1],w1:ev.s==my?HW:30,r0:0,r1:0,t0:T+i*130,dur:380,done(){snd(260,.03,'square')}});
         if(ev.pen)flash[ev.s]={t:T,txt:'+2 Strafe'}
       }else if(ev.k=='mau'){flash[ev.s]={t:T,txt:'MAU!'};snd(660,.12,'triangle')}
       else if(ev.k=='skip'){flash[ev.s]={t:T,txt:'setzt aus'};snd(200,.12,'sawtooth')}
@@ -3050,8 +3117,8 @@ function mmMk(){
   }
   const hostEmit=(snap,ev)=>{pushHands(snap);onSnap(snap,ev);if(LUN.ref)LUN.ref.child('snap').set(JSON.stringify({snap,ev})).catch(e=>toast(luErr(e)))};
   function pushHands(snap){
-    if(mode!='host'||!LUN.ref||!host||!LUN.room)return;const seats=luSeatsOf(LUN.room);
-    for(let s=0;s<4;s++){
+    if(mode!='host'||!LUN.ref||!host||!LUN.room)return;const seats=mmSeats(LUN.room);
+    for(let s=0;s<MMN;s++){
       if(snap.sp[s]!='o')continue;const u=seats[s].uid;if(!u)continue;
       const str=JSON.stringify({h:host.hand(s),dr:host.dr(s)});
       if(hsent[u]!==str){hsent[u]=str;OL.db.ref('hands/'+LUN.code+'/'+u).set(str).catch(e=>toast(luErr(e)))}
@@ -3067,16 +3134,16 @@ function mmMk(){
   function setupHTML(){
     const M=S.mm,sg=(cls,arr,cur)=>arr.map(([v,l])=>`<button data-lu=${cls} data-v="${v}" class="${cur==v?'on':''}">${l}</button>`).join('');
     return`<div class=luwrap><h2>Mau-Mau</h2><div class=lusetup>
-<div class=lurow><b>Gegner</b><div class=seg>${sg('mn',[[1,'1 Computer'],[2,'2 Computer'],[3,'3 Computer']],M.n)}</div></div>
-<div class=lurow><b>Computer</b><div class=seg>${sg('diff',[[0,'Einfach'],[1,'Normal'],[2,'Schwer'],[3,'Adaptiv']],S.d)}</div></div>
+<div class=lurow><b>Computer-Gegner</b><div class=seg>${sg('mn',[1,2,3,4,5,6,7,8,9].map(v=>[v,v]),M.n)}</div></div>
+<div class=lurow><b>Stärke</b><div class=seg>${sg('diff',[[0,'Einfach'],[1,'Normal'],[2,'Schwer'],[3,'Adaptiv']],S.d)}</div></div>
 <div class=lurow><b>„Mau“ rufen</b><div class=seg>${sg('mauopt',[[1,'Pflicht'],[0,'Aus']],M.mau)}</div></div></div>
 <div><button class=btn data-lu=go>Spiel starten</button></div>
 <div class=luon><b>🌐 Online</b><button class=btn data-lu=create>Raum erstellen</button><input id=lucode maxlength=5 placeholder="CODE" autocomplete=off autocapitalize=characters><button class="btn r" data-lu=join>Beitreten</button></div>
-<p class=luhint>Passende Farbe oder Zahl legen. 7: nächster zieht 2 (mit einer 7 weitergeben) · 8: nächster setzt aus · Bube: Farbe wünschen · Ass: nochmal dran. Vor der vorletzten Karte „Mau“ rufen!</p></div>`
+<p class=luhint>Passende Farbe oder Zahl legen. 7: nächster zieht 2 (mit einer 7 weitergeben) · 8: nächster setzt aus · Bube: Farbe wünschen · Auf eine 7 musst du selbst ziehen, wenn du keine hast. Vor der vorletzten Karte „Mau“ rufen!</p></div>`
   }
   const showSetup=()=>{mode='setup';st=demo();ani=[];showOv(setupHTML())};
   function frHTML(room){
-    const seats=luSeatsOf(room||LUN.room),inRoom=seats.filter(x=>x.k=='p').map(x=>x.uid),fr=Object.keys(OL.F||{}).filter(u=>!inRoom.includes(u)&&olAllowed(u));
+    const seats=mmSeats(room||LUN.room),inRoom=seats.filter(x=>x.k=='p').map(x=>x.uid),fr=Object.keys(OL.F||{}).filter(u=>!inRoom.includes(u)&&olAllowed(u));
     if(!fr.length)return Object.keys(OL.F||{}).length?'<span class=luhint>Alle deine Freunde sind schon im Raum.</span>':'<span class=luhint>Noch keine Freunde. <button class=mini data-lu=frs>Freunde hinzufügen</button></span>';
     const st_=u=>!OL.P[u]?0:OL.P[u].g?1:2;
     return fr.sort((a,b)=>st_(b)-st_(a)||olNameOf(a).localeCompare(olNameOf(b))).map(u=>{
@@ -3098,16 +3165,16 @@ function mmMk(){
     }catch(e){toast(luErr(e))}
   }
   function lobbyHTML(room){
-    const seats=luSeatsOf(room),isHost=LUN.role=='host',L=room.cfg||{};
+    const seats=mmSeats(room),isHost=LUN.role=='host',L=room.cfg||{};
     const rows=seats.map((x,s)=>{
       let lab,ctl='';
       if(x.k=='p'){lab=luHtml(x.name||'Spieler')+(x.uid==room.host?' <small>(Host)</small>':'');if(isHost&&x.uid!=room.host)ctl=`<button class=mini data-lu=sk data-s=${s} data-v=open>Entfernen</button>`}
       else{lab=x.k=='open'?'<em>wartet auf Spieler …</em>':x.k=='cpu'?'Computer':'<span style="opacity:.5">Aus</span>';
         if(isHost&&s>0)ctl=`<div class=seg>${[['open','Offen'],['cpu','Computer'],['off','Aus']].map(([v,l])=>`<button data-lu=sk data-s=${s} data-v=${v} class="${x.k==v?'on':''}">${l}</button>`).join('')}</div>`}
-      return`<div class=lurow><i style="background:${LU.COL[s]}"></i><b>${lab}</b>${ctl}</div>`}).join('');
+      return`<div class=lurow><i style="background:${MMC[s]}"></i><b>${lab}</b>${ctl}</div>`}).join('');
     const nAct=seats.filter(x=>x.k=='p'||x.k=='cpu').length,nOpen=seats.filter(x=>x.k=='open').length;
     const ok=nAct>=2&&!nOpen;
-    return`<div class=luwrap><div class=kick>Mau-Mau · Online-Raum</div><div class=lucode>${LUN.code}</div><p class=luhint>${isHost?'Lade Freunde unten direkt ein – oder sie geben diesen Code unter „Beitreten“ ein.':'Freunde öffnen Mau-Mau, wählen „Beitreten“ und geben diesen Code ein.'}</p><div class=lusetup>${rows}</div>
+    return`<div class=luwrap><div class=kick>Mau-Mau · Online-Raum</div><div class=lucode>${LUN.code}</div><p class=luhint>${isHost?'Lade Freunde unten direkt ein – oder sie geben diesen Code unter „Beitreten“ ein.':'Freunde öffnen Mau-Mau, wählen „Beitreten“ und geben diesen Code ein.'}</p><div class=lusetup style="max-height:38vh;overflow:auto">${rows}</div>
 <p class=luhint>Computer: ${diffTxt[L.d|0]||'Normal'} · „Mau“ rufen: ${L.mau?'Pflicht':'aus'}</p>
 ${isHost&&nOpen?`<div class=lufrw><b>Freunde einladen</b><div id=lufr>${frHTML(room)}</div></div>`:''}
 ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten</button></div><p class=luhint>${ok?'Alle Plätze sind belegt.':nOpen?'Offene Plätze auf „Computer“ oder „Aus“ stellen, sobald niemand mehr kommt.':'Mindestens 2 Spieler nötig.'}</p>`:'<p class=luhint>Warte auf den Host …</p>'}
@@ -3118,12 +3185,12 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     const h=st.rk.map((s,i)=>{
       let tag='';
       if(online&&st.hu[s]){tag=st.rm[s]==1?'<small style="color:#4ade80">✓ Revanche</small>':st.rm[s]==2?'<small style="opacity:.6">verlässt den Raum</small>':'<small style="opacity:.7">überlegt …</small>'}
-      return`<div class=lurow style="border-color:${LU.COL[s]}"><i style="background:${LU.COL[s]}"></i><b>${med[i]||i+1+'.'} ${luHtml(st.nm[s])}</b><span class=luhint style="margin:0">${i?st.n[s]+(st.n[s]==1?' Karte':' Karten'):'alle abgelegt'}</span>${tag}</div>`}).join('');
+      return`<div class=lurow style="border-color:${MMC[s]}"><i style="background:${MMC[s]}"></i><b>${med[i]||i+1+'.'} ${luHtml(st.nm[s])}</b><span class=luhint style="margin:0">${i?st.n[s]+(st.n[s]==1?' Karte':' Karten'):'alle abgelegt'}</span>${tag}</div>`}).join('');
     let b='';
     if(mode=='local')b='<button class=btn data-lu=again>Nochmal spielen</button> <button class="btn r" data-lu=menu>Menü</button>';
     else if(st.rm[my]==0)b='<button class=btn data-lu=rm>Revanche</button> <button class="btn r" data-lu=menu>'+(mode=='host'?'Beenden':'Verlassen')+'</button><p class=luhint>Nur wer Revanche wählt, bleibt in der Gruppe – alle anderen verlassen den Raum.</p>';
     else b='<p class=luhint>Du bist für die Revanche dabei – warte auf die anderen …</p><button class="btn r" data-lu=menu>Verlassen</button>';
-    return`<div class=luwrap><div class=kick>Runde beendet</div><h2 style="color:${LU.COL[w]}">${w==my&&mode!='setup'?'Du gewinnst!':luHtml(st.nm[w])+' gewinnt!'}</h2><div class=lusetup>${h}</div><div>${b}</div></div>`
+    return`<div class=luwrap><div class=kick>Runde beendet</div><h2 style="color:${MMC[w]}">${w==my&&mode!='setup'?'Du gewinnst!':luHtml(st.nm[w])+' gewinnt!'}</h2><div class=lusetup style="max-height:38vh;overflow:auto">${h}</div><div>${b}</div></div>`
   }
   /* ----- Starten ----- */
   function launch(G,emitFn){
@@ -3132,16 +3199,15 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     ovHide();host.start()
   }
   function startLocal(){
-    const M=S.mm,n=Math.max(1,Math.min(3,M.n|0)),sp=['h','x','x','x'],nm=[(OL&&OL.name)||'Du','','',''];
+    const M=S.mm,n=Math.max(1,Math.min(9,M.n|0)),sp=MMS.map((_,i)=>i?'x':'h'),nm=MMS.map((_,i)=>i?'Platz '+(i+1):(OL&&OL.name)||'Du');
     for(let i=1;i<=n;i++){sp[i]='c';nm[i]='Computer '+i}
-    for(let i=n+1;i<4;i++)nm[i]=LU.NAME[i];
     const d=S.d==3?Math.max(0,Math.min(2,Math.round(adEff()+rnd(-.4,.4)))):S.d;
     mode='local';my=0;
     launch(mmNew(sp,nm,{d,mau:M.mau},0,0),onSnap)
   }
   function startHostOnline(room){
-    const seats=luSeatsOf(room),sp=seats.map(x=>x.k=='p'?(x.uid==OL.me?'h':'o'):x.k=='cpu'?'c':'x');
-    const nm=seats.map((x,i)=>x.k=='p'?x.name:x.k=='cpu'?'Computer '+LU.NAME[i]:LU.NAME[i]);
+    const seats=mmSeats(room),sp=seats.map(x=>x.k=='p'?(x.uid==OL.me?'h':'o'):x.k=='cpu'?'c':'x');
+    const nm=seats.map((x,i)=>x.k=='p'?x.name:x.k=='cpu'?'Computer '+(i+1):'Platz '+(i+1));
     const cfg=room.cfg||{};
     mode='host';my=LUN.seat;LUN.lastAct={};
     LUN.ref.update({status:'play'}).catch(e=>toast(luErr(e)));
@@ -3152,13 +3218,13 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
   /* Revanche: alle, die zugestimmt haben (plus Computer-Plätze), spielen weiter; die anderen fliegen aus dem Raum */
   function doRematch(yes){
     if(mode!='host'||!host||!st||!LUN.room)return;
-    const prev=st,seats=luSeatsOf(LUN.room);
+    const prev=st,seats=mmSeats(LUN.room);
     if(!yes.includes(my))yes=yes.concat(my);
-    const sp=[0,1,2,3].map(s=>prev.hu[s]?(yes.includes(s)?(s==my?'h':'o'):'x'):(prev.sp[s]=='c'?'c':'x'));
+    const sp=MMS.map(s=>prev.hu[s]?(yes.includes(s)?(s==my?'h':'o'):'x'):(prev.sp[s]=='c'?'c':'x'));
     if(sp.filter(x=>x!='x').length<2){const f=sp.findIndex(x=>x=='x');if(f>=0)sp[f]='c'}
-    const nm=[0,1,2,3].map(s=>sp[s]=='h'||sp[s]=='o'?(seats[s].name||LU.NAME[s]):sp[s]=='c'?'Computer '+LU.NAME[s]:LU.NAME[s]);
+    const nm=MMS.map(s=>sp[s]=='h'||sp[s]=='o'?(seats[s].name||'Spieler '+(s+1)):sp[s]=='c'?'Computer '+(s+1):'Platz '+(s+1));
     const upd={};
-    for(let s=0;s<4;s++){const k=sp[s]=='x'?'off':sp[s]=='c'?'cpu':'p';if(k!='p'&&seats[s].k!=k)upd['seats/'+s]={k}}
+    for(let s=0;s<MMN;s++){const k=sp[s]=='x'?'off':sp[s]=='c'?'cpu':'p';if(k!='p'&&seats[s].k!=k)upd['seats/'+s]={k}}
     const cfg=prev.cfg;host.stop();
     const run=()=>launch(mmNew(sp,nm,cfg,prev.seq+5,prev.rn+1),hostEmit);
     if(Object.keys(upd).length)LUN.ref.update(upd).then(run,e=>toast(luErr(e)));else run()
@@ -3167,7 +3233,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     if(!await luLogin())return;
     const M=S.mm,cfg={d:S.d==3?Math.max(0,Math.min(2,Math.round(adEff()))):S.d,mau:M.mau},code=luCode(),ref=OL.db.ref('rooms/'+code);
     try{
-      await ref.set({host:OL.me,hn:OL.name,ts:olTS(),status:'lobby',cfg,seats:{0:{k:'p',uid:OL.me,name:OL.name},1:{k:'open'},2:{k:'open'},3:{k:'open'}}});
+      await ref.set({host:OL.me,hn:OL.name,ts:olTS(),status:'lobby',cfg,seats:Object.fromEntries(MMS.map(i=>[i,i?{k:i<4?'open':'off'}:{k:'p',uid:OL.me,name:OL.name}]))});
       OL.db.ref('hands/'+code).onDisconnect().remove();
       ref.onDisconnect().remove()
     }catch(e){toast(luErr(e));return}
@@ -3188,9 +3254,9 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     let got=-1;
     try{
       const seats=room.seats||{};
-      for(let i=0;i<4;i++){const seat=seats[i];if(seat&&seat.k==='p'&&seat.uid===OL.me){got=i;break}}
+      for(let i=0;i<MMN;i++){const seat=seats[i];if(seat&&seat.k==='p'&&seat.uid===OL.me){got=i;break}}
       if(got<0){
-        for(let i=0;i<4;i++){
+        for(let i=0;i<MMN;i++){
           const result=await ref.child('seats/'+i).transaction(cur=>{
             if(cur===null)return {k:'p',uid:OL.me,name:OL.name};if(cur.k!=='open')return;
             return {k:'p',uid:OL.me,name:OL.name};
@@ -3209,7 +3275,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     LUN.ref.on('value',s=>{
       const v=s.val();LUN.room=v;if(LUN.left||!LUN.ref)return;
       if(!v){exit('Der Raum wurde geschlossen.');return}
-      const seats=luSeatsOf(v);
+      const seats=mmSeats(v);
       if(seats.some(x=>x.uid&&x.uid!==OL.me&&OL.BL[x.uid])){exit('Der Raum enthält einen blockierten Spieler.');return}
       if(LUN.role=='guest'){
         const i=seats.findIndex(x=>x.k=='p'&&x.uid==OL.me);
@@ -3293,33 +3359,81 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
   }
   /* ----- Zeichnen ----- */
   const fitText=(t,w,size,wt)=>{c.font=(wt||700)+' '+size+'px system-ui';while(size>10&&c.measureText(t).width>w){size--;c.font=(wt||700)+' '+size+'px system-ui'}};
-  function chip(x,y,w,s){
-    const on=st.sp[s]!='x',cur=on&&st.t==s&&st.ph!='end'&&mode!='setup';
-    c.save();rr(x,y,w,30,15,cur?'#ffffff2e':'#0000004d');
-    if(cur){c.strokeStyle=LU.COL[s];c.lineWidth=2.5;c.shadowColor=LU.COL[s];c.shadowBlur=S.anim?12:0;c.beginPath();c.roundRect(x,y,w,30,15);c.stroke();c.shadowBlur=0}
-    circ(x+15,y+15,6,LU.COL[s]);
-    let nmx=st.nm[s]||'';c.fillStyle='#f4f7f2';c.textAlign='left';c.textBaseline='middle';
-    fitText(nmx,w-100,13);c.fillText(nmx,x+28,y+15.5);
-    c.textAlign='right';c.font='700 12px system-ui';c.fillStyle=st.n[s]<=1?'#ffd24a':'#cfe0d8';
-    c.fillText(st.n[s]+(st.n[s]==1?' Karte':' Karten'),x+w-12,y+15.5);
-    if(st.mau&&st.mau[s]){rr(x+w-8,y-9,40,18,9,'#ffd24a');c.fillStyle='#3a2a00';c.textAlign='center';c.font='800 10px system-ui';c.fillText('MAU',x+w+12,y+.5)}
-    const f=flash[s];if(f&&f.txt&&now()-f.t<1500){const a=Math.min(1,(1500-(now()-f.t))/500);c.globalAlpha=a;c.fillStyle='#ffd24a';c.textAlign='center';c.font='800 14px system-ui';c.fillText(f.txt,x+w/2,y-12-(now()-f.t)/60);}
+  /* Spieler-Kachel: Name (eigene Zeile, passt sich an), darunter Mini-Kartenfächer und Anzahl */
+  function tile(t,s){
+    const on=st.sp[s]!='x',cur=on&&st.t==s&&st.ph!='end'&&mode!='setup',x=t.x,y=t.y,w=t.w,h=t.h,n=st.n[s];
+    c.save();rr(x,y,w,h,12,cur?'#ffffff2e':'#0000004d');
+    if(cur){c.strokeStyle=MMC[s];c.lineWidth=2.5;c.shadowColor=MMC[s];c.shadowBlur=S.anim?10:0;c.beginPath();c.roundRect(x,y,w,h,12);c.stroke();c.shadowBlur=0}
+    circ(x+12,y+14,5,MMC[s]);
+    c.fillStyle='#f4f7f2';c.textAlign='left';c.textBaseline='middle';
+    const nmx=st.nm[s]||'',mw=st.mau&&st.mau[s]?44:0;fitText(nmx,w-30-mw,13);c.fillText(nmx,x+23,y+14.5);
+    const m=Math.min(n,6),sp=m>1?Math.min(7,(w*.45-18)/(m-1)):0;
+    for(let i=0;i<m;i++)drawCard(x+9+i*sp,y+25,17,-1,{sh:0});
+    c.textAlign='right';c.font='700 12px system-ui';c.fillStyle=n<=1?'#ffd24a':'#cfe0d8';c.fillText(n+(n==1?' Karte':' Karten'),x+w-9,y+36);
+    if(st.mau&&st.mau[s]){rr(x+w-42,y+5,36,17,8,'#ffd24a');c.fillStyle='#3a2a00';c.textAlign='center';c.font='800 10px system-ui';c.fillText('MAU',x+w-24,y+14)}
+    const f=flash[s];if(f&&f.txt&&now()-f.t<1500){const a=Math.min(1,(1500-(now()-f.t))/500);c.globalAlpha=a;rr(x+4,y+h/2-11,w-8,22,11,'#000c');c.fillStyle='#ffd24a';c.textAlign='center';c.font='800 13px system-ui';c.fillText(f.txt,x+w/2,y+h/2+.5)}
     c.restore()
+  }
+  /* ---- Ulti-Effekt der 7er-Kette ---- */
+  const ulCol=L=>L<1.5?'#ffb02e':L<2.5?'#ff7a2e':L<3.5?'#ff3d3d':L<4.5?'#ff3da8':'#c23cff';
+  function ultiHit(L){
+    ulS=L;ulShk=Math.max(ulShk,Math.min(10,2+L*1.7));ulBurst.push({t:now(),x:PXc,y:PYc,L,r:1});
+    snd(110-L*6,.22,'sawtooth');snd(60+L*25,.3,'square');
+    if(S.anim)for(let i=0;i<10+L*6;i++){const a=rnd(0,6.3),v=rnd(80,170+L*40);ulP.push({x:PXc,y:PYc,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:rnd(.4,.9),t0:now(),col:ulCol(L),z:rnd(2,3.5)})}
+  }
+  function ultiPay(L,an,n){
+    const T=now();ulBolts.push({t0:T,L,x:an[0],y:an[1],hit:0});
+    ulLast=L;ulS=0;
+    for(let i=0;i<4;i++)setTimeout(()=>snd(180+i*110+L*20,.1,'sawtooth'),i*110)
+  }
+  function jag(x0,y0,x1,y1,amp,n){c.beginPath();c.moveTo(x0,y0);for(let i=1;i<n;i++){const f=i/n,nx=-(y1-y0),ny=x1-x0,l=Math.hypot(nx,ny)||1,o=(Math.random()-.5)*amp*(1-Math.abs(f-.5)*.6);c.lineTo(x0+(x1-x0)*f+nx/l*o,y0+(y1-y0)*f+ny/l*o)}c.lineTo(x1,y1);c.stroke()}
+  function ultiFx(T,dt){
+    ulV+=(ulS-ulV)*Math.min(1,dt*6);
+    const anim=S.anim,L=ulV;
+    c.save();c.globalCompositeOperation='lighter';
+    if(L>.05){
+      const col=ulCol(L),R=56+L*14,p=.8+.2*Math.sin(T/(230-Math.min(L,6)*24));
+      const g=c.createRadialGradient(PXc,PYc,8,PXc,PYc,R*1.7*p);g.addColorStop(0,col+'bb');g.addColorStop(.45,col+'55');g.addColorStop(1,col+'00');
+      c.fillStyle=g;c.beginPath();c.arc(PXc,PYc,R*1.7*p,0,7);c.fill();
+      if(anim){
+        const na=Math.min(2+Math.round(L),10);c.strokeStyle=col;c.lineWidth=2+L*.7;c.globalAlpha=.85;
+        for(let i=0;i<na;i++){const a=T/320*(1+L*.18)*(i%2?-1:1)+i*6.283/na;c.beginPath();c.arc(PXc,PYc,R*.8+Math.sin(T/160+i*2)*3+(i%2)*9,a,a+.55+L*.06);c.stroke()}
+        c.globalAlpha=1;
+        if(L>=1.5&&(T/70|0)%2==0){c.lineWidth=1.5+L*.4;c.strokeStyle='#fff';for(let i=0;i<Math.min(1+Math.floor(L),6);i++){const a=rnd(0,6.3);jag(PXc+Math.cos(a)*30,PYc+Math.sin(a)*30,PXc+Math.cos(a)*(R+20+L*8),PYc+Math.sin(a)*(R+20+L*8),16+L*4,6)}}
+        if(Math.random()<.3+L*.2)ulP.push({x:PXc+rnd(-40,40),y:PYc+30,vx:rnd(-20,20),vy:-rnd(50,120+L*20),l:rnd(.6,1.1),t0:T,col:col,z:rnd(1.5,3)});
+      }
+    }
+    /* Entladung auf den Spieler, der ziehen muss */
+    ulBolts=ulBolts.filter(b=>{
+      const f=(T-b.t0)/1100;if(f>1.15)return false;const col=ulCol(b.L),Lb=b.L;
+      const gather=Math.min(1,f/.55);
+      if(f<.6){ /* Energie sammelt sich am Stapel und schießt zum Ziel */
+        const hx=PXc+(b.x-PXc)*Math.pow(gather,2),hy=PYc+(b.y-PYc)*Math.pow(gather,2);
+        const g=c.createRadialGradient(hx,hy,2,hx,hy,26+Lb*12);g.addColorStop(0,'#fff');g.addColorStop(.3,col+'cc');g.addColorStop(1,col+'00');c.fillStyle=g;c.beginPath();c.arc(hx,hy,26+Lb*12,0,7);c.fill();
+        if(anim){c.strokeStyle=col;c.lineWidth=2+Lb;c.globalAlpha=.8;jag(PXc,PYc,hx,hy,22+Lb*5,9);c.strokeStyle='#fff';c.lineWidth=1;jag(PXc,PYc,hx,hy,14,9);c.globalAlpha=1}
+      }else{
+        if(!b.hit){b.hit=1;ulShk=Math.max(ulShk,Math.min(12,4+Lb*2.2));ulBurst.push({t:T,x:b.x,y:b.y,L:Lb*1.6,r:1});snd(70,.4,'sawtooth');snd(140+Lb*20,.25,'square');
+          if(anim)for(let i=0;i<16+Lb*10;i++){const a=rnd(0,6.3),v=rnd(100,260+Lb*50);ulP.push({x:b.x,y:b.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:rnd(.5,1.2),t0:T,col:i%3?col:'#ffffff',z:rnd(2,4)})}}
+        const k=(f-.6)/.55,rr_=(30+Lb*14)*(1-k*.5);
+        const g=c.createRadialGradient(b.x,b.y,2,b.x,b.y,rr_*2);g.addColorStop(0,'#fff');g.addColorStop(.35,col+'bb');g.addColorStop(1,col+'00');c.globalAlpha=1-k;c.fillStyle=g;c.beginPath();c.arc(b.x,b.y,rr_*2,0,7);c.fill();c.globalAlpha=1;
+      }
+      return true});
+    /* Stoßwellen */
+    ulBurst=ulBurst.filter(b=>{const f=(T-b.t)/650;if(f>1)return false;c.globalAlpha=(1-f)*.9;c.strokeStyle=ulCol(b.L);c.lineWidth=3+b.L*1.5*(1-f);c.beginPath();c.arc(b.x,b.y,10+f*(70+b.L*26),0,7);c.stroke();c.globalAlpha=1;return true});
+    /* Funken */
+    ulP=ulP.filter(q=>{const a=(T-q.t0)/1000;if(a>q.l)return false;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=60*dt;c.globalAlpha=1-a/q.l;c.fillStyle=q.col;c.beginPath();c.arc(q.x,q.y,q.z,0,7);c.fill();return true});
+    c.restore();c.globalAlpha=1
   }
   function suitBadge(x,y,s,r){circ(x,y,r,'#fcfbf8');c.save();c.fillStyle=CD.COL[s];cdSuit(c,s,x,y+1,r*1.15);c.restore()}
   function draw(){
-    const T=now(),dim=(mode=='setup'||mode=='lobby')&&!window.NOFIN;
+    const T=now(),dim=(mode=='setup'||mode=='lobby')&&!window.NOFIN,dtF=Math.min(.05,Math.max(.001,(T-(draw.lt||T))/1000));draw.lt=T;
+    c.save();
+    {const amp=ulShk+(S.anim&&ulV>=3?Math.min(2.5,(ulV-2)*.6):0);if(amp>.15&&S.anim)c.translate(rnd(-amp,amp),rnd(-amp,amp));ulShk*=Math.pow(.02,dtF)}
     /* Tisch */
     const g=c.createRadialGradient(400,210,40,400,240,520);g.addColorStop(0,'#2b6a55');g.addColorStop(1,'#0e2a23');c.fillStyle=g;c.fillRect(0,0,W,H);
     c.strokeStyle='#ffffff10';c.lineWidth=2;c.beginPath();c.ellipse(385,178,162,104,0,0,7);c.stroke();
     /* Gegner */
-    for(const s of actSeats()){
-      if(mine(s)||(mode=='setup'&&s==my))continue;
-      const pos=posOf(s),n=st.n[s];
-      for(const f of fan(pos,n))drawCard(f.x-f.w/2,f.y-f.w*.7,f.w,-1,{rot:f.r,sh:0});
-      const cx=pos==2?[300,200]:pos==1?[10,196]:[594,196],cy=pos==2?78:86;
-      chip(cx[0],cy,cx[1],s)
-    }
+    {const R=tiles();for(const s of actSeats()){if(mine(s)||(mode=='setup'&&s==my)||!R[s])continue;tile(R[s],s)}}
     /* Stapel */
     const dk=st.dk;
     if(dk>0){for(let i=Math.min(3,dk)-1;i>=0;i--)drawCard(DXc-PW/2-i*1.6,PYc-PW*.7-i*1.6,PW,-1,{sh:i==0?1:0})}
@@ -3332,12 +3446,14 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     const wished=cdR(dTop)==9||st.suit!=cdS(dTop);
     suitBadge(PXc+PW/2+44,PYc-12,st.suit,20);
     c.fillStyle='#cfe0d8';c.font='700 11px system-ui';c.textAlign='center';c.fillText(wished?'Wunsch':'Farbe',PXc+PW/2+44,PYc+30);
-    if(st.pend>0){rr(DXc-48,PYc-PW*.7-34,96,26,13,'#d23c3c');c.fillStyle='#fff';c.font='800 13px system-ui';c.textAlign='center';c.textBaseline='middle';c.fillText('+'+st.pend+' ziehen',DXc,PYc-PW*.7-20.5);c.textBaseline='alphabetic'}
+    ultiFx(T,dtF);
+    if(st.pend>0){const L=st.pend/2,sc=1+Math.min(L,6)*.07,cx=DXc,cy=PYc-PW*.7-20;c.save();c.translate(cx,cy);c.scale(sc,sc);rr(-52,-14,104,28,14,ulCol(L));c.fillStyle='#fff';c.font='800 13px system-ui';c.textAlign='center';c.textBaseline='middle';c.fillText('+'+st.pend+' ziehen',0,.5);c.restore();
+      if(L>=1){c.save();c.textAlign='center';c.font='900 '+(11+Math.min(L,6)*2)+'px system-ui';c.fillStyle=ulCol(L);c.shadowColor=ulCol(L);c.shadowBlur=8+L*3;c.fillText('ULTI ×'+L,DXc,cy-20-Math.min(L,6));c.restore()}}
     /* Meldung */
     c.textAlign='center';c.fillStyle='#f4f7f2';fitText(st.msg||'',460,16,700);c.fillText(st.msg||'',400,272);
     const my_t=myTurn()&&mode!='setup';
     c.font='600 11px system-ui';c.fillStyle='#9fbfb2';
-    c.fillText(my_t?(st.pend>0?'Lege eine 7 oder ziehe vom Stapel':st.dr?'Gezogene Karte legen oder behalten':myH.some(q=>ok(q))?'Karte antippen · oder vom Stapel ziehen':'Keine passende Karte – ziehe vom Stapel'):'',400,290);
+    c.fillText(my_t?(st.pend>0?(myH.some(q=>ok(q))?'Lege eine 7 weiter – oder ziehe +'+st.pend+' vom Stapel':'Keine 7 – ziehe +'+st.pend+' vom Stapel'):st.dr?'Gezogene Karte legen oder behalten':myH.some(q=>ok(q))?'Karte antippen · oder vom Stapel ziehen':'Keine passende Karte – ziehe vom Stapel'):'',400,290);
     /* Buttons */
     for(const b of btns()){
       c.save();if(b.hot){c.shadowColor='#ffd24a';c.shadowBlur=14+6*Math.sin(T/160)}
@@ -3346,7 +3462,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     }
     /* meine Hand */
     if(st.sp[my]!='x'){
-      chip(14,314,Math.min(190,150),my);
+      tile({x:14,y:300,w:176,h:TILE_H},my);
       const L=handLay(myH);
       L.forEach((q,i)=>{
         const lg=my_t&&ok(q.c),dm=my_t&&!lg?.45:0;
@@ -3367,15 +3483,16 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
       for(let k=0;k<4;k++){const x=250+k*100;c.save();c.shadowColor='#0008';c.shadowBlur=14;suitBadge(x,PYc,k,34);c.restore()}
     }
     if(flash.wish&&T-flash.wish.t<1400){const a=Math.min(1,(1400-(T-flash.wish.t))/400);c.save();c.globalAlpha=a;c.fillStyle='#ffd24a';c.font='800 15px system-ui';c.textAlign='center';c.fillText('Wunsch: '+CD.SN[flash.wish.s],PXc+PW/2+44,PYc-46);c.restore()}
+    c.restore();
     if(dim){c.fillStyle='#000b';c.fillRect(0,0,W,H)}
   }
   function update(dt){
     if(mode=='setup'||mode=='lobby'||!st)return;
-    if(st.t!==lastTurn){lastTurn=st.t;if(st.ph!='end')$('#game').style.setProperty('--tb',LU.COL[st.t])}
+    if(st.t!==lastTurn){lastTurn=st.t;if(st.ph!='end')$('#game').style.setProperty('--tb',MMC[st.t])}
     if(st.ph=='end'){
       if(!endShown&&!ani.length){endShown=1;rmSig=JSON.stringify(st.rm);
         const won=st.rk[0]==my;snd(520,.2,'triangle');setTimeout(()=>snd(660,.2,'triangle'),200);setTimeout(()=>snd(800,.35,'triangle'),400);
-        spark(400,200,LU.COL[st.rk[0]],40);
+        spark(400,200,MMC[st.rk[0]],40);
         if(mode=='local'&&S.d==3)adSet(adR()+(won?.22:-.22));
         showOv(endHTML())}
       else if(endShown&&rmSig!==JSON.stringify(st.rm)){rmSig=JSON.stringify(st.rm);showOv(endHTML())}
@@ -3386,8 +3503,8 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     leave(){window.luFr=null;if(host){host.stop();host=null}LUN.left=1;luCleanup();$('#game').style.removeProperty('--tb')}};
   return api
 }
-GAMES.push({id:'maumau',n:'Mau-Mau',ic:'🃏',d:'Das Kartenspiel für 2–4 Spieler, auch online.',cat:'Karten',h:'Karte antippen zum Ausspielen · Stapel antippen zum Ziehen · vor der vorletzten Karte „Mau!“',sub:'2–4 Spieler · Computer · Online',mk:mmMk});
-RULES.maumau='Gespielt wird mit 32 Karten (7 bis Ass), jeder bekommt 5. Du legst eine Karte, die zur obersten in Farbe oder Zahl passt – wer nichts hat, zieht eine Karte und darf sie sofort legen, wenn sie passt. 7: Der Nächste muss 2 Karten ziehen, kann aber mit einer eigenen 7 weitergeben (dann +2 mehr). 8: Der Nächste setzt aus. Bube: darf (außer auf einen Buben) immer gelegt werden, du wünschst dir eine Farbe. Ass: du bist nochmal dran. Mit dem Buben darf man nicht gewinnen. Hast du nur noch zwei Karten, musst du vor dem Ablegen „Mau!“ rufen – sonst gibt es 2 Strafkarten. Wer zuerst keine Karte mehr hat, gewinnt. Online: Nach der Runde spielen nur diejenigen weiter, die „Revanche“ wählen; alle anderen verlassen den Raum.';
+GAMES.push({id:'maumau',n:'Mau-Mau',ic:'🃏',d:'Das Kartenspiel für 2–10 Spieler, auch online.',cat:'Karten',h:'Karte antippen zum Ausspielen · Stapel antippen zum Ziehen · vor der vorletzten Karte „Mau!“',sub:'2–10 Spieler · Computer · Online',mk:mmMk});
+RULES.maumau='Gespielt wird mit 32 Karten (7 bis Ass), jeder bekommt 5. Du legst eine Karte, die zur obersten in Farbe oder Zahl passt – wer nichts hat, zieht eine Karte und darf sie sofort legen, wenn sie passt. 7: Der Nächste muss 2 Karten ziehen, kann aber mit einer eigenen 7 weitergeben (dann +2 mehr). Wer keine 7 hat, muss selbst vom Stapel ziehen – die Ulti-Energie aller gelegten Siebenen entlädt sich dann auf ihn. 8: Der Nächste setzt aus. Bube: darf (außer auf einen Buben) immer gelegt werden, du wünschst dir eine Farbe. Das Ass ist eine ganz normale Karte. Mit dem Buben darf man nicht gewinnen. Hast du nur noch zwei Karten, musst du vor dem Ablegen „Mau!“ rufen – sonst gibt es 2 Strafkarten. Wer zuerst keine Karte mehr hat, gewinnt. Ab 5 Spielern werden mehrere Kartensätze gemischt. Online: Nach der Runde spielen nur diejenigen weiter, die „Revanche“ wählen; alle anderen verlassen den Raum.';
 
 GAMES.forEach(g=>{const m=NM[g.id];if(m){g.n=m[0];g.d=m[1]}g.ic=ICON[g.id]||g.ic});
 const revised={
