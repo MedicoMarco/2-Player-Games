@@ -294,7 +294,7 @@ const LV=a=>{if(S.d!=3)return a[S.d];const r=adEff(),i=Math.min(a.length-2,Math.
 const LI=a=>a[DI()];
 const adSync=()=>{try{if(typeof OL!='undefined'&&OL.me&&OL.db&&gdef){const m=adM();OL.db.ref('users/'+OL.me+'/ad/'+gdef.id).set({r:Math.round(adR()*1000)/1000,s:Math.round(m.s*1000)/1000,d:m.d,n:m.n,k:m.k,v:m.v}).catch(()=>{})}}catch(e){}};
 const adSet=v=>{if(!gdef||!Number.isFinite(v))return;S.ar=S.ar||{};v=Math.max(0,Math.min(2,v));S.ar[gdef.id]=v;S.ag=(S.ag!=null?S.ag:1)+(v-(S.ag!=null?S.ag:1))*.2;save();adSync()};
-const adTick=dt=>{const st=gdef&&(gdef.id=='chess'||gdef.id=='ludo');
+const adTick=dt=>{const st=gdef&&(gdef.id=='chess'||gdef.id=='ludo'||gdef.id=='maumau');
   if(S.d!=3||S.cpu!==1||ON||over||idle||!gdef){if(AD.lo&&(over||S.d!=3))AD.lo*=.9;return}
   if(AD.cur!==cur){AD.cur=cur;AD.t=0;AD.ph=rnd(0,6.3);AD.form=rnd(-.3,.3);AD.lo=adCal()?0:(st?rnd(-.35,.35):0)}
   if(st)return; /* Schach/Mensch ärgere dich nicht: Stärke pro Partie fest (Tagesform), gelernt wird nach der Partie */
@@ -700,7 +700,7 @@ function go(){if(!idle||coinB)return;
 const GOALS={pong:v=>v+' Punkte',tennis:v=>({3:7,5:11,7:21}[v])+' Punkte',hockey:v=>v+' Tore',volley:v=>v+' Punkte',snakes:v=>Math.ceil(v/2)+' Siege',sumo:v=>Math.ceil(v/2)+' Siege',cup:v=>v+' Spiele',ttt:v=>Math.ceil(v/2)+' Siege',tug:v=>Math.ceil(v/2)+' Siege',spinner:v=>Math.ceil(v/2)+' Siege',elf:v=>v+' Schüsse',mini:v=>Math.min(v,MG_POOL.length)+' Bahnen',memory:v=>(v<4?16:v<6?24:36)/2+' Paare',clash:v=>v*2+' Züge',target:v=>(v==3?30:v==5?45:60)+' s',spot:v=>({3:2,5:3,7:4}[v])+' Bilder',bball:v=>(30+v*5)+' s',micro:v=>({3:2,5:3,7:5}[v])+' Runden',racing:v=>v==3?'0,8 km':v==5?'1,4 km':'2,0 km'};
 const goalOf=(id,v)=>GOALS[id]?GOALS[id](v):null;
 const goalLbl=(g,v)=>g.id=='snakes'&&isSolo()?null:goalOf(g.id,v);
-function intro(){if(gdef.id=='ludo'){idle=0;$('#hint').textContent=gdef.h;cur.showSetup();return}idle=1;const g=gdef,again=()=>{clearInput();PA=[];cur=g.mk();intro();$('#hint').textContent=g.h+(isSolo()?' · Solo: spiele auf Highscore':'')};
+function intro(){if(ROOMG.includes(gdef.id)){idle=0;$('#hint').textContent=gdef.h;cur.showSetup();return}idle=1;const g=gdef,again=()=>{clearInput();PA=[];cur=g.mk();intro();$('#hint').textContent=g.h+(isSolo()?' · Solo: spiele auf Highscore':'')};
 showOv(`<div class=intro style='--k:${KC[g.cat]||"#888"}'><div class=ipic>${g.th?'<img alt="" src="'+g.th+'">':g.ic}</div><div class=itx><div class=kick>${g.cat} · 1–2 Spieler</div><h2>${g.n}</h2><p class=lead>${g.d}</p><h4>So funktioniert’s</h4><p>${isSolo()?(g.soloRules||RULES[g.id]):RULES[g.id]}</p><h4>Steuerung</h4><p>${g.h}</p><h4>Einstellungen</h4><div class=bar style='justify-content:flex-start'><div class=seg id=im></div><div class=seg id=id></div><div class=seg id=it${goalLbl(g,3)?'':' style=display:none'}></div></div><button class=btn id=ig>Spiel starten</button></div></div>`);
 seg('im','cpu',[[0,'2 Spieler'],[1,'Gegen Computer'],...(g.solo&&!cup?[[2,'Solo']]:[])],again);seg('id','d',[[0,'Einfach'],[1,'Normal'],[2,'Schwer'],[3,'Adaptiv']],again);if(goalLbl(g,3))seg('it','t',[3,5,7].map(v=>[v,goalLbl(g,v)]),again);bd('ig',go)}
 /* Spielansicht: Auto = auf Touch-Geräten (Handy/Tablet/iPad) Bildschirm ausfüllen + Scrollen/Zoomen sperren, am PC Vollbild */
@@ -729,7 +729,7 @@ GAMES.forEach(g=>{try{gdef=g;over=0;idle=0;PA=[];const o=g.mk();cur=o;for(let f=
 c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.shadowBlur=0;c.shadowOffsetY=0;c.setLineDash([]);c.lineWidth=1;c.textAlign='center'});
 S.snd=sv[0];S.cpu=sv[1];S.t=sv[2];cur=oc;gdef=og;over=oo;idle=oi;PA=op;window.NOFIN=0}
 const applyTheme=()=>{document.documentElement.dataset.theme=S.theme=='auto'?'':S.theme};
-const KC={Sport:'#d9772b',Geschick:'#2c8c7e',Puzzle:'#7658c4',Arcade:'#cf4338',Reaktion:'#c99a12'};
+const KC={Sport:'#d9772b',Geschick:'#2c8c7e',Puzzle:'#7658c4',Arcade:'#cf4338',Reaktion:'#c99a12',Karten:'#2e6f95'};
 $('#bt').onclick=()=>{S.theme={auto:'light',light:'dark',dark:'auto'}[S.theme]||'auto';save();applyTheme();menu()};
 function xa(w){const id=gdef.id;
 if(S.cpu===1&&!ON){S.stk=w==1?(S.stk||0)+1:0;if(S.stk>=3)ach('streak3','3 Siege in Folge');if(S.stk>=5)ach('streak5','5 Siege in Folge')}
@@ -742,9 +742,9 @@ save()}
 function fa(w){xa(w);if(!w)return;const o=w==1?LS[1]:LS[0],m=w==1?LS[0]:LS[1];if(gdef.id!='chess'&&o===0&&m>=3&&(!S.cpu||w==1)&&(!ON||w==1))ach('shutout','Zu null gewonnen');if(gdef.id=='chess'&&(!S.cpu||w==1)&&(!ON||w==1))ach('chess','Schach gewonnen')}
 function toast(t){const e=$('#toast');e.textContent=t;e.style.opacity=1;clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.opacity=0,2600)}
 function ach(id,t){if(!S.ach[id]){S.ach[id]=1;save();const k=PAL.filter(q=>q.u==id).map(q=>q.n);toast('Erfolg: '+t+(k.length?' · Neue Farbe: '+k.join(', '):''))}}
-function prog(w){adLearn(w);S.pl=(S.pl||0)+1;ach('first','Erstes Match');if(S.pl>=10)ach('ten','10 Matches');if(S.pl>=25)ach('p25','25 Matches');if(S.pl>=50)ach('p50','50 Matches');if(GAMES.every(g=>S.st[g.id]))ach('all','Alle Spiele probiert');if(S.cpu&&S.d==2&&w==1)ach('hard','Computer (Schwer) besiegt');if(cup&&cup.i>=cup.n)ach('cup','Cup beendet');save()}
+function prog(w){adLearn(w);S.pl=(S.pl||0)+1;ach('first','Erstes Match');if(S.pl>=10)ach('ten','10 Matches');if(S.pl>=25)ach('p25','25 Matches');if(S.pl>=50)ach('p50','50 Matches');if(GAMES.filter(g=>!ROOMG.includes(g.id)).every(g=>S.st[g.id]))ach('all','Alle Spiele probiert');if(S.cpu&&S.d==2&&w==1)ach('hard','Computer (Schwer) besiegt');if(cup&&cup.i>=cup.n)ach('cup','Cup beendet');save()}
 const list=()=>{const q=($('#q').value||'').toLowerCase();return GAMES.filter(g=>(S.cpu!==2||g.solo)&&(S.cat=='all'||(S.cat=='★'&&S.fav.includes(g.id))||g.cat==S.cat)&&(g.n+' '+g.d).toLowerCase().includes(q)).sort((a,b)=>S.fav.includes(b.id)-S.fav.includes(a.id))};
-function tabs(){$('#cnt').textContent=GAMES.length+' Spiele · solo, zu zweit oder gegen Computer · offline spielbar';$('#bt').textContent='Darstellung: '+({auto:'Auto',light:'Hell',dark:'Dunkel'}[S.theme]||'Auto');seg('sc','cat',['all','★','Sport','Geschick','Puzzle','Arcade','Reaktion'].map(v=>[v,v=='all'?'Alle':v=='★'?'★ Favoriten':v]));
+function tabs(){$('#cnt').textContent=GAMES.length+' Spiele · solo, zu zweit oder gegen Computer · offline spielbar';$('#bt').textContent='Darstellung: '+({auto:'Auto',light:'Hell',dark:'Dunkel'}[S.theme]||'Auto');seg('sc','cat',['all','★','Sport','Geschick','Puzzle','Arcade','Reaktion','Karten'].map(v=>[v,v=='all'?'Alle':v=='★'?'★ Favoriten':v]));
 $('#rec').innerHTML=S.rec.length?'Zuletzt: '+S.rec.map(id=>{const g=GAMES.find(x=>x.id==id);return g?`<button class=chip data-r=${id}>${g.n}</button>`:''}).join(''):'';
 const tot=Object.values(S.st).reduce((a,s)=>[a[0]+s[0],a[1]+s[1]],[0,0]);
 $('#prog').innerHTML=`<p>Matches: <b>${S.pl}</b> · Siege ${tot[0]} : ${tot[1]}${S.rc?' · Beste Reaktion: <b>'+S.rc+' ms</b>':''}</p><div>${AC.map(a=>`<span class=chip style="opacity:${S.ach[a[0]]?1:.45}">${S.ach[a[0]]?'✓':'○'} ${a[1]}</span>`).join('')}</div><p>Spielerfarben (Freischaltung durch gespielte Matches):</p>${[0,1].map(p=>'<div>'+(p?SKR:SKB).map((col,i)=>`<button class="sw ${S.sk[p]==i?'on':''}" data-p=${p} data-i=${i} style="background:${col}">${S.pl<TH[i]?'×':''}</button>`).join('')+'</div>').join('')}`}
@@ -2435,9 +2435,10 @@ const luErr=e=>{const m=String(e&&(e.code||e.message)||e);return /PERMISSION/i.t
 function luCleanup(){
   const r=LUN.ref;
   try{if(OL.me&&OL.db)for(const u in LUN.inv)OL.db.ref('invites/'+u+'/'+OL.me).remove()}catch(e){}LUN.inv={};
+  if(LUN.hr){try{LUN.hr.off()}catch(e){}LUN.hr=null}
   if(r){try{r.off()}catch(e){}
     try{
-      if(LUN.role=='host'){r.onDisconnect().cancel();r.remove()}
+      if(LUN.role=='host'){r.onDisconnect().cancel();try{OL.db.ref('hands/'+LUN.code).onDisconnect().cancel();OL.db.ref('hands/'+LUN.code).remove()}catch(e){}r.remove()}
       else if(LUN.role=='guest'&&LUN.seat>=0){r.child('seats/'+LUN.seat).onDisconnect().cancel();r.child('seats/'+LUN.seat).set({k:'gone',uid:OL.me,name:OL.name})}
     }catch(e){}}
   if(OL.me&&OL.db)try{olSetGame(null)}catch(e){}
@@ -2577,6 +2578,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     const ref=OL.db.ref('rooms/'+code);let room;
     try{room=(await ref.once('value')).val()}catch(e){toast(luErr(e));return}
     if(!room){toast('Raum nicht gefunden.');return}
+    if(room.cfg&&room.cfg.mau!=null){toast('Dieser Raum gehört zu einem anderen Spiel.');return}
     for(const seat of Object.values(room.seats||{})){if(seat.uid&&seat.uid!==OL.me&&!await olCanContact(seat.uid))return}
     if(room.status!=='lobby'){toast('Das Spiel läuft schon.');return}
     let got=-1;
@@ -2807,6 +2809,586 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
 
 GAMES.push({id:'ludo',n:'Mensch ärgere dich nicht',ic:'\ud83c\udfb2',d:'Würfeln, ziehen, rauswerfen: 2–4 Spieler, auch online.',cat:'Geschick',h:'Würfeln und mit allen vier Figuren ins Ziel kommen',sub:'2–4 Spieler · Computer · Online',mk:luMk});
 RULES.ludo='Jeder hat vier Figuren. Mit einer 6 kommt eine Figur aufs Startfeld; nach jeder 6 würfelst du nochmal. Ohne Figur auf dem Feld hast du drei Versuche. Wer auf ein besetztes Feld zieht, schmeißt die Figur raus – das ist freiwillig, du darfst den anderen auch verschonen (Computer schlagen meistens). Bei einer 6 darfst du wählen: rauskommen oder mit einer Figur ziehen. Rauskommen geht nicht, solange eine eigene Figur auf dem Startfeld steht. Im Zielhaus wird nicht gesprungen, du brauchst die genaue Augenzahl. Wer zuerst alle vier Figuren im Ziel hat, gewinnt.';
+ICON.maumau=GI(`<rect x="6" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(-12 16 24)"/><rect x="20" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(10 30 24)"/><path d="M31 17c-3-4-8 0-5 5l5 5 5-5c3-5-2-9-5-5z" fill="${Rd}" stroke="none" transform="rotate(10 30 24)"/>`);
+NM.maumau=['Mau-Mau','Das Kartenspiel für 2–4 Spieler, auch online.'];
+const ROOMG=['ludo','maumau'];
+/* ===== Karten-Bibliothek (für alle Kartenspiele) =====
+   Karte = Zahl 0..51: Farbe = id/13 (0 Pik, 1 Herz, 2 Karo, 3 Kreuz), Rang = id%13 (0 = 2 ... 8 = 10, 9 = Bube, 10 = Dame, 11 = König, 12 = Ass).
+   cdSprite() zeichnet jede Karte einmal vektorscharf in ein Bild, drawCard() stempelt sie in beliebiger Größe (Rückseite: id -1). */
+const CD={W:100,H:140,SN:['Pik','Herz','Karo','Kreuz'],RK:['2','3','4','5','6','7','8','9','10','B','D','K','A'],COL:['#1d2430','#d23c3c','#d23c3c','#1d2430']};
+const cdS=id=>id/13|0,cdR=id=>id%13,cdName=id=>CD.SN[cdS(id)]+' '+CD.RK[cdR(id)];
+const CD_SU=(()=>{const P=d=>new Path2D(d),club=new Path2D();[[50,30,20],[27,64,20],[73,64,20],[50,56,13]].forEach(([x,y,r])=>{club.moveTo(x+r,y);club.arc(x,y,r,0,7)});club.addPath(P('M50 52 C50 78 46 90 35 96 L65 96 C54 90 50 78 50 52Z'));
+return[P('M50 5 C64 28 92 40 92 62 C92 76 81 84 69 84 C62 84 56 81 53 76 C54 86 58 92 67 96 L33 96 C42 92 46 86 47 76 C44 81 38 84 31 84 C19 84 8 76 8 62 C8 40 36 28 50 5Z'),
+P('M50 90 C18 66 6 48 6 31 C6 17 17 8 30 8 C39 8 46 13 50 21 C54 13 61 8 70 8 C83 8 94 17 94 31 C94 48 82 66 50 90Z'),
+P('M50 4 C57 24 75 40 94 50 C75 60 57 76 50 96 C43 76 25 60 6 50 C25 40 43 24 50 4Z'),club]})();
+const cdSuit=(g,s,x,y,sz)=>{g.save();g.translate(x-sz/2,y-sz/2);g.scale(sz/100,sz/100);g.fill(CD_SU[s]);g.restore()};
+const cdCache={};
+function cdSprite(id){
+  if(cdCache[id])return cdCache[id];
+  const K=2,k=document.createElement('canvas');k.width=CD.W*K;k.height=CD.H*K;const g=k.getContext('2d');g.scale(K,K);
+  const W=CD.W,H=CD.H,R=9;g.textAlign='center';g.textBaseline='alphabetic';
+  if(id<0){
+    const gr=g.createLinearGradient(0,0,W,H);gr.addColorStop(0,'#2f3f5c');gr.addColorStop(1,'#182131');
+    g.fillStyle=gr;g.beginPath();g.roundRect(.5,.5,W-1,H-1,R);g.fill();g.strokeStyle='#0b101a';g.lineWidth=1;g.stroke();
+    g.save();g.beginPath();g.roundRect(8,8,W-16,H-16,5);g.clip();g.strokeStyle='rgba(255,255,255,.07)';g.lineWidth=1;
+    for(let i=-H;i<W+H;i+=11){g.beginPath();g.moveTo(i,0);g.lineTo(i+H,H);g.stroke();g.beginPath();g.moveTo(i+H,0);g.lineTo(i,H);g.stroke()}g.restore();
+    g.strokeStyle='rgba(255,255,255,.28)';g.lineWidth=1.2;g.beginPath();g.roundRect(8,8,W-16,H-16,5);g.stroke();
+    g.fillStyle='#1d2a40';g.beginPath();g.arc(W/2,H/2,21,0,7);g.fill();g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=1.6;g.stroke();
+    g.fillStyle='rgba(255,255,255,.78)';cdSuit(g,2,W/2,H/2,20);
+  }else{
+    const s=cdS(id),r=cdR(id),col=CD.COL[s],rk=CD.RK[r];
+    g.fillStyle='#fcfbf8';g.beginPath();g.roundRect(.5,.5,W-1,H-1,R);g.fill();g.strokeStyle='#d8d4cb';g.lineWidth=1;g.stroke();
+    g.fillStyle=col;
+    const idx=()=>{g.font=(rk=='10'?'700 21px':'700 25px')+' ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif';g.fillText(rk,14,27);cdSuit(g,s,14,43,15)};
+    idx();g.save();g.translate(W,H);g.rotate(Math.PI);idx();g.restore();
+    if(r==12)cdSuit(g,s,W/2,H/2+1,58);
+    else if(r>=9){
+      g.strokeStyle=col;g.globalAlpha=.22;g.lineWidth=1.4;g.beginPath();g.roundRect(26,33,W-52,H-66,8);g.stroke();g.globalAlpha=1;
+      g.font='600 46px ui-serif,Georgia,"Times New Roman",serif';g.fillText(rk,W/2,H/2+8);cdSuit(g,s,W/2,H/2+27,18);cdSuit(g,s,W/2,H/2-27,18)
+    }else cdSuit(g,s,W/2,H/2+1,r>=6?46:42);
+  }
+  return cdCache[id]=k
+}
+/* Karte zeichnen: x,y = linke obere Ecke, w = Breite (Höhe = 1,4 w). o: rot (Bogenmaß um die Mitte), a (Deckkraft), dim (0..1 abdunkeln), hl (Rahmenfarbe), sh:0 = ohne Schatten */
+function drawCard(x,y,w,id,o){o=o||{};const h=w*1.4,rd=w*.09;c.save();c.translate(x+w/2,y+h/2);if(o.rot)c.rotate(o.rot);if(o.a!=null)c.globalAlpha=o.a;
+  if(o.sh!==0){c.fillStyle='rgba(0,0,0,.2)';c.beginPath();c.roundRect(-w/2,-h/2+w*.05,w,h,rd);c.fill();c.fillStyle='rgba(0,0,0,.12)';c.beginPath();c.roundRect(-w/2-1,-h/2+w*.09,w+2,h,rd+1);c.fill()}
+  c.drawImage(cdSprite(id),-w/2,-h/2,w,h);
+  if(o.dim){c.fillStyle='rgba(18,26,38,'+o.dim+')';c.beginPath();c.roundRect(-w/2,-h/2,w,h,rd);c.fill()}
+  if(o.hl){c.strokeStyle=o.hl;c.lineWidth=3;c.beginPath();c.roundRect(-w/2,-h/2,w,h,rd);c.stroke()}
+  c.restore()}
+
+/* ===== Mau-Mau: 2–4 Spieler, lokal gegen Computer oder online (Host berechnet, Hände bleiben privat) =====
+   Skat-Blatt (7 bis Ass). 7 = nächster zieht 2 (weitergeben mit einer 7), 8 = nächster setzt aus, Bube = Farbe wünschen (nicht auf Bube, nicht als letzte Karte), Ass = nochmal. */
+const mmShuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const mmDeck=()=>{const d=[];for(let s=0;s<4;s++)for(let r=5;r<=12;r++)d.push(s*13+r);return mmShuf(d)};
+/* Darf Karte c auf den Stapel? st = öffentlicher Zustand (top, suit, pend, dr), hand = Hand des Spielers, drc = soeben gezogene Karte */
+function mmOK(st,hand,c,drc){
+  const r=cdR(c),s=cdS(c);
+  if(st.dr&&c!==drc)return false;
+  if(hand.length==1&&r==9)return false;
+  if(st.pend>0)return r==5;
+  if(r==9)return cdR(st.top)!=9;
+  return s==st.suit||r==cdR(st.top)
+}
+function mmNew(sp,nm,cfg,seq0,rn){
+  const deck=mmDeck(),H=[[],[],[],[]],act=[0,1,2,3].filter(s=>sp[s]!='x');
+  for(let k=0;k<5;k++)for(const s of act)H[s].push(deck.pop());
+  let top;const skip=[];
+  for(;;){top=deck.pop();const r=cdR(top);if(r==7||r==8||r==10||r==11)break;skip.push(top)}
+  deck.unshift(...skip);
+  const st={seq:seq0|0,rn:rn|0,sp:sp.slice(),nm:nm.slice(),hu:sp.map(x=>x=='h'||x=='o'?1:0),n:H.map(h=>h.length),t:act[Math.random()*act.length|0],top,suit:cdS(top),pend:0,dr:0,mau:[0,0,0,0],dk:deck.length,dcn:0,ph:'play',msg:'',rk:[],rm:[0,0,0,0],cfg:{d:cfg.d|0,mau:cfg.mau?1:0}};
+  st.msg=st.nm[st.t]+' beginnt';
+  return{st,H,deck,disc:[]}
+}
+/* Host: Spielablauf. emit(snapshot, event) nach jeder Änderung; hooks.onRematch(sitze) wenn alle über die Revanche entschieden haben. */
+function mmHostMake(G,emit,hooks){
+  const st=G.st,H=G.H;let deck=G.deck,disc=G.disc,drc=-1,tm=null,rmT=null,stopped=0,rmDone=0;
+  const later=(f,ms)=>{clearTimeout(tm);tm=setTimeout(()=>{if(!stopped)f()},ms)};
+  const out=ev=>{
+    st.n=H.map(h=>h.length);st.dk=deck.length;st.dcn=disc.length;
+    for(let s=0;s<4;s++)if(H[s].length>=3||!H[s].length)st.mau[s]=0;
+    st.seq++;emit(JSON.parse(JSON.stringify(st)),ev||null)
+  };
+  const nm=s=>st.nm[s];
+  const nextOf=s=>{let n=s;for(let i=0;i<4;i++){n=(n+1)%4;if(st.sp[n]!='x')return n}return s};
+  const drawN=(s,n)=>{let got=0;for(let i=0;i<n;i++){if(!deck.length&&disc.length){deck=mmShuf(disc);disc=[]}if(!deck.length)break;H[s].push(deck.pop());got++}return got};
+  const ok=(s,c)=>mmOK(st,H[s],c,drc);
+  const legalOf=s=>H[s].filter(c=>ok(s,c));
+  const wishOf=(s,c)=>{const cnt=[0,0,0,0];H[s].forEach(x=>{if(x!==c)cnt[cdS(x)]++});let b=0;for(let i=1;i<4;i++)if(cnt[i]>cnt[b]||(cnt[i]==cnt[b]&&Math.random()<.5))b=i;return b};
+  function pick(s,lg){
+    const d=st.cfg.d,hand=H[s];if(d==0)return lg[Math.random()*lg.length|0];
+    const nx=nextOf(s),nn=H[nx].length,cnt=[0,0,0,0];hand.forEach(c=>cnt[cdS(c)]++);
+    let best=lg[0],bs=-1e9;
+    for(const c of lg){
+      const r=cdR(c),su=cdS(c);let sc=Math.random()*(d==1?5:1.5);
+      sc+=cnt[su]*1.2;
+      if(hand.some(x=>x!==c&&cdR(x)==r))sc+=1.5;
+      if(r==5)sc+=nn<=3?9:3;
+      if(r==6)sc+=nn<=2?8:2;
+      if(r==12)sc+=5;
+      if(r==9)sc+=hand.length<=3?2:-7;
+      if(st.pend>0)sc+=50;
+      if(sc>bs){bs=sc;best=c}
+    }
+    return best
+  }
+  function prompt(){
+    if(stopped||st.ph!='play')return;const s=st.t;
+    if(st.sp[s]=='c')later(()=>bot(s),650+Math.random()*750+(st.cfg.d==0?350:0));
+    else if(!st.dr&&st.pend>0&&!H[s].some(c=>cdR(c)==5))later(()=>{if(st.t==s&&st.ph=='play'&&!st.dr)draw(s)},1500);
+    else if(st.sp[s]=='o')later(()=>bot(s),45000)
+  }
+  function bot(s){
+    if(stopped||st.ph!='play'||st.t!=s)return;
+    const hand=H[s],lg=legalOf(s);
+    if(!lg.length){if(st.dr)endTurn(s);else draw(s);return}
+    if(st.cfg.mau&&hand.length==2&&!st.mau[s]&&st.sp[s]=='c'&&Math.random()<[.6,.88,1][st.cfg.d]){st.mau[s]=1;out({k:'mau',s});later(()=>bot(s),600);return}
+    const c=pick(s,lg);play(s,c,cdR(c)==9?(st.cfg.d==0?Math.random()*4|0:wishOf(s,c)):-1)
+  }
+  function play(s,c,w){
+    const h=H[s];h.splice(h.indexOf(c),1);
+    disc.push(st.top);st.top=c;const r=cdR(c);
+    st.suit=r==9?(w>=0&&w<4?w:wishOf(s,c)):cdS(c);
+    const pen=st.cfg.mau&&h.length==1&&!st.mau[s];
+    st.dr=0;drc=-1;
+    const ev={k:'play',s,c,w:r==9?st.suit:-1};
+    if(!h.length){win(s,ev);return}
+    if(r==5)st.pend+=2;
+    st.ph='anim';st.msg=nm(s)+' legt '+cdName(c)+(r==9?' und wünscht '+CD.SN[st.suit]:'');
+    out(ev);
+    later(()=>{
+      if(pen){const g=drawN(s,2);st.mau[s]=0;st.msg=nm(s)+' hat „Mau“ vergessen: +'+g+' Karten';out({k:'draw',s,n:g,pen:1});later(()=>step(s,r),700+g*160)}
+      else step(s,r)
+    },r==9?950:800)
+  }
+  function step(s,r){
+    let t=nextOf(s),ev=null;
+    if(r==12){t=s;st.msg=nm(s)+' ist nochmal dran'}
+    else if(r==6){const sk=t;t=nextOf(sk);st.msg=nm(sk)+' setzt aus';ev={k:'skip',s:sk}}
+    else st.msg=nm(t)+(st.pend?': +'+st.pend+' ziehen oder eine 7 legen':' ist dran');
+    st.t=t;st.ph='play';out(ev);prompt()
+  }
+  function draw(s){
+    if(st.ph!='play'||st.t!=s||st.dr)return;
+    if(st.pend>0){
+      const g=drawN(s,st.pend);st.pend=0;st.ph='anim';st.msg=nm(s)+' zieht '+g+' Karten';out({k:'draw',s,n:g});
+      later(()=>endTurn(s),650+g*150);return
+    }
+    const g=drawN(s,1);
+    if(!g){st.ph='anim';st.msg='Der Stapel ist leer';out();later(()=>endTurn(s),800);return}
+    drc=H[s][H[s].length-1];st.ph='anim';
+    if(ok(s,drc)){st.dr=1;st.msg=nm(s)+' zieht – die Karte passt';out({k:'draw',s,n:1});later(()=>{st.ph='play';out();prompt()},560)}
+    else{st.msg=nm(s)+' zieht eine Karte';out({k:'draw',s,n:1});later(()=>endTurn(s),800)}
+  }
+  function endTurn(s){st.dr=0;drc=-1;st.t=nextOf(s);st.ph='play';st.msg=nm(st.t)+(st.pend?': +'+st.pend+' ziehen oder eine 7 legen':' ist dran');out();prompt()}
+  function win(s,ev){
+    st.ph='end';
+    st.rk=[0,1,2,3].filter(x=>st.sp[x]!='x').sort((a,b)=>(a==s?-1:b==s?1:0)||H[a].length-H[b].length||a-b);
+    st.msg=nm(s)+' gewinnt!';
+    st.rm=[0,1,2,3].map(x=>st.hu[x]?(st.sp[x]=='c'?2:0):1);
+    out(ev);
+    if(hooks&&hooks.onRematch){rmT=setTimeout(()=>{if(!stopped)rmCheck(1)},25000);rmCheck()}
+  }
+  const humans=()=>[0,1,2,3].filter(s=>st.hu[s]&&st.sp[s]!='x');
+  function rmCheck(force){
+    if(rmDone||!hooks||!hooks.onRematch)return;
+    const hs=humans();
+    if(force||hs.every(s=>st.rm[s])){rmDone=1;clearTimeout(rmT);hooks.onRematch(hs.filter(s=>st.rm[s]==1))}
+  }
+  return{
+    start(){out({k:'start'});later(prompt,900)},
+    act(seat,a,p,w){
+      if(stopped)return;
+      if(st.ph=='end'){
+        if((a=='rematch'||a=='leave')&&st.hu[seat]&&!st.rm[seat]){st.rm[seat]=a=='rematch'?1:2;out();rmCheck()}
+        return
+      }
+      if(st.ph!='play'||seat!==st.t||st.sp[seat]=='c')return;
+      if(a=='mau'){if(st.cfg.mau&&H[seat].length==2&&!st.mau[seat]){st.mau[seat]=1;out({k:'mau',s:seat})}return}
+      if(a=='play'){if(!H[seat].includes(p)||!ok(seat,p))return;clearTimeout(tm);play(seat,p,w|0);return}
+      if(a=='draw'){clearTimeout(tm);draw(seat);return}
+      if(a=='pass'&&st.dr){clearTimeout(tm);endTurn(seat)}
+    },
+    gone(s){
+      if(st.ph=='end'){if(st.hu[s]&&st.rm[s]!=2){st.rm[s]=2;out();rmCheck()}return}
+      if(st.sp[s]!='o')return;
+      st.sp[s]='c';st.nm[s]=st.nm[s]+' (Bot)';out();
+      if(st.t==s&&st.ph=='play')later(()=>bot(s),900)
+    },
+    hand:s=>H[s].slice(),
+    dr:s=>s==st.t&&st.dr?drc:-1,
+    stop(){stopped=1;clearTimeout(tm);clearTimeout(rmT)}
+  }
+}
+
+function mmMk(){
+  let st=null,mode='setup',host=null,my=0,myH=[],myDr=-1,ani=[],pile=[],dTop=0,endShown=0,rmSig='',lastTurn=-1,flash={},shake={},wishFor=-1,lastPlay=null,hsent={};
+  const DXc=340,PXc=430,PYc=176,PW=78,HW=84,HY=352;
+  const sortH=h=>h.slice().sort((a,b)=>a-b);
+  const demo=()=>{
+    const G=mmNew(['h','c','c','c'],['Du','Computer 1','Computer 2','Computer 3'],{d:1,mau:1},0,0);
+    while(G.H[0].length<7)G.H[0].push(G.deck.pop());
+    G.st.t=0;G.st.msg='Mau-Mau';myH=sortH(G.H[0]);myDr=-1;G.st.n=[7,5,4,6];
+    pile=[{c:G.deck[0],rot:-.22,dx:-6,dy:4},{c:G.deck[1],rot:.17,dx:5,dy:-3},{c:G.st.top,rot:.04,dx:0,dy:0}];dTop=G.st.top;
+    return G.st
+  };
+  st=demo();
+  const mine=s=>(mode=='local'||mode=='host'||mode=='guest')&&s==my;
+  const myTurn=()=>!!st&&mine(st.t)&&st.ph=='play';
+  const ok=c=>mmOK(st,myH,c,myDr);
+  const actSeats=()=>[0,1,2,3].filter(x=>st.sp[x]!='x');
+  /* Platz am Tisch: 0 unten (ich), 1 links, 2 oben, 3 rechts */
+  const posOf=s=>{const a=actSeats(),n=a.length,i=a.indexOf(s),j=Math.max(0,a.indexOf(my));return({1:[0],2:[0,2],3:[0,1,3],4:[0,1,2,3]}[n]||[0,1,2,3])[(i-j+n)%n]};
+  const handLay=h=>{const n=h.length,sp=n>1?Math.min(HW*.74,(724-HW)/(n-1)):0,x0=400-(sp*(n-1)+HW)/2;return h.map((c,i)=>({c,x:x0+i*sp,y:HY,w:HW,vis:i<n-1?sp:HW}))};
+  const ANCH=[[400,410],[36,235],[400,38],[764,235]];
+  const fan=(pos,n)=>{const w=40,o=[];if(pos==2){const sp=n>1?Math.min(w*.42,230/(n-1)):0;for(let i=0;i<n;i++)o.push({x:400-(n-1)*sp/2+i*sp,y:38,r:0,w})}
+    else{const sp=n>1?Math.min(w*.4,170/(n-1)):0;for(let i=0;i<n;i++)o.push({x:pos==1?36:764,y:235-(n-1)*sp/2+i*sp,r:pos==1?Math.PI/2:-Math.PI/2,w})}return o};
+  /* ----- Zustand empfangen ----- */
+  const syncMine=()=>{if(host){myH=sortH(host.hand(my));myDr=host.dr(my)}};
+  function onSnap(snap,ev){
+    snap.rk=snap.rk||[];snap.rm=snap.rm||[0,0,0,0];
+    const first=!st||mode=='setup'||!st.seq||st.rn!==snap.rn,jump=!!st&&snap.seq>st.seq+1;
+    let from=null;
+    if(ev&&ev.k=='play'&&ev.s==my&&!first&&!jump){const i=myH.indexOf(ev.c),L=handLay(myH);from=i>=0?L[i]:(lastPlay&&lastPlay.c==ev.c?lastPlay.p:null)}
+    st=snap;syncMine();
+    if(first||jump){ani=[];dTop=st.top;pile=[{c:st.top,rot:rnd(-.12,.12),dx:0,dy:0}];flash={};wishFor=-1}
+    else if(ev){
+      const T=now();
+      if(ev.k=='play'){
+        const pos=posOf(ev.s),a=fan(pos,Math.max(1,st.n[ev.s]+1)),mid=a[a.length>>1]||{x:ANCH[pos][0],y:ANCH[pos][1],w:40};
+        const sx=from?from.x+from.w/2:ev.s==my?400:mid.x,sy=from?from.y+from.w*.7:ev.s==my?420:mid.y,sw=from?from.w:ev.s==my?HW:mid.w*1.4,rot=ev.s==my?0:pos==1?Math.PI/2:pos==3?-Math.PI/2:0;
+        const e={k:'play',c:ev.c,x0:sx,y0:sy,w0:sw,x1:PXc,y1:PYc,w1:PW,r0:rot,r1:rnd(-.16,.16),t0:T,dur:430,done(){dTop=ev.c;pile.push({c:ev.c,rot:e.r1,dx:rnd(-4,4),dy:rnd(-3,3)});if(pile.length>5)pile.shift();snd(520+(ev.c%13)*8,.05,'triangle');if(ev.w>=0){flash.wish={t:now(),s:ev.w}}}};
+        ani.push(e)
+      }else if(ev.k=='draw'){
+        const pos=posOf(ev.s);
+        for(let i=0;i<ev.n;i++)ani.push({k:'draw',c:-1,x0:DXc,y0:PYc,w0:PW,x1:ANCH[pos][0],y1:ANCH[pos][1],w1:pos==0?HW:40,r0:0,r1:pos==1?Math.PI/2:pos==3?-Math.PI/2:0,t0:T+i*130,dur:380,done(){snd(260,.03,'square')}});
+        if(ev.pen)flash[ev.s]={t:T,txt:'+2 Strafe'}
+      }else if(ev.k=='mau'){flash[ev.s]={t:T,txt:'MAU!'};snd(660,.12,'triangle')}
+      else if(ev.k=='skip'){flash[ev.s]={t:T,txt:'setzt aus'};snd(200,.12,'sawtooth')}
+    }
+    if(st.ph!='end'&&endShown){endShown=0;rmSig='';ovHide()}
+  }
+  const hostEmit=(snap,ev)=>{pushHands(snap);onSnap(snap,ev);if(LUN.ref)LUN.ref.child('snap').set(JSON.stringify({snap,ev})).catch(e=>toast(luErr(e)))};
+  function pushHands(snap){
+    if(mode!='host'||!LUN.ref||!host||!LUN.room)return;const seats=luSeatsOf(LUN.room);
+    for(let s=0;s<4;s++){
+      if(snap.sp[s]!='o')continue;const u=seats[s].uid;if(!u)continue;
+      const str=JSON.stringify({h:host.hand(s),dr:host.dr(s)});
+      if(hsent[u]!==str){hsent[u]=str;OL.db.ref('hands/'+LUN.code+'/'+u).set(str).catch(e=>toast(luErr(e)))}
+    }
+  }
+  const send=(a,p,w)=>{
+    if(mode=='guest'){LUN.actN++;LUN.ref.child('act/'+OL.me).set(JSON.stringify({n:LUN.actN,a,p:p|0,w:w==null?-1:w})).catch(e=>toast(luErr(e)))}
+    else if(host)host.act(my,a,p,w)
+  };
+  /* ----- Overlays ----- */
+  const ovHide=()=>{$('#ov').style.display='none'};
+  const diffTxt=['Einfach','Normal','Schwer'];
+  function setupHTML(){
+    const M=S.mm,sg=(cls,arr,cur)=>arr.map(([v,l])=>`<button data-lu=${cls} data-v="${v}" class="${cur==v?'on':''}">${l}</button>`).join('');
+    return`<div class=luwrap><h2>Mau-Mau</h2><div class=lusetup>
+<div class=lurow><b>Gegner</b><div class=seg>${sg('mn',[[1,'1 Computer'],[2,'2 Computer'],[3,'3 Computer']],M.n)}</div></div>
+<div class=lurow><b>Computer</b><div class=seg>${sg('diff',[[0,'Einfach'],[1,'Normal'],[2,'Schwer'],[3,'Adaptiv']],S.d)}</div></div>
+<div class=lurow><b>„Mau“ rufen</b><div class=seg>${sg('mauopt',[[1,'Pflicht'],[0,'Aus']],M.mau)}</div></div></div>
+<div><button class=btn data-lu=go>Spiel starten</button></div>
+<div class=luon><b>🌐 Online</b><button class=btn data-lu=create>Raum erstellen</button><input id=lucode maxlength=5 placeholder="CODE" autocomplete=off autocapitalize=characters><button class="btn r" data-lu=join>Beitreten</button></div>
+<p class=luhint>Passende Farbe oder Zahl legen. 7: nächster zieht 2 (mit einer 7 weitergeben) · 8: nächster setzt aus · Bube: Farbe wünschen · Ass: nochmal dran. Vor der vorletzten Karte „Mau“ rufen!</p></div>`
+  }
+  const showSetup=()=>{mode='setup';st=demo();ani=[];showOv(setupHTML())};
+  function frHTML(room){
+    const seats=luSeatsOf(room||LUN.room),inRoom=seats.filter(x=>x.k=='p').map(x=>x.uid),fr=Object.keys(OL.F||{}).filter(u=>!inRoom.includes(u)&&olAllowed(u));
+    if(!fr.length)return Object.keys(OL.F||{}).length?'<span class=luhint>Alle deine Freunde sind schon im Raum.</span>':'<span class=luhint>Noch keine Freunde. <button class=mini data-lu=frs>Freunde hinzufügen</button></span>';
+    const st_=u=>!OL.P[u]?0:OL.P[u].g?1:2;
+    return fr.sort((a,b)=>st_(b)-st_(a)||olNameOf(a).localeCompare(olNameOf(b))).map(u=>{
+      const k=st_(u),sent=LUN.inv[u]&&Date.now()-LUN.inv[u]<45000,col=['#9ca3af','#f59e0b','#22c55e'][k];
+      const btn=k==2?(sent?'<button class=mini disabled>Eingeladen ✓</button>':`<button class=mini data-lu=inv data-u=${u}>Einladen</button>`):`<button class=mini disabled>${k?'Beschäftigt':'Offline'}</button>`;
+      return`<div class=lurow><i style="background:${col}"></i><b>${luHtml(olNameOf(u))}</b>${btn}</div>`}).join('')
+  }
+  const refreshFr=()=>{const e=$('#lufr');if(e&&mode=='lobby'&&LUN.role=='host'&&LUN.room&&LUN.room.status=='lobby')e.innerHTML=frHTML(LUN.room)};
+  window.luFr=refreshFr;
+  async function invite(u){
+    if(!await olCanContact(u))return;
+    if(LUN.role!='host'||!LUN.room||LUN.room.status!='lobby'||!u)return;
+    if(!OL.P[u]||OL.P[u].g){toast(olNameOf(u)+' ist gerade nicht frei.');refreshFr();return}
+    try{
+      const r=OL.db.ref('invites/'+u+'/'+OL.me);
+      await r.set({mid:'room:'+LUN.code,name:OL.name,game:'maumau',t:0,ts:olTS()});
+      r.onDisconnect().remove();LUN.inv[u]=Date.now();
+      toast('Einladung an '+olNameOf(u)+' gesendet');refreshFr();setTimeout(refreshFr,45500)
+    }catch(e){toast(luErr(e))}
+  }
+  function lobbyHTML(room){
+    const seats=luSeatsOf(room),isHost=LUN.role=='host',L=room.cfg||{};
+    const rows=seats.map((x,s)=>{
+      let lab,ctl='';
+      if(x.k=='p'){lab=luHtml(x.name||'Spieler')+(x.uid==room.host?' <small>(Host)</small>':'');if(isHost&&x.uid!=room.host)ctl=`<button class=mini data-lu=sk data-s=${s} data-v=open>Entfernen</button>`}
+      else{lab=x.k=='open'?'<em>wartet auf Spieler …</em>':x.k=='cpu'?'Computer':'<span style="opacity:.5">Aus</span>';
+        if(isHost&&s>0)ctl=`<div class=seg>${[['open','Offen'],['cpu','Computer'],['off','Aus']].map(([v,l])=>`<button data-lu=sk data-s=${s} data-v=${v} class="${x.k==v?'on':''}">${l}</button>`).join('')}</div>`}
+      return`<div class=lurow><i style="background:${LU.COL[s]}"></i><b>${lab}</b>${ctl}</div>`}).join('');
+    const nAct=seats.filter(x=>x.k=='p'||x.k=='cpu').length,nOpen=seats.filter(x=>x.k=='open').length;
+    const ok=nAct>=2&&!nOpen;
+    return`<div class=luwrap><div class=kick>Mau-Mau · Online-Raum</div><div class=lucode>${LUN.code}</div><p class=luhint>${isHost?'Lade Freunde unten direkt ein – oder sie geben diesen Code unter „Beitreten“ ein.':'Freunde öffnen Mau-Mau, wählen „Beitreten“ und geben diesen Code ein.'}</p><div class=lusetup>${rows}</div>
+<p class=luhint>Computer: ${diffTxt[L.d|0]||'Normal'} · „Mau“ rufen: ${L.mau?'Pflicht':'aus'}</p>
+${isHost&&nOpen?`<div class=lufrw><b>Freunde einladen</b><div id=lufr>${frHTML(room)}</div></div>`:''}
+${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten</button></div><p class=luhint>${ok?'Alle Plätze sind belegt.':nOpen?'Offene Plätze auf „Computer“ oder „Aus“ stellen, sobald niemand mehr kommt.':'Mindestens 2 Spieler nötig.'}</p>`:'<p class=luhint>Warte auf den Host …</p>'}
+<div><button class="btn r" data-lu=leave>Raum verlassen</button></div></div>`
+  }
+  function endHTML(){
+    const med=['🥇','🥈','🥉','4.'],online=mode=='host'||mode=='guest',w=st.rk[0];
+    const h=st.rk.map((s,i)=>{
+      let tag='';
+      if(online&&st.hu[s]){tag=st.rm[s]==1?'<small style="color:#4ade80">✓ Revanche</small>':st.rm[s]==2?'<small style="opacity:.6">verlässt den Raum</small>':'<small style="opacity:.7">überlegt …</small>'}
+      return`<div class=lurow style="border-color:${LU.COL[s]}"><i style="background:${LU.COL[s]}"></i><b>${med[i]||i+1+'.'} ${luHtml(st.nm[s])}</b><span class=luhint style="margin:0">${i?st.n[s]+(st.n[s]==1?' Karte':' Karten'):'alle abgelegt'}</span>${tag}</div>`}).join('');
+    let b='';
+    if(mode=='local')b='<button class=btn data-lu=again>Nochmal spielen</button> <button class="btn r" data-lu=menu>Menü</button>';
+    else if(st.rm[my]==0)b='<button class=btn data-lu=rm>Revanche</button> <button class="btn r" data-lu=menu>'+(mode=='host'?'Beenden':'Verlassen')+'</button><p class=luhint>Nur wer Revanche wählt, bleibt in der Gruppe – alle anderen verlassen den Raum.</p>';
+    else b='<p class=luhint>Du bist für die Revanche dabei – warte auf die anderen …</p><button class="btn r" data-lu=menu>Verlassen</button>';
+    return`<div class=luwrap><div class=kick>Runde beendet</div><h2 style="color:${LU.COL[w]}">${w==my&&mode!='setup'?'Du gewinnst!':luHtml(st.nm[w])+' gewinnt!'}</h2><div class=lusetup>${h}</div><div>${b}</div></div>`
+  }
+  /* ----- Starten ----- */
+  function launch(G,emitFn){
+    ani=[];endShown=0;rmSig='';wishFor=-1;hsent={};st=null;
+    host=mmHostMake(G,emitFn,mode=='host'?{onRematch:doRematch}:null);
+    ovHide();host.start()
+  }
+  function startLocal(){
+    const M=S.mm,n=Math.max(1,Math.min(3,M.n|0)),sp=['h','x','x','x'],nm=[(OL&&OL.name)||'Du','','',''];
+    for(let i=1;i<=n;i++){sp[i]='c';nm[i]='Computer '+i}
+    for(let i=n+1;i<4;i++)nm[i]=LU.NAME[i];
+    const d=S.d==3?Math.max(0,Math.min(2,Math.round(adEff()+rnd(-.4,.4)))):S.d;
+    mode='local';my=0;
+    launch(mmNew(sp,nm,{d,mau:M.mau},0,0),onSnap)
+  }
+  function startHostOnline(room){
+    const seats=luSeatsOf(room),sp=seats.map(x=>x.k=='p'?(x.uid==OL.me?'h':'o'):x.k=='cpu'?'c':'x');
+    const nm=seats.map((x,i)=>x.k=='p'?x.name:x.k=='cpu'?'Computer '+LU.NAME[i]:LU.NAME[i]);
+    const cfg=room.cfg||{};
+    mode='host';my=LUN.seat;LUN.lastAct={};
+    LUN.ref.update({status:'play'}).catch(e=>toast(luErr(e)));
+    launch(mmNew(sp,nm,{d:cfg.d,mau:cfg.mau},1,0),hostEmit);
+    olSetGame('maumau');
+    try{for(const u in LUN.inv)OL.db.ref('invites/'+u+'/'+OL.me).remove()}catch(e){}LUN.inv={}
+  }
+  /* Revanche: alle, die zugestimmt haben (plus Computer-Plätze), spielen weiter; die anderen fliegen aus dem Raum */
+  function doRematch(yes){
+    if(mode!='host'||!host||!st||!LUN.room)return;
+    const prev=st,seats=luSeatsOf(LUN.room);
+    if(!yes.includes(my))yes=yes.concat(my);
+    const sp=[0,1,2,3].map(s=>prev.hu[s]?(yes.includes(s)?(s==my?'h':'o'):'x'):(prev.sp[s]=='c'?'c':'x'));
+    if(sp.filter(x=>x!='x').length<2){const f=sp.findIndex(x=>x=='x');if(f>=0)sp[f]='c'}
+    const nm=[0,1,2,3].map(s=>sp[s]=='h'||sp[s]=='o'?(seats[s].name||LU.NAME[s]):sp[s]=='c'?'Computer '+LU.NAME[s]:LU.NAME[s]);
+    const upd={};
+    for(let s=0;s<4;s++){const k=sp[s]=='x'?'off':sp[s]=='c'?'cpu':'p';if(k!='p'&&seats[s].k!=k)upd['seats/'+s]={k}}
+    const cfg=prev.cfg;host.stop();
+    const run=()=>launch(mmNew(sp,nm,cfg,prev.seq+5,prev.rn+1),hostEmit);
+    if(Object.keys(upd).length)LUN.ref.update(upd).then(run,e=>toast(luErr(e)));else run()
+  }
+  async function create(){
+    if(!await luLogin())return;
+    const M=S.mm,cfg={d:S.d==3?Math.max(0,Math.min(2,Math.round(adEff()))):S.d,mau:M.mau},code=luCode(),ref=OL.db.ref('rooms/'+code);
+    try{
+      await ref.set({host:OL.me,hn:OL.name,ts:olTS(),status:'lobby',cfg,seats:{0:{k:'p',uid:OL.me,name:OL.name},1:{k:'open'},2:{k:'open'},3:{k:'open'}}});
+      OL.db.ref('hands/'+code).onDisconnect().remove();
+      ref.onDisconnect().remove()
+    }catch(e){toast(luErr(e));return}
+    LUN.code=code;LUN.role='host';LUN.seat=0;LUN.ref=ref;LUN.left=0;LUN.g=api;LUN.lastAct={};
+    mode='lobby';listen();olSetGame('maumau')
+  }
+  async function join(codeArg){
+    const code=String(codeArg||(($('#lucode')||{}).value)||'').trim().toUpperCase();
+    if(host&&mode!='lobby'){host.stop();host=null}
+    if(code.length<4){toast('Bitte den Raumcode eingeben.');return}
+    if(!await luLogin())return;
+    const ref=OL.db.ref('rooms/'+code);let room;
+    try{room=(await ref.once('value')).val()}catch(e){toast(luErr(e));return}
+    if(!room){toast('Raum nicht gefunden.');return}
+    if(room.cfg&&room.cfg.mau==null&&room.cfg.force!=null){toast('Dieser Raum gehört zu einem anderen Spiel.');return}
+    for(const seat of Object.values(room.seats||{})){if(seat.uid&&seat.uid!==OL.me&&!await olCanContact(seat.uid))return}
+    if(room.status!=='lobby'){toast('Das Spiel läuft schon.');return}
+    let got=-1;
+    try{
+      const seats=room.seats||{};
+      for(let i=0;i<4;i++){const seat=seats[i];if(seat&&seat.k==='p'&&seat.uid===OL.me){got=i;break}}
+      if(got<0){
+        for(let i=0;i<4;i++){
+          const result=await ref.child('seats/'+i).transaction(cur=>{
+            if(cur===null)return {k:'p',uid:OL.me,name:OL.name};if(cur.k!=='open')return;
+            return {k:'p',uid:OL.me,name:OL.name};
+          });
+          const reserved=result.snapshot&&result.snapshot.val();
+          if(result.committed&&reserved&&reserved.k==='p'&&reserved.uid===OL.me){got=i;break}
+        }
+      }
+      if(got<0){toast('Der Raum ist voll.');return}
+    }catch(e){toast(luErr(e));return}
+    LUN.code=code;LUN.role='guest';LUN.seat=got;LUN.ref=ref;LUN.left=0;LUN.g=api;LUN.actN=0;
+    ref.child('seats/'+got).onDisconnect().set({k:'gone',uid:OL.me,name:OL.name});
+    mode='lobby';listen();olSetGame('maumau')
+  }
+  function listen(){
+    LUN.ref.on('value',s=>{
+      const v=s.val();LUN.room=v;if(LUN.left||!LUN.ref)return;
+      if(!v){exit('Der Raum wurde geschlossen.');return}
+      const seats=luSeatsOf(v);
+      if(seats.some(x=>x.uid&&x.uid!==OL.me&&OL.BL[x.uid])){exit('Der Raum enthält einen blockierten Spieler.');return}
+      if(LUN.role=='guest'){
+        const i=seats.findIndex(x=>x.k=='p'&&x.uid==OL.me);
+        if(i<0){exit(st&&st.ph=='end'&&mode=='guest'?'Du bist nicht mehr in der Gruppe, weil du keine Revanche gewählt hast.':'Du wurdest aus dem Raum entfernt.');return}
+        LUN.seat=i;
+        if(v.status=='lobby'){if(mode!='lobby'){mode='lobby';st=demo();ani=[]}showOv(lobbyHTML(v));return}
+        if(v.status=='play'&&v.snap){
+          let o;try{o=JSON.parse(v.snap)}catch(e){return}
+          if(mode!='guest'){
+            mode='guest';my=i;ani=[];endShown=0;ovHide();st=null;LUN.lastSeq=0;myH=[];myDr=-1;
+            LUN.ref.child('seats/'+i).onDisconnect().set({k:'gone',uid:OL.me,name:OL.name});
+            LUN.hr=OL.db.ref('hands/'+LUN.code+'/'+OL.me);
+            LUN.hr.on('value',hs=>{const t=hs.val();if(!t)return;try{const q=JSON.parse(t);myH=sortH(q.h||[]);myDr=q.dr==null?-1:q.dr}catch(e){}},e=>{if(!LUN.left)toast(luErr(e))})
+          }
+          if(o.snap.seq>LUN.lastSeq){LUN.lastSeq=o.snap.seq;onSnap(o.snap,o.ev)}
+        }
+      }else{
+        if(v.status=='lobby'){
+          const fix={};seats.forEach((x,i)=>{if(x.k=='gone')fix['seats/'+i]={k:'open'}});
+          if(Object.keys(fix).length){LUN.ref.update(fix);return}
+          if(mode!='lobby'){mode='lobby';st=demo();ani=[];if(host){host.stop();host=null}}
+          showOv(lobbyHTML(v))
+        }else if(v.status=='play'&&host){
+          seats.forEach((x,i)=>{if(x.k=='gone')host.gone(i)});
+          const a=v.act||{};
+          for(const uid in a){let o;try{o=JSON.parse(a[uid])}catch(e){continue}
+            if(!(o.n>(LUN.lastAct[uid]||0)))continue;LUN.lastAct[uid]=o.n;
+            const si=seats.findIndex(x=>x.k=='p'&&x.uid==uid);if(si>=0)host.act(si,o.a,o.p,o.w)}
+        }
+      }
+    },e=>{if(!LUN.left)exit(luErr(e))})
+  }
+  function exit(msg){LUN.left=1;if(msg)toast(msg);toMenu()}
+  /* ----- Klicks in den Overlays ----- */
+  function luClick(b){
+    const a=b.dataset.lu,v=b.dataset.v,s=b.dataset.s;
+    if(a=='mn'){S.mm.n=+v;save();showOv(setupHTML())}
+    else if(a=='diff'){S.d=+v;save();showOv(setupHTML())}
+    else if(a=='mauopt'){S.mm.mau=+v;save();showOv(setupHTML())}
+    else if(a=='go'||a=='again')startLocal();
+    else if(a=='create')create();
+    else if(a=='join')join();
+    else if(a=='inv')invite(b.dataset.u);
+    else if(a=='frs')olOpen();
+    else if(a=='sk'&&LUN.role=='host'){LUN.ref.child('seats/'+s).set({k:v})}
+    else if(a=='start'&&LUN.role=='host'&&LUN.room)startHostOnline(LUN.room);
+    else if(a=='rm'){send('rematch')}
+    else if(a=='leave'||a=='menu')toMenu()
+  }
+  /* ----- Eingaben im Spiel ----- */
+  const btns=()=>{
+    const o=[];
+    if(!myTurn())return o;
+    if(st.dr&&myDr>=0)o.push({a:'pass',t:'Behalten',w:124});
+    if(st.cfg.mau&&myH.length==2&&!st.mau[my])o.push({a:'mau',t:'Mau!',w:104,hot:1});
+    const tot=o.reduce((x,q)=>x+q.w+14,-14);let x=400-tot/2;o.forEach(q=>{q.x=x;q.y=302;q.h=36;x+=q.w+14});return o
+  };
+  function playSent(c,w){lastPlay={c,p:handLay(myH).find(q=>q.c==c)};send('play',c,w)}
+  function tapCard(q){
+    if(!ok(q.c)){snd(150,.08,'sawtooth');shake[q.c]=now();return}
+    if(cdR(q.c)==9){wishFor=q.c;return}
+    playSent(q.c,-1)
+  }
+  function click(x,y){
+    if(mode=='setup'||mode=='lobby'||!st||st.ph=='end')return;
+    if(wishFor>=0){const i=[0,1,2,3].findIndex(k=>Math.hypot(x-(250+k*100),y-PYc)<40);const c=wishFor;wishFor=-1;if(i>=0)playSent(c,i);return}
+    if(!myTurn())return;
+    for(const b of btns())if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){send(b.a);return}
+    if(Math.abs(x-DXc)<PW/2+6&&Math.abs(y-PYc)<PW*.7+6){
+      if(st.dr){toast('Du hast schon gezogen – lege die Karte oder wähle „Behalten“.');return}
+      send('draw');return
+    }
+    const L=handLay(myH);
+    for(let i=L.length-1;i>=0;i--){const q=L[i];if(x>=q.x&&x<=q.x+q.vis&&y>=q.y-16&&y<=q.y+HW*1.4){tapCard(q);return}}
+  }
+  function key(k){
+    if(mode=='setup'||mode=='lobby'||!st||st.ph=='end'||!myTurn())return;
+    if(k=='Space'||k=='Enter'){if(!st.dr)send('draw');else send('pass')}
+    else if(k=='KeyM')send('mau');
+    else{const m=/^(Digit|Numpad)([1-9])$/.exec(k);if(m){const q=handLay(myH)[+m[2]-1];if(q)tapCard(q)}}
+  }
+  /* ----- Zeichnen ----- */
+  const fitText=(t,w,size,wt)=>{c.font=(wt||700)+' '+size+'px system-ui';while(size>10&&c.measureText(t).width>w){size--;c.font=(wt||700)+' '+size+'px system-ui'}};
+  function chip(x,y,w,s){
+    const on=st.sp[s]!='x',cur=on&&st.t==s&&st.ph!='end'&&mode!='setup';
+    c.save();rr(x,y,w,30,15,cur?'#ffffff2e':'#0000004d');
+    if(cur){c.strokeStyle=LU.COL[s];c.lineWidth=2.5;c.shadowColor=LU.COL[s];c.shadowBlur=S.anim?12:0;c.beginPath();c.roundRect(x,y,w,30,15);c.stroke();c.shadowBlur=0}
+    circ(x+15,y+15,6,LU.COL[s]);
+    let nmx=st.nm[s]||'';c.fillStyle='#f4f7f2';c.textAlign='left';c.textBaseline='middle';
+    fitText(nmx,w-100,13);c.fillText(nmx,x+28,y+15.5);
+    c.textAlign='right';c.font='700 12px system-ui';c.fillStyle=st.n[s]<=1?'#ffd24a':'#cfe0d8';
+    c.fillText(st.n[s]+(st.n[s]==1?' Karte':' Karten'),x+w-12,y+15.5);
+    if(st.mau&&st.mau[s]){rr(x+w-8,y-9,40,18,9,'#ffd24a');c.fillStyle='#3a2a00';c.textAlign='center';c.font='800 10px system-ui';c.fillText('MAU',x+w+12,y+.5)}
+    const f=flash[s];if(f&&f.txt&&now()-f.t<1500){const a=Math.min(1,(1500-(now()-f.t))/500);c.globalAlpha=a;c.fillStyle='#ffd24a';c.textAlign='center';c.font='800 14px system-ui';c.fillText(f.txt,x+w/2,y-12-(now()-f.t)/60);}
+    c.restore()
+  }
+  function suitBadge(x,y,s,r){circ(x,y,r,'#fcfbf8');c.save();c.fillStyle=CD.COL[s];cdSuit(c,s,x,y+1,r*1.15);c.restore()}
+  function draw(){
+    const T=now(),dim=(mode=='setup'||mode=='lobby')&&!window.NOFIN;
+    /* Tisch */
+    const g=c.createRadialGradient(400,210,40,400,240,520);g.addColorStop(0,'#2b6a55');g.addColorStop(1,'#0e2a23');c.fillStyle=g;c.fillRect(0,0,W,H);
+    c.strokeStyle='#ffffff10';c.lineWidth=2;c.beginPath();c.ellipse(385,178,162,104,0,0,7);c.stroke();
+    /* Gegner */
+    for(const s of actSeats()){
+      if(mine(s)||(mode=='setup'&&s==my))continue;
+      const pos=posOf(s),n=st.n[s];
+      for(const f of fan(pos,n))drawCard(f.x-f.w/2,f.y-f.w*.7,f.w,-1,{rot:f.r,sh:0});
+      const cx=pos==2?[300,200]:pos==1?[10,196]:[594,196],cy=pos==2?78:86;
+      chip(cx[0],cy,cx[1],s)
+    }
+    /* Stapel */
+    const dk=st.dk;
+    if(dk>0){for(let i=Math.min(3,dk)-1;i>=0;i--)drawCard(DXc-PW/2-i*1.6,PYc-PW*.7-i*1.6,PW,-1,{sh:i==0?1:0})}
+    else{c.strokeStyle='#ffffff40';c.setLineDash([5,5]);c.lineWidth=2;c.beginPath();c.roundRect(DXc-PW/2,PYc-PW*.7,PW,PW*1.4,PW*.09);c.stroke();c.setLineDash([])}
+    c.fillStyle='#cfe0d8';c.font='700 11px system-ui';c.textAlign='center';c.textBaseline='alphabetic';c.fillText(dk+' im Stapel',DXc,PYc+PW*.7+16);
+    const canDraw=myTurn()&&!st.dr&&mode!='setup';
+    if(canDraw&&!myH.some(q=>ok(q))||(canDraw&&st.pend>0)){c.save();c.globalAlpha=.55+.35*Math.sin(T/200);c.strokeStyle='#ffd24a';c.lineWidth=3;c.beginPath();c.roundRect(DXc-PW/2-3,PYc-PW*.7-3,PW+6,PW*1.4+6,PW*.1);c.stroke();c.restore()}
+    for(const q of pile)drawCard(PXc-PW/2+q.dx,PYc-PW*.7+q.dy,PW,q.c,{rot:q.rot,sh:1});
+    /* gewünschte / aktuelle Farbe */
+    const wished=cdR(dTop)==9||st.suit!=cdS(dTop);
+    suitBadge(PXc+PW/2+44,PYc-12,st.suit,20);
+    c.fillStyle='#cfe0d8';c.font='700 11px system-ui';c.textAlign='center';c.fillText(wished?'Wunsch':'Farbe',PXc+PW/2+44,PYc+30);
+    if(st.pend>0){rr(DXc-48,PYc-PW*.7-34,96,26,13,'#d23c3c');c.fillStyle='#fff';c.font='800 13px system-ui';c.textAlign='center';c.textBaseline='middle';c.fillText('+'+st.pend+' ziehen',DXc,PYc-PW*.7-20.5);c.textBaseline='alphabetic'}
+    /* Meldung */
+    c.textAlign='center';c.fillStyle='#f4f7f2';fitText(st.msg||'',460,16,700);c.fillText(st.msg||'',400,272);
+    const my_t=myTurn()&&mode!='setup';
+    c.font='600 11px system-ui';c.fillStyle='#9fbfb2';
+    c.fillText(my_t?(st.pend>0?'Lege eine 7 oder ziehe vom Stapel':st.dr?'Gezogene Karte legen oder behalten':myH.some(q=>ok(q))?'Karte antippen · oder vom Stapel ziehen':'Keine passende Karte – ziehe vom Stapel'):'',400,290);
+    /* Buttons */
+    for(const b of btns()){
+      c.save();if(b.hot){c.shadowColor='#ffd24a';c.shadowBlur=14+6*Math.sin(T/160)}
+      rr(b.x,b.y,b.w,b.h,19,b.hot?'#ffd24a':'#ffffff26');c.restore();
+      c.fillStyle=b.hot?'#3a2a00':'#f4f7f2';c.font='800 15px system-ui';c.textAlign='center';c.textBaseline='middle';c.fillText(b.t,b.x+b.w/2,b.y+b.h/2+1);c.textBaseline='alphabetic'
+    }
+    /* meine Hand */
+    if(st.sp[my]!='x'){
+      chip(14,314,Math.min(190,150),my);
+      const L=handLay(myH);
+      L.forEach((q,i)=>{
+        const lg=my_t&&ok(q.c),dm=my_t&&!lg?.45:0;
+        const sk=shake[q.c]&&T-shake[q.c]<260?Math.sin((T-shake[q.c])/22)*5:0;
+        drawCard(q.x+sk,q.y+(lg?-14:0),q.w,q.c,{dim:dm,hl:my_t&&st.dr&&q.c==myDr?'#ffd24a':0})
+      })
+    }
+    /* Karten im Flug */
+    ani=ani.filter(a=>{
+      if(T<a.t0)return true;
+      const f=Math.min(1,(T-a.t0)/a.dur),e=f*f*(3-2*f),w=a.w0+(a.w1-a.w0)*e;
+      drawCard(a.x0+(a.x1-a.x0)*e-w/2,a.y0+(a.y1-a.y0)*e-w*.7-Math.sin(f*Math.PI)*16,w,a.c,{rot:a.r0+(a.r1-a.r0)*e});
+      if(f>=1){a.done&&a.done();return false}return true
+    });
+    /* Wunsch-Auswahl */
+    if(wishFor>=0){
+      c.fillStyle='#000a';c.fillRect(0,0,W,H);c.fillStyle='#f4f7f2';c.font='800 20px system-ui';c.textAlign='center';c.fillText('Welche Farbe wünschst du dir?',400,PYc-64);
+      for(let k=0;k<4;k++){const x=250+k*100;c.save();c.shadowColor='#0008';c.shadowBlur=14;suitBadge(x,PYc,k,34);c.restore()}
+    }
+    if(flash.wish&&T-flash.wish.t<1400){const a=Math.min(1,(1400-(T-flash.wish.t))/400);c.save();c.globalAlpha=a;c.fillStyle='#ffd24a';c.font='800 15px system-ui';c.textAlign='center';c.fillText('Wunsch: '+CD.SN[flash.wish.s],PXc+PW/2+44,PYc-46);c.restore()}
+    if(dim){c.fillStyle='#000b';c.fillRect(0,0,W,H)}
+  }
+  function update(dt){
+    if(mode=='setup'||mode=='lobby'||!st)return;
+    if(st.t!==lastTurn){lastTurn=st.t;if(st.ph!='end')$('#game').style.setProperty('--tb',LU.COL[st.t])}
+    if(st.ph=='end'){
+      if(!endShown&&!ani.length){endShown=1;rmSig=JSON.stringify(st.rm);
+        const won=st.rk[0]==my;snd(520,.2,'triangle');setTimeout(()=>snd(660,.2,'triangle'),200);setTimeout(()=>snd(800,.35,'triangle'),400);
+        spark(400,200,LU.COL[st.rk[0]],40);
+        if(mode=='local'&&S.d==3)adSet(adR()+(won?.22:-.22));
+        showOv(endHTML())}
+      else if(endShown&&rmSig!==JSON.stringify(st.rm)){rmSig=JSON.stringify(st.rm);showOv(endHTML())}
+    }
+  }
+  const api={update,draw,click,key,luClick,showSetup,
+    canJoin(){return !LUN.ref&&(mode=='setup'||mode=='local')},joinCode(c){return join(c)},
+    leave(){window.luFr=null;if(host){host.stop();host=null}LUN.left=1;luCleanup();$('#game').style.removeProperty('--tb')}};
+  return api
+}
+GAMES.push({id:'maumau',n:'Mau-Mau',ic:'🃏',d:'Das Kartenspiel für 2–4 Spieler, auch online.',cat:'Karten',h:'Karte antippen zum Ausspielen · Stapel antippen zum Ziehen · vor der vorletzten Karte „Mau!“',sub:'2–4 Spieler · Computer · Online',mk:mmMk});
+RULES.maumau='Gespielt wird mit 32 Karten (7 bis Ass), jeder bekommt 5. Du legst eine Karte, die zur obersten in Farbe oder Zahl passt – wer nichts hat, zieht eine Karte und darf sie sofort legen, wenn sie passt. 7: Der Nächste muss 2 Karten ziehen, kann aber mit einer eigenen 7 weitergeben (dann +2 mehr). 8: Der Nächste setzt aus. Bube: darf (außer auf einen Buben) immer gelegt werden, du wünschst dir eine Farbe. Ass: du bist nochmal dran. Mit dem Buben darf man nicht gewinnen. Hast du nur noch zwei Karten, musst du vor dem Ablegen „Mau!“ rufen – sonst gibt es 2 Strafkarten. Wer zuerst keine Karte mehr hat, gewinnt. Online: Nach der Runde spielen nur diejenigen weiter, die „Revanche“ wählen; alle anderen verlassen den Raum.';
+
 GAMES.forEach(g=>{const m=NM[g.id];if(m){g.n=m[0];g.d=m[1]}g.ic=ICON[g.id]||g.ic});
 const revised={
   snakes:{n:'Snake Garden',d:'Wischen, Äpfel sammeln, immer länger werden.',solo:true,soloRules:'Eine Schlange, das ganze Feld: Sammle Äpfel für Punkte und wachse. Jede Schwierigkeit hat einen eigenen Highscore. Wände und dein eigener Körper beenden die Runde. Wische in die gewünschte Richtung; eine direkte Kehrtwende ist nicht möglich.',h:'Wischen: direkt in die gewünschte Richtung · Spieler 1: WASD, Spieler 2: Pfeile · Solo: ganzes Feld und beide Tastensätze'},
@@ -2825,7 +3407,7 @@ let n1='Spieler 1';const n2=()=>S.cpu?'Computer':(ON&&ON.names?ON.names[1]:'Spie
 function loop(t){requestAnimationFrame(loop);if(!cur)return;const dt=Math.min(Math.max((t-last)/1000||.016,.001),.033);last=t;if(!over&&!idle&&!document.hidden){cur.update(dt);adTick(dt)}
 PA.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.l-=dt});PA=PA.filter(p=>p.l>0);const tw=turnW();if(tw!==TBw){TBw=tw;pageTurn(tw);ON&&ON.role==0&&ON.send&&ON.send({tw})}cur.draw();for(const p of PA){c.globalAlpha=Math.min(1,p.l*2);circ(p.x,p.y,4,p.c)}c.globalAlpha=1;}
 const cs=()=>{if(!cup){$('#cs').textContent='';return}const v=cup.i+(over?0:1);$('#cs').textContent=`Cup · Spiel ${v}${v<=cup.n?'/'+cup.n:''} · ${cup.w[0]} : ${cup.w[1]}`};
-const cupAll=()=>GAMES.filter(g=>g.id!='ludo').map(g=>g.id),newCup=(pool,n)=>({n,i:0,w:[0,0],pool:pool.length?pool:cupAll(),bag:[],last:null});
+const cupAll=()=>GAMES.filter(g=>!ROOMG.includes(g.id)).map(g=>g.id),newCup=(pool,n)=>({n,i:0,w:[0,0],pool:pool.length?pool:cupAll(),bag:[],last:null});
 function cupNext(){const c=cup;if(!c.bag.length){const b=c.pool.slice().sort(()=>Math.random()-.5);if(b.length>1&&b[b.length-1]==c.last){const t=b[0];b[0]=b[b.length-1];b[b.length-1]=t}c.bag=b}c.last=c.bag.pop();return c.last}
 const cupInfo=()=>'Cup: '+S.t+' zufällige Spiele, jederzeit beendbar · Haken wählt die Spiele ('+sel.size+')';
 function start(id,sk){gdef=GAMES.find(g=>g.id==id);AD.lo=0;if(S.cpu===2&&(!gdef.solo||cup))S.cpu=1;clearInput();if(!ON)n1=S.cpu===1&&typeof OL!='undefined'&&OL.name?OL.name:'Spieler 1';S.rec=[id,...S.rec.filter(x=>x!=id)].slice(0,4);save();window.RX='';over=0;PA=[];TBw=-1;setView();cur=gdef.mk();$('#menu').style.display='none';$('#game').style.display='block';fsOn();setView();$('#gt').textContent=gdef.n;$('#hint').textContent=gdef.h+(isSolo()?' · Solo: spiele auf Highscore':S.cpu?' (gegen Computer: du bist Spieler 1)':'');cs();intro();if(sk)go()}
@@ -2845,14 +3427,14 @@ function cupEnd(){const a=cup.w;showOv(`<div class=kick>Cup beendet</div><h2>${a
 let MENUY=0;
 addEventListener('scroll',()=>{const m=document.getElementById('menu'),g=document.getElementById('game');if(!document.body.classList.contains('playing')&&m&&m.style.display!='none'&&(!g||g.style.display=='none'))MENUY=window.scrollY||0},{passive:true});
 function toMenu(){clearInput();if(ON&&ON.leave){ON.leave();return}fsOff();if(cur&&cur.leave)cur.leave();cur=null;TBw=9;pageTurn(9);setView(1);cup=null;$('#game').style.display='none';$('#menu').style.display='block';menu();const y=MENUY,go=()=>{try{window.scrollTo(0,y)}catch(e){}};go();requestAnimationFrame(go);setTimeout(go,120)}
-const sel=new Set(GAMES.map(g=>g.id));sel.delete('ludo');S.lu=S.lu||{sp:['h','c','c','c'],force:1,all:1};
+const sel=new Set(GAMES.map(g=>g.id));ROOMG.forEach(x=>sel.delete(x));S.lu=S.lu||{sp:['h','c','c','c'],force:1,all:1};S.mm=S.mm||{n:3,mau:1};
 function seg(id,key,o,cb){const el=$('#'+id);el.innerHTML='';o.forEach(([v,l])=>{const b=document.createElement('button');b.textContent=l;b.className=S[key]==v?'on':'';b.onclick=()=>{S[key]=v;save();(cb||menu)()};el.append(b)})}
 function menu(){tabs();seg('sm','cpu',[[0,'2 Spieler'],[1,'Gegen Computer'],[2,'Solo']]);seg('sd','d',[[0,'Einfach'],[1,'Normal'],[2,'Schwer'],[3,'Adaptiv']]);seg('st','t',[[3,'Ziel 3'],[5,'Ziel 5'],[7,'Ziel 7']]);
 $('#bo').textContent='Pong/Hockey/Tischtennis: '+(S.ori=='p'?'Hochkant':'Quer');$('#bi').textContent='Meine Seite: '+(S.ori=='p'?(S.side?'Oben':'Unten'):(S.side?'Rechts':'Links'));$('#bs').textContent='Ton '+(S.snd?'an':'aus');$('#ba').textContent='Effekte '+(S.anim?'an':'aus');document.body.classList.toggle('noanim',!S.anim);
 $('#cup').disabled=S.cpu===2;$('#cinfo').textContent=S.cpu===2?'Solo: Snake, Block Battle und Basketball mit persönlichen Highscores.':cupInfo();
-$('#grid').innerHTML=list().map(g=>{const s=S.st[g.id]||[0,0];return`<div class=card data-id=${g.id} style='--k:${KC[g.cat]||"#888"}'><label><input type=checkbox ${sel.has(g.id)?'checked':''}> Cup</label><span class=fv>${S.fav.includes(g.id)?'★':'☆'}</span><div class=pic>${g.th?'<img alt="" src="'+g.th+'">':g.ic}<b class=tg>${g.cat}</b></div><h3>${g.n}</h3><small>${g.sub||(g.solo?'Solo · 2 Spieler · Computer':'2 Spieler · Computer')}${s[0]+s[1]?' · Siege '+s[0]+':'+s[1]:''}</small></div>`}).join('')}
+$('#grid').innerHTML=list().map(g=>{const s=S.st[g.id]||[0,0];return`<div class=card data-id=${g.id} style='--k:${KC[g.cat]||"#888"}'>${ROOMG.includes(g.id)?'':`<label><input type=checkbox ${sel.has(g.id)?'checked':''}> Cup</label>`}<span class=fv>${S.fav.includes(g.id)?'★':'☆'}</span><div class=pic>${g.th?'<img alt="" src="'+g.th+'">':g.ic}<b class=tg>${g.cat}</b></div><h3>${g.n}</h3><small>${g.sub||(g.solo?'Solo · 2 Spieler · Computer':'2 Spieler · Computer')}${s[0]+s[1]?' · Siege '+s[0]+':'+s[1]:''}</small></div>`}).join('')}
 $('#grid').onclick=e=>{const k=e.target.closest('label'),cd=e.target.closest('.card');if(e.target.closest('.fv')){const id=cd.dataset.id;S.fav=S.fav.includes(id)?S.fav.filter(x=>x!=id):[...S.fav,id];save();if(S.fav.length)ach('fav','Erster Favorit');menu();return}if(k){const i=k.querySelector('input');setTimeout(()=>{i.checked?sel.add(cd.dataset.id):sel.delete(cd.dataset.id);$('#cinfo').textContent=cupInfo()});return}if(cd){cup=null;start(cd.dataset.id)}};
-$('#cup').onclick=()=>{if(S.cpu===2){toast('Für den Cup bitte 2 Spieler oder Computer wählen.');return}cup=newCup(GAMES.filter(g=>sel.has(g.id)&&g.id!='ludo').map(g=>g.id),S.t);start(cupNext())};
+$('#cup').onclick=()=>{if(S.cpu===2){toast('Für den Cup bitte 2 Spieler oder Computer wählen.');return}cup=newCup(GAMES.filter(g=>sel.has(g.id)&&!ROOMG.includes(g.id)).map(g=>g.id),S.t);start(cupNext())};
 $('#bs').onclick=()=>{S.snd^=1;save();menu();snd(600,.08)};$('#ba').onclick=()=>{S.anim^=1;save();menu()};$('#bo').onclick=()=>{S.ori=S.ori=='p'?'l':'p';save();menu()};$('#bi').onclick=()=>{S.side=S.side?0:1;save();menu();if(S.cpu!==1)toast('Die Seitenwahl gilt gegen den Computer.')};
 $('#bf').onclick=()=>{try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen().catch(()=>{})}catch(e){}};
 $('#back').onclick=toMenu;$('#rs').onclick=()=>{if(ON)return;start(gdef.id,1)};
@@ -2892,7 +3474,7 @@ const ACI={
   newhs:['📈','Überbiete in einem Solo-Spiel deinen Highscore.'],
   solo10:['🎯','Beende 10 Solo-Runden.',()=>[Math.min(S.sp||0,10),10]]
 };
-GAMES.filter(g=>g.id!='ludo').forEach(g=>{ACI['win_'+g.id]=[g.ic||'🏅','Gewinne ein Match in '+g.n+'.'];AC.push(['win_'+g.id,g.n+' gewonnen'])});
+GAMES.filter(g=>!ROOMG.includes(g.id)).forEach(g=>{ACI['win_'+g.id]=[g.ic||'🏅','Gewinne ein Match in '+g.n+'.'];AC.push(['win_'+g.id,g.n+' gewonnen'])});
 [['w10','10 Siege'],['w25','25 Siege'],['w50','50 Siege'],['w100','100 Siege'],['p100','100 Matches'],['streak3','3 Siege in Folge'],['streak5','5 Siege in Folge'],['g5','Siege in 5 Spielen'],['g10','Siege in 10 Spielen'],['hard5','5 Siege gegen Schwer'],['chess_hard','Schach (Schwer) gewonnen'],['tt_rally','Tischtennis: 10er-Ballwechsel'],['snake200','Snake: 200 Punkte'],['fast200','Reaktion unter 200 ms'],['newhs','Highscore gebrochen'],['solo10','10 Solo-Runden']].forEach(x=>AC.push(x));
 (()=>{let ch=0;const g=(id,c)=>{if(c&&!S.ach[id]){S.ach[id]=1;ch=1}};
   g('p25',S.pl>=25);g('p50',S.pl>=50);g('fav',S.fav.length>0);g('color',S.sk[0]>1||S.sk[1]>1||(S.oc|0)>1);g('solo',S.high&&Object.keys(S.high).length>0);
@@ -3148,7 +3730,7 @@ ${lg?'':'<p>Merke dir das Passwort gut – es gibt keine Zurücksetzen-Funktion.
     const u=OL.pick;t='Spiel wählen';
     h=`<p>Gegen <b>${olEsc(olNameOf(u))}</b> – du bist Spieler 1 (blau, links), dein Gegner Spieler 2 (rot, rechts).</p>
 <div class=seg>${[3,5,7].map(v=>`<button data-o=tt data-v=${v} class="${OL.t==v?'on':''}">Ziel ${v}</button>`).join('')}</div>
-<div class=olgames><button data-o=pg data-g=cup>🏆 Cup – zufällige Spiele</button>${GAMES.filter(g=>g.id!='ludo').map(g=>`<button data-o=pg data-g=${g.id}>${g.ic.length<5?g.ic+' ':''}${olEsc(g.n)}</button>`).join('')}</div>
+<div class=olgames><button data-o=pg data-g=cup>🏆 Cup – zufällige Spiele</button>${GAMES.filter(g=>!ROOMG.includes(g.id)).map(g=>`<button data-o=pg data-g=${g.id}>${g.ic.length<5?g.ic+' ':''}${olEsc(g.n)}</button>`).join('')}</div>
 <button class="btn g" data-o=back style="align-self:flex-start;color:var(--tx);background:var(--bg)">← Zurück</button>`;
   }else{
     const s=OL.stats||{};
@@ -3284,7 +3866,7 @@ function olCards(){
   let h='';
   if(OL.out)h+=`<div class=olinv><b>Herausforderung an ${olEsc(olNameOf(OL.out.uid))}</b><span>${olEsc(olGameName(OL.out.gid))}${goalOf(OL.out.gid,OL.out.t)?' · '+goalOf(OL.out.gid,OL.out.t):''} – warte auf Antwort…</span><div class=row><button class="btn g" data-o=cx>Abbrechen</button></div></div>`;
   if(OL.sess&&!OL.sess.live)h+=`<div class=olinv><b>Verbinde mit ${olEsc(OL.sess.names[OL.sess.role?0:1])}…</b><span>${olEsc(olGameName(OL.sess.gid))}</span><div class=row><button class="btn g" data-o=lv>Abbrechen</button></div></div>`;
-  for(const u in OL.INV){if(!olAllowed(u))continue;const v=OL.INV[u];if(olIsRoom(v)){h+=`<div class=olinv><b>${olEsc(v.name)} lädt dich zu „Mensch ärgere dich nicht“ ein!</b><span>Online-Raum ${olEsc(String(v.mid).slice(5))}</span><div class=row><button class=btn data-o=acc data-u=${u}>Beitreten</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`;continue}h+=`<div class=olinv><b>${olEsc(v.name)} fordert dich heraus!</b><span>${olEsc(olGameName(v.game))}${goalOf(v.game,+v.t||5)?' · '+goalOf(v.game,+v.t||5):''}</span><div class=row><button class=btn data-o=acc data-u=${u}>Annehmen</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`}
+  for(const u in OL.INV){if(!olAllowed(u))continue;const v=OL.INV[u];if(olIsRoom(v)){h+=`<div class=olinv><b>${olEsc(v.name)} lädt dich zu „${v.game=='maumau'?'Mau-Mau':'Mensch ärgere dich nicht'}“ ein!</b><span>Online-Raum ${olEsc(String(v.mid).slice(5))}</span><div class=row><button class=btn data-o=acc data-u=${u}>Beitreten</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`;continue}h+=`<div class=olinv><b>${olEsc(v.name)} fordert dich heraus!</b><span>${olEsc(olGameName(v.game))}${goalOf(v.game,+v.t||5)?' · '+goalOf(v.game,+v.t||5):''}</span><div class=row><button class=btn data-o=acc data-u=${u}>Annehmen</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`}
   $('#oli').innerHTML=h;
 }
 function olInvites(){
@@ -3332,7 +3914,7 @@ async function olAccept(u){
   const v=OL.INV[u];if(!v||OL.sess||OL.out)return;
   if(olIsRoom(v)){
     try{await OL.db.ref('invites/'+OL.me+'/'+u).remove()}catch(e){}
-    olClose();olCards();olJoinRoom(String(v.mid).slice(5));return
+    olClose();olCards();olJoinRoom(String(v.mid).slice(5),v.game);return
   }
   try{
     const m=(await OL.db.ref('matches/'+v.mid).once('value')).val();
@@ -3345,12 +3927,13 @@ async function olAccept(u){
 }
 
 /* Einladung in einen Mensch-ärgere-dich-nicht-Raum annehmen */
-async function olJoinRoom(code){
+async function olJoinRoom(code,gid){
+  gid=gid=='maumau'?'maumau':'ludo';
   if(ON||OL.sess){toast('Beende zuerst dein aktuelles Online-Spiel.');return}
-  if(!(cur&&gdef&&gdef.id=='ludo'&&cur.canJoin&&cur.canJoin())){
-    if(cur&&gdef&&gdef.id=='ludo'&&cur.canJoin&&!cur.canJoin()){toast('Du bist schon in einem Raum.');return}
+  if(!(cur&&gdef&&gdef.id==gid&&cur.canJoin&&cur.canJoin())){
+    if(cur&&gdef&&gdef.id==gid&&cur.canJoin&&!cur.canJoin()){toast('Du bist schon in einem Raum.');return}
     if(cur&&cur.leave)cur.leave();
-    cup=null;start('ludo')
+    cup=null;start(gid)
   }
   if(cur&&cur.joinCode)await cur.joinCode(code)
 }
