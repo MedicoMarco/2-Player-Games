@@ -2,83 +2,425 @@
   "rules": {
     ".read": false,
     ".write": false,
-    "deletionLocks": {
-      ".read": false,
-      ".write": false
-    },
     "names": {
-      ".read": true,
-      "$name": {
-        ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && ((!data.exists() && newData.val() == auth.uid) || (data.val() == auth.uid && !newData.exists()))",
+      "$lower": {
+        ".read": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && $lower.matches(/^[a-z0-9_-]{3,16}$/)",
+        ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && $lower.matches(/^[a-z0-9_-]{3,16}$/) && (!data.exists() && newData.val() === auth.uid && $lower + '@spieler.2pg.invalid' === auth.token.email && newData.parent().parent().child('users').child(auth.uid).child('lower').val() === $lower || data.val() === auth.uid && !newData.exists())",
         ".validate": "newData.isString()"
       }
     },
     "users": {
-      ".read": "auth != null",
       "$uid": {
-        ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && auth.uid == $uid",
-        ".validate": "newData.hasChildren(['name','lower','created'])"
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && !root.child('deletionLocks').child(auth.uid).exists() && (data.exists() || newData.exists() && newData.child('lower').val() + '@spieler.2pg.invalid' === auth.token.email && newData.parent().parent().child('names').child(newData.child('lower').val()).val() === $uid)",
+        ".validate": "newData.hasChildren(['name', 'lower', 'created']) && newData.child('lower').val() === newData.child('name').val().toLowerCase()",
+        "name": {
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{3,16}$/) && (!data.exists() || newData.val() === data.val())",
+          ".read": "auth != null && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() && root.child('friends').child(auth.uid).child($uid).exists() && root.child('friends').child($uid).child(auth.uid).exists() && !root.child('blocked').child(auth.uid).child($uid).exists() && !root.child('blocked').child($uid).child(auth.uid).exists()"
+        },
+        "lower": {
+          ".validate": "newData.isString() && newData.val().matches(/^[a-z0-9_-]{3,16}$/) && (!data.exists() || newData.val() === data.val())"
+        },
+        "created": {
+          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now && (!data.exists() || newData.val() === data.val())"
+        },
+        "stats": {
+          "w": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2147483647 && newData.val() % 1 === 0"
+          },
+          "l": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2147483647 && newData.val() % 1 === 0"
+          },
+          "d": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2147483647 && newData.val() % 1 === 0"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "ad": {
+          "$game": {
+            ".validate": "newData.hasChildren(['r'])",
+            "r": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2"
+            },
+            "s": {
+              ".validate": "newData.isNumber()"
+            },
+            "d": {
+              ".validate": "newData.isNumber()"
+            },
+            "n": {
+              ".validate": "newData.isNumber()"
+            },
+            "k": {
+              ".validate": "newData.isNumber()"
+            },
+            "v": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "progress": {
+          ".validate": "newData.hasChildren(['ts', 'rs'])",
+          "ts": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          },
+          "rs": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "pl": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2147483647 && newData.val() % 1 === 0"
+          },
+          "rc": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2147483647 && newData.val() % 1 === 0"
+          },
+          "stk": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2147483647 && newData.val() % 1 === 0"
+          },
+          "hw": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2147483647 && newData.val() % 1 === 0"
+          },
+          "sp": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2147483647 && newData.val() % 1 === 0"
+          },
+          "d": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2147483647 && newData.val() % 1 === 0"
+          },
+          "t": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2147483647 && newData.val() % 1 === 0"
+          },
+          "oc": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2147483647 && newData.val() % 1 === 0"
+          },
+          "st": {
+            ".validate": "newData.hasChildren()"
+          },
+          "ach": {
+            ".validate": "newData.hasChildren()"
+          },
+          "high": {
+            ".validate": "newData.hasChildren()"
+          },
+          "gw": {
+            ".validate": "newData.hasChildren()"
+          },
+          "ucol": {
+            ".validate": "newData.hasChildren()"
+          },
+          "sk": {
+            ".validate": "newData.hasChildren()"
+          },
+          "fav": {
+            ".validate": "newData.hasChildren()"
+          },
+          "rec": {
+            ".validate": "newData.hasChildren()"
+          },
+          "snd": {
+            ".validate": "newData.isBoolean() || newData.val() === 0 || newData.val() === 1"
+          },
+          "anim": {
+            ".validate": "newData.isBoolean() || newData.val() === 0 || newData.val() === 1"
+          },
+          "theme": {
+            ".validate": "newData.isString() && newData.val().matches(/^(auto|light|dark)$/)"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "factory": {
+          ".validate": "newData.hasChildren()"
+        },
+        "factoryAudio": {
+          ".validate": "newData.hasChildren()"
+        },
+        "$other": {
+          ".validate": false
+        }
       }
     },
     "presence": {
-      ".read": "auth != null",
       "$uid": {
-        ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && auth.uid == $uid && root.child('users').child($uid).exists() && !root.child('deletionLocks').child($uid).exists()"
+        ".read": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && (auth.uid === $uid || root.child('users').child(auth.uid).exists() && root.child('friends').child(auth.uid).child($uid).exists() && root.child('friends').child($uid).child(auth.uid).exists() && !root.child('blocked').child(auth.uid).child($uid).exists() && !root.child('blocked').child($uid).child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid === $uid && (!newData.exists() || root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists())",
+        ".validate": "newData.hasChildren(['name', 'ts'])",
+        "name": {
+          ".validate": "newData.val() === root.child('users').child($uid).child('name').val()"
+        },
+        "ts": {
+          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now"
+        },
+        "g": {
+          ".validate": "newData.isString() && newData.val().matches(/^(tennis|pong|hockey|snakes|sumo|ttt|react|tug|curling|blocks|target|spot|spinner|clash|memory|chess|pool|mini|micro|ice|racing|bball|elf|volley|cup)$/) || newData.val() === 'ludo' || newData.val() === 'maumau'"
+        },
+        "$other": {
+          ".validate": false
+        }
       }
     },
     "blocked": {
       "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && !newData.exists()",
         "$peer": {
-          ".read": "auth != null && auth.uid == $peer",
-          ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && auth.uid == $uid && $uid != $peer && (!newData.exists() || root.child('users').child($peer).exists() && !root.child('deletionLocks').child($peer).exists())",
-          ".validate": "newData.hasChildren(['name','ts'])"
+          ".write": "auth != null && auth.uid === $uid && $uid !== $peer && (!newData.exists() || root.child('users').child($uid).exists() && root.child('users').child($peer).exists() && !root.child('deletionLocks').child(auth.uid).exists() && !newData.parent().parent().parent().child('friends').child($uid).child($peer).exists() && !newData.parent().parent().parent().child('friends').child($peer).child($uid).exists() && !newData.parent().parent().parent().child('requests').child($uid).child($peer).exists() && !newData.parent().parent().parent().child('requests').child($peer).child($uid).exists() && !newData.parent().parent().parent().child('invites').child($uid).child($peer).exists() && !newData.parent().parent().parent().child('invites').child($peer).child($uid).exists())",
+          ".validate": "newData.hasChildren(['name', 'ts'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 16"
+          },
+          "ts": {
+            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now"
+          },
+          "$other": {
+            ".validate": false
+          }
         }
       }
     },
     "friends": {
       "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
-        "$peer": {
-          ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && ((!newData.exists() && (auth.uid == $uid || auth.uid == $peer)) || (newData.exists() && (auth.uid == $uid || auth.uid == $peer) && (root.child('requests').child($uid).child($peer).exists() || root.child('requests').child($peer).child($uid).exists() || data.exists()) && root.child('users').child($uid).exists() && !root.child('deletionLocks').child($uid).exists() && root.child('users').child($peer).exists() && !root.child('deletionLocks').child($peer).exists() && !root.child('blocked').child($uid).child($peer).exists() && !root.child('blocked').child($peer).child($uid).exists()))"
+        ".read": "auth != null && auth.uid === $uid",
+        "$friend": {
+          ".write": "auth != null && (auth.uid === $uid || auth.uid === $friend) && $uid !== $friend && (!newData.exists() && !newData.parent().parent().parent().child('friends').child($friend).child($uid).exists() || root.child('users').child($uid).exists() && root.child('users').child($friend).exists() && !root.child('deletionLocks').child($uid).exists() && !root.child('deletionLocks').child($friend).exists() && !newData.parent().parent().parent().child('blocked').child($uid).child($friend).exists() && !newData.parent().parent().parent().child('blocked').child($friend).child($uid).exists() && (root.child('requests').child($uid).child($friend).exists() && auth.uid === $uid && !newData.parent().parent().parent().child('requests').child($uid).child($friend).exists() || root.child('requests').child($friend).child($uid).exists() && auth.uid === $friend && !newData.parent().parent().parent().child('requests').child($friend).child($uid).exists()) && newData.parent().parent().parent().child('friends').child($friend).child($uid).val() === true)",
+          ".validate": "newData.val() === true"
         }
       }
     },
     "requests": {
-      "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
-        "$peer": {
-          ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && ((!newData.exists() && (auth.uid == $uid || auth.uid == $peer)) || (newData.exists() && auth.uid == $peer && root.child('users').child($uid).exists() && !root.child('deletionLocks').child($uid).exists() && root.child('users').child($peer).exists() && !root.child('deletionLocks').child($peer).exists() && !root.child('blocked').child($uid).child($peer).exists() && !root.child('blocked').child($peer).child($uid).exists()))"
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        "$from": {
+          ".write": "auth != null && $to !== $from && ((auth.uid === $to || auth.uid === $from) && !newData.exists() || auth.uid === $from && !data.exists() && newData.exists() && root.child('users').child($from).exists() && root.child('users').child($to).exists() && !root.child('deletionLocks').child($from).exists() && !root.child('deletionLocks').child($to).exists() && !newData.parent().parent().parent().child('blocked').child($to).child($from).exists() && !newData.parent().parent().parent().child('blocked').child($from).child($to).exists() && !root.child('friends').child($to).child($from).exists() && !root.child('friends').child($from).child($to).exists())",
+          ".validate": "newData.hasChildren(['name', 'ts'])",
+          "name": {
+            ".validate": "newData.val() === root.child('users').child($from).child('name').val()"
+          },
+          "ts": {
+            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now"
+          },
+          "$other": {
+            ".validate": false
+          }
         }
       }
     },
     "invites": {
-      "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
-        "$peer": {
-          ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && ((!newData.exists() && (auth.uid == $uid || auth.uid == $peer)) || (newData.exists() && auth.uid == $peer && root.child('users').child($uid).exists() && !root.child('deletionLocks').child($uid).exists() && root.child('users').child($peer).exists() && !root.child('deletionLocks').child($peer).exists() && !root.child('blocked').child($uid).child($peer).exists() && !root.child('blocked').child($peer).child($uid).exists()))"
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        "$from": {
+          ".write": "auth != null && $to !== $from && ((auth.uid === $to || auth.uid === $from) && !newData.exists() || auth.uid === $from && newData.exists() && root.child('users').child($to).exists() && root.child('users').child($from).exists() && !root.child('deletionLocks').child($to).exists() && !root.child('deletionLocks').child($from).exists() && root.child('friends').child($from).child($to).exists() && root.child('friends').child($to).child($from).exists() && !root.child('blocked').child($from).child($to).exists() && !root.child('blocked').child($to).child($from).exists() && !newData.parent().parent().parent().child('blocked').child($from).child($to).exists() && !newData.parent().parent().parent().child('blocked').child($to).child($from).exists())",
+          ".validate": "newData.hasChildren(['mid', 'name', 'game', 't', 'ts']) && (newData.child('code').isString() && newData.child('code').val().matches(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{20}$/) && newData.child('mid').val() === 'room:' + newData.child('code').val() && newData.child('t').val() === 0 && root.child('rooms').child(newData.child('code').val()).child('host').val() === $from && root.child('rooms').child(newData.child('code').val()).child('status').val() === 'lobby' && root.child('rooms').child(newData.child('code').val()).child('game').val() === newData.child('game').val() || !newData.child('code').exists() && root.child('matches').child(newData.child('mid').val()).child('host').val() === $from && root.child('matches').child(newData.child('mid').val()).child('guest').val() === $to && root.child('matches').child(newData.child('mid').val()).child('state').val() === 'invited' && root.child('matches').child(newData.child('mid').val()).child('game').val() === newData.child('game').val() && root.child('matches').child(newData.child('mid').val()).child('t').val() === newData.child('t').val())",
+          "mid": {
+            ".validate": "newData.isString() && newData.val().length <= 30"
+          },
+          "code": {
+            ".validate": "newData.isString() && newData.val().length <= 20"
+          },
+          "name": {
+            ".validate": "newData.val() === root.child('users').child($from).child('name').val()"
+          },
+          "game": {
+            ".validate": "newData.isString() && newData.val().length <= 22"
+          },
+          "t": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 7 && newData.val() % 1 === 0"
+          },
+          "ts": {
+            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now"
+          },
+          "$other": {
+            ".validate": false
+          }
         }
       }
     },
     "matches": {
       "$mid": {
-        ".read": "auth != null && (!data.exists() || data.child('host').val() == auth.uid || data.child('guest').val() == auth.uid)",
-        ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && ((!newData.exists() && (data.child('host').val() == auth.uid || data.child('guest').val() == auth.uid)) || (newData.exists() && ((newData.child('host').val() == auth.uid) || (newData.child('guest').val() == auth.uid && data.exists())) && root.child('users').child(newData.child('host').val()).exists() && !root.child('deletionLocks').child(newData.child('host').val()).exists() && root.child('users').child(newData.child('guest').val()).exists() && !root.child('deletionLocks').child(newData.child('guest').val()).exists() && !root.child('blocked').child(newData.child('host').val()).child(newData.child('guest').val()).exists() && !root.child('blocked').child(newData.child('guest').val()).child(newData.child('host').val()).exists() && (!data.exists() || (newData.child('host').val() == data.child('host').val() && newData.child('guest').val() == data.child('guest').val()))))"
+        ".read": "auth != null && (auth.uid === root.child('matches').child($mid).child('host').val() || auth.uid === root.child('matches').child($mid).child('guest').val()) && !root.child('deletionLocks').child(auth.uid).exists() && root.child('friends').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && root.child('friends').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('guest').val()).exists()",
+        ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && ((auth.uid === root.child('matches').child($mid).child('host').val() || auth.uid === root.child('matches').child($mid).child('guest').val()) && !newData.exists() || !data.exists() && newData.exists() && newData.child('host').val() === auth.uid && newData.child('guest').isString() && newData.child('guest').val() !== auth.uid && newData.child('state').val() === 'invited' && root.child('users').child(auth.uid).exists() && root.child('users').child(newData.child('guest').val()).exists() && !root.child('deletionLocks').child(newData.child('guest').val()).exists() && root.child('friends').child(auth.uid).child(newData.child('guest').val()).exists() && root.child('friends').child(newData.child('guest').val()).child(auth.uid).exists() && !root.child('blocked').child(auth.uid).child(newData.child('guest').val()).exists() && !root.child('blocked').child(newData.child('guest').val()).child(auth.uid).exists() && !newData.hasChild('offer') && !newData.hasChild('answer') && !newData.hasChild('ice') && !newData.hasChild('gc'))",
+        ".validate": "newData.hasChildren(['host', 'guest', 'hn', 'gn', 'game', 't', 'state', 'ts'])",
+        "host": {
+          ".validate": "newData.isString()"
+        },
+        "guest": {
+          ".validate": "newData.isString()"
+        },
+        "hn": {
+          ".validate": "newData.val() === root.child('users').child(newData.parent().child('host').val()).child('name').val()"
+        },
+        "gn": {
+          ".validate": "newData.val() === root.child('users').child(newData.parent().child('guest').val()).child('name').val()"
+        },
+        "game": {
+          ".validate": "newData.isString() && newData.val().matches(/^(tennis|pong|hockey|snakes|sumo|ttt|react|tug|curling|blocks|target|spot|spinner|clash|memory|chess|pool|mini|micro|ice|racing|bball|elf|volley|cup)$/)"
+        },
+        "t": {
+          ".validate": "newData.val() === 3 || newData.val() === 5 || newData.val() === 7"
+        },
+        "ts": {
+          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now"
+        },
+        "offer": {
+          ".write": "auth != null && (auth.uid === root.child('matches').child($mid).child('host').val() || auth.uid === root.child('matches').child($mid).child('guest').val()) && !root.child('deletionLocks').child(auth.uid).exists() && auth.uid === root.child('matches').child($mid).child('host').val() && root.child('matches').child($mid).child('state').val() === 'accepted' && root.child('friends').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && root.child('friends').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('guest').val()).exists()",
+          ".validate": "newData.isString() && newData.val().length <= 25000"
+        },
+        "answer": {
+          ".write": "auth != null && (auth.uid === root.child('matches').child($mid).child('host').val() || auth.uid === root.child('matches').child($mid).child('guest').val()) && !root.child('deletionLocks').child(auth.uid).exists() && auth.uid === root.child('matches').child($mid).child('guest').val() && root.child('matches').child($mid).child('state').val() === 'accepted' && root.child('friends').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && root.child('friends').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('guest').val()).exists()",
+          ".validate": "newData.isString() && newData.val().length <= 25000"
+        },
+        "hc": {
+          ".write": "auth != null && (auth.uid === root.child('matches').child($mid).child('host').val() || auth.uid === root.child('matches').child($mid).child('guest').val()) && !root.child('deletionLocks').child(auth.uid).exists() && auth.uid === root.child('matches').child($mid).child('host').val() && root.child('friends').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && root.child('friends').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('guest').val()).exists() && root.child('matches').child($mid).child('state').val() === 'invited'",
+          ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 14"
+        },
+        "gc": {
+          ".write": "auth != null && (auth.uid === root.child('matches').child($mid).child('host').val() || auth.uid === root.child('matches').child($mid).child('guest').val()) && !root.child('deletionLocks').child(auth.uid).exists() && auth.uid === root.child('matches').child($mid).child('guest').val() && root.child('friends').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && root.child('friends').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('guest').val()).exists() && root.child('matches').child($mid).child('state').val() === 'invited' && root.child('invites').child(auth.uid).child(root.child('matches').child($mid).child('host').val()).child('mid').val() === $mid && newData.parent().child('state').val() === 'accepted'",
+          ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 14"
+        },
+        "state": {
+          ".write": "auth != null && (auth.uid === root.child('matches').child($mid).child('host').val() || auth.uid === root.child('matches').child($mid).child('guest').val()) && !root.child('deletionLocks').child(auth.uid).exists() && auth.uid === root.child('matches').child($mid).child('guest').val() && root.child('friends').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && root.child('friends').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('guest').val()).exists() && data.val() === 'invited' && root.child('invites').child(auth.uid).child(root.child('matches').child($mid).child('host').val()).child('mid').val() === $mid && !newData.parent().parent().parent().child('invites').child(auth.uid).child(root.child('matches').child($mid).child('host').val()).exists() && (newData.val() === 'declined' || newData.val() === 'accepted' && newData.parent().child('gc').isNumber())",
+          ".validate": "newData.val() === 'invited' || newData.val() === 'accepted' || newData.val() === 'declined'"
+        },
+        "ice": {
+          "h": {
+            "$candidate": {
+              ".write": "auth != null && (auth.uid === root.child('matches').child($mid).child('host').val() || auth.uid === root.child('matches').child($mid).child('guest').val()) && !root.child('deletionLocks').child(auth.uid).exists() && auth.uid === root.child('matches').child($mid).child('host').val() && root.child('matches').child($mid).child('state').val() === 'accepted' && root.child('friends').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && root.child('friends').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('guest').val()).exists()",
+              ".validate": "newData.hasChildren(['candidate'])",
+              "candidate": {
+                ".validate": "newData.isString() && newData.val().length <= 2048"
+              },
+              "sdpMid": {
+                ".validate": "newData.isString() && newData.val().length <= 80"
+              },
+              "sdpMLineIndex": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 256 && newData.val() % 1 === 0"
+              },
+              "usernameFragment": {
+                ".validate": "newData.isString() && newData.val().length <= 256"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
+          "g": {
+            "$candidate": {
+              ".write": "auth != null && (auth.uid === root.child('matches').child($mid).child('host').val() || auth.uid === root.child('matches').child($mid).child('guest').val()) && !root.child('deletionLocks').child(auth.uid).exists() && auth.uid === root.child('matches').child($mid).child('guest').val() && root.child('matches').child($mid).child('state').val() === 'accepted' && root.child('friends').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && root.child('friends').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('host').val()).child(root.child('matches').child($mid).child('guest').val()).exists() && !root.child('blocked').child(root.child('matches').child($mid).child('guest').val()).child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('host').val()).exists() && !root.child('deletionLocks').child(root.child('matches').child($mid).child('guest').val()).exists()",
+              ".validate": "newData.hasChildren(['candidate'])",
+              "candidate": {
+                ".validate": "newData.isString() && newData.val().length <= 2048"
+              },
+              "sdpMid": {
+                ".validate": "newData.isString() && newData.val().length <= 80"
+              },
+              "sdpMLineIndex": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 256 && newData.val() % 1 === 0"
+              },
+              "usernameFragment": {
+                ".validate": "newData.isString() && newData.val().length <= 256"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
       }
     },
     "rooms": {
-      ".read": "auth != null",
-      "$room": {
-        ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && ((!data.exists() && newData.child('host').val() == auth.uid && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists()) || (data.child('host').val() == auth.uid && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists()))",
-        "seats": {
-          "$seat": {
-            ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() && root.child('users').child(data.parent().parent().child('host').val()).exists() && !root.child('deletionLocks').child(data.parent().parent().child('host').val()).exists() && !root.child('blocked').child(auth.uid).child(data.parent().parent().child('host').val()).exists() && !root.child('blocked').child(data.parent().parent().child('host').val()).child(auth.uid).exists() && (!data.parent().child('0/uid').exists() || (!root.child('blocked').child(auth.uid).child(data.parent().child('0/uid').val()).exists() && !root.child('blocked').child(data.parent().child('0/uid').val()).child(auth.uid).exists())) && (!data.parent().child('1/uid').exists() || (!root.child('blocked').child(auth.uid).child(data.parent().child('1/uid').val()).exists() && !root.child('blocked').child(data.parent().child('1/uid').val()).child(auth.uid).exists())) && (!data.parent().child('2/uid').exists() || (!root.child('blocked').child(auth.uid).child(data.parent().child('2/uid').val()).exists() && !root.child('blocked').child(data.parent().child('2/uid').val()).child(auth.uid).exists())) && (!data.parent().child('3/uid').exists() || (!root.child('blocked').child(auth.uid).child(data.parent().child('3/uid').val()).exists() && !root.child('blocked').child(data.parent().child('3/uid').val()).child(auth.uid).exists())) && ((data.child('uid').val() == auth.uid && (!newData.exists() || newData.child('uid').val() == auth.uid)) || (data.parent().parent().child('status').val() == 'lobby' && (!data.exists() || data.child('k').val() == 'open') && newData.child('uid').val() == auth.uid && newData.child('k').val() == 'p'))"
+      "$code": {
+        ".read": "auth != null && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() && $code.matches(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{20}$/) && (auth.uid === root.child('rooms').child($code).child('host').val() || (root.child('rooms').child($code).child('seats/0').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/0').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/1').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/1').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/2').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/2').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/3').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/3').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/4').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/4').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/5').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/5').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/6').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/6').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/7').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/7').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/8').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/8').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/9').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/9').child('uid').val() === auth.uid) && (root.child('rooms').child($code).child('seats/0').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/0').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/0').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/1').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/1').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/1').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/2').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/2').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/2').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/3').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/3').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/3').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/4').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/4').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/4').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/5').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/5').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/5').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/6').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/6').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/6').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/7').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/7').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/7').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/8').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/8').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/8').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/9').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/9').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/9').child('uid').val()).child(auth.uid).exists()))",
+        ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && (auth.uid === root.child('rooms').child($code).child('host').val() && !newData.exists() || auth != null && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() && $code.matches(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{20}$/) && !data.exists() && newData.child('host').val() === auth.uid && newData.child('status').val() === 'lobby' && !newData.hasChild('snap') && !newData.hasChild('act'))",
+        ".validate": "newData.hasChildren(['host', 'hn', 'ts', 'status', 'game', 'cfg', 'seats']) && newData.child('seats/0/k').val() === 'p' && newData.child('seats/0/uid').val() === newData.child('host').val() && (newData.child('game').val() === 'ludo' && newData.child('seats').hasChildren(['0','1','2','3']) && !newData.child('seats/4').exists() && !newData.child('seats/5').exists() && !newData.child('seats/6').exists() && !newData.child('seats/7').exists() && !newData.child('seats/8').exists() && !newData.child('seats/9').exists() || newData.child('game').val() === 'maumau' && newData.child('seats').hasChildren(['0','1','2','3','4','5','6','7','8','9']))",
+        "host": {
+          ".validate": "newData.isString()"
+        },
+        "hn": {
+          ".validate": "newData.val() === root.child('users').child(newData.parent().child('host').val()).child('name').val()"
+        },
+        "ts": {
+          ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now"
+        },
+        "game": {
+          ".read": "auth != null && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() && $code.matches(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{20}$/) && (!root.child('rooms').child($code).exists() || root.child('rooms').child($code).child('status').val() === 'lobby' && (root.child('rooms').child($code).child('seats/0').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/0').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/0').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/1').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/1').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/1').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/2').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/2').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/2').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/3').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/3').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/3').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/4').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/4').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/4').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/5').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/5').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/5').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/6').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/6').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/6').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/7').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/7').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/7').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/8').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/8').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/8').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/9').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/9').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/9').child('uid').val()).child(auth.uid).exists()))",
+          ".validate": "newData.val() === 'ludo' || newData.val() === 'maumau'"
+        },
+        "status": {
+          ".write": "auth != null && auth.uid === root.child('rooms').child($code).child('host').val() && !root.child('deletionLocks').child(auth.uid).exists()",
+          ".validate": "newData.val() === 'lobby' || (newData.val() === 'play' && newData.parent().child('seats/0/k').val() !== 'open' && newData.parent().child('seats/1/k').val() !== 'open' && newData.parent().child('seats/2/k').val() !== 'open' && newData.parent().child('seats/3/k').val() !== 'open' && newData.parent().child('seats/4/k').val() !== 'open' && newData.parent().child('seats/5/k').val() !== 'open' && newData.parent().child('seats/6/k').val() !== 'open' && newData.parent().child('seats/7/k').val() !== 'open' && newData.parent().child('seats/8/k').val() !== 'open' && newData.parent().child('seats/9/k').val() !== 'open' && ((newData.parent().child('seats/1/k').val() === 'cpu' || newData.parent().child('seats/1/k').val() === 'p') || (newData.parent().child('seats/2/k').val() === 'cpu' || newData.parent().child('seats/2/k').val() === 'p') || (newData.parent().child('seats/3/k').val() === 'cpu' || newData.parent().child('seats/3/k').val() === 'p') || (newData.parent().child('seats/4/k').val() === 'cpu' || newData.parent().child('seats/4/k').val() === 'p') || (newData.parent().child('seats/5/k').val() === 'cpu' || newData.parent().child('seats/5/k').val() === 'p') || (newData.parent().child('seats/6/k').val() === 'cpu' || newData.parent().child('seats/6/k').val() === 'p') || (newData.parent().child('seats/7/k').val() === 'cpu' || newData.parent().child('seats/7/k').val() === 'p') || (newData.parent().child('seats/8/k').val() === 'cpu' || newData.parent().child('seats/8/k').val() === 'p') || (newData.parent().child('seats/9/k').val() === 'cpu' || newData.parent().child('seats/9/k').val() === 'p')))"
+        },
+        "cfg": {
+          ".validate": "(newData.parent().child('game').val() === 'ludo' && newData.hasChildren(['force', 'all', 'd', 'np']) && !newData.child('mau').exists() || newData.parent().child('game').val() === 'maumau' && newData.hasChildren(['mau', 'd']) && !newData.hasChild('force') && !newData.hasChild('all') && !newData.hasChild('np'))",
+          "d": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2 && newData.val() % 1 === 0"
+          },
+          "force": {
+            ".validate": "newData.val() === true || newData.val() === false || newData.val() === 0 || newData.val() === 1"
+          },
+          "all": {
+            ".validate": "newData.val() === true || newData.val() === false || newData.val() === 0 || newData.val() === 1"
+          },
+          "mau": {
+            ".validate": "newData.val() === true || newData.val() === false || newData.val() === 0 || newData.val() === 1"
+          },
+          "np": {
+            ".validate": "newData.val() === 2 || newData.val() === 4"
+          },
+          "$other": {
+            ".validate": false
           }
         },
-        "act": {
-          "$uid": {
-            ".write": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && auth.uid == $uid && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() && data.parent().parent().child('host').exists()"
+        "seats": {
+          "$seat": {
+            ".write": "auth != null && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() && $seat.matches(/^[0-9]$/) && (auth != null && auth.uid === root.child('rooms').child($code).child('host').val() && !root.child('deletionLocks').child(auth.uid).exists() && $seat !== '0' && (newData.child('k').val() === 'open' || newData.child('k').val() === 'cpu' || newData.child('k').val() === 'off') || $seat !== '0' && auth != null && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() && $code.matches(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{20}$/) && root.child('rooms').child($code).child('status').val() === 'lobby' && (root.child('rooms').child($code).child('game').val() === 'maumau' || (root.child('rooms').child($code).child('game').val() === 'ludo' && $seat.matches(/^[1-3]$/))) && (root.child('rooms').child($code).child('seats/0').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/0').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/0').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/1').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/1').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/1').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/2').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/2').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/2').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/3').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/3').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/3').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/4').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/4').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/4').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/5').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/5').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/5').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/6').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/6').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/6').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/7').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/7').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/7').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/8').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/8').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/8').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/9').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/9').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/9').child('uid').val()).child(auth.uid).exists()) && ($seat === '0' || data.parent().child('0/uid').val() !== auth.uid) && ($seat === '1' || data.parent().child('1/uid').val() !== auth.uid) && ($seat === '2' || data.parent().child('2/uid').val() !== auth.uid) && ($seat === '3' || data.parent().child('3/uid').val() !== auth.uid) && ($seat === '4' || data.parent().child('4/uid').val() !== auth.uid) && ($seat === '5' || data.parent().child('5/uid').val() !== auth.uid) && ($seat === '6' || data.parent().child('6/uid').val() !== auth.uid) && ($seat === '7' || data.parent().child('7/uid').val() !== auth.uid) && ($seat === '8' || data.parent().child('8/uid').val() !== auth.uid) && ($seat === '9' || data.parent().child('9/uid').val() !== auth.uid) && newData.child('k').val() === 'p' && newData.child('uid').val() === auth.uid && (data.child('k').val() === 'open' || data.child('k').val() === 'p' && data.child('uid').val() === auth.uid) || $seat !== '0' && data.child('uid').val() === auth.uid && data.child('k').val() === 'p' && newData.child('k').val() === 'gone' && newData.child('uid').val() === auth.uid && newData.child('name').val() === data.child('name').val())",
+            ".validate": "$seat.matches(/^[0-9]$/) && ($seat === '0' && newData.child('k').val() === 'p' && newData.child('uid').val() === auth.uid && newData.child('uid').val() === newData.parent().parent().child('host').val() || $seat !== '0' && (newData.child('k').val() === 'open' || newData.child('k').val() === 'cpu' || newData.child('k').val() === 'off') && !newData.hasChild('uid') && !newData.hasChild('name') || $seat !== '0' && (newData.child('k').val() === 'p' || newData.child('k').val() === 'gone') && data.exists() && newData.child('uid').val() === auth.uid && newData.hasChildren(['uid','name']))",
+            "k": {
+              ".validate": "newData.isString()"
+            },
+            "uid": {
+              ".validate": "newData.isString()"
+            },
+            "name": {
+              ".validate": "newData.val() === root.child('users').child(newData.parent().child('uid').val()).child('name').val()"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
+        },
+        "snap": {
+          ".write": "auth != null && auth.uid === root.child('rooms').child($code).child('host').val() && !root.child('deletionLocks').child(auth.uid).exists()",
+          ".validate": "newData.isString() && newData.val().length <= 30000"
+        },
+        "act": {
+          ".write": "auth != null && auth.uid === root.child('rooms').child($code).child('host').val() && !root.child('deletionLocks').child(auth.uid).exists() && !newData.exists()",
+          "$uid": {
+            ".write": "auth != null && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() && $code.matches(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{20}$/) && auth.uid === $uid && $uid !== root.child('rooms').child($code).child('host').val() && (root.child('rooms').child($code).child('seats/0').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/0').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/1').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/1').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/2').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/2').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/3').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/3').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/4').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/4').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/5').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/5').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/6').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/6').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/7').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/7').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/8').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/8').child('uid').val() === auth.uid || root.child('rooms').child($code).child('seats/9').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/9').child('uid').val() === auth.uid) && (root.child('rooms').child($code).child('seats/0').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/0').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/0').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/1').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/1').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/1').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/2').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/2').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/2').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/3').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/3').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/3').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/4').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/4').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/4').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/5').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/5').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/5').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/6').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/6').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/6').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/7').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/7').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/7').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/8').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/8').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/8').child('uid').val()).child(auth.uid).exists()) && (root.child('rooms').child($code).child('seats/9').child('k').val() !== 'p' || !root.child('blocked').child(auth.uid).child(root.child('rooms').child($code).child('seats/9').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/9').child('uid').val()).child(auth.uid).exists()) && root.child('rooms').child($code).child('status').val() === 'play'",
+            ".validate": "newData.isString() && newData.val().length <= 240"
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "hands": {
+      "$code": {
+        ".write": "auth != null && auth.uid === root.child('rooms').child($code).child('host').val() && !root.child('deletionLocks').child(auth.uid).exists() && !newData.exists()",
+        "$uid": {
+          ".read": "auth != null && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() && $code.matches(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{20}$/) && auth.uid === $uid && root.child('rooms').child($code).child('game').val() === 'maumau' && (root.child('rooms').child($code).child('seats/0').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/0').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/1').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/1').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/2').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/2').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/3').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/3').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/4').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/4').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/5').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/5').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/6').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/6').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/7').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/7').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/8').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/8').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/9').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/9').child('uid').val() === $uid) && (root.child('rooms').child($code).child('seats/0').child('k').val() !== 'p' || !root.child('blocked').child($uid).child(root.child('rooms').child($code).child('seats/0').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/0').child('uid').val()).child($uid).exists()) && (root.child('rooms').child($code).child('seats/1').child('k').val() !== 'p' || !root.child('blocked').child($uid).child(root.child('rooms').child($code).child('seats/1').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/1').child('uid').val()).child($uid).exists()) && (root.child('rooms').child($code).child('seats/2').child('k').val() !== 'p' || !root.child('blocked').child($uid).child(root.child('rooms').child($code).child('seats/2').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/2').child('uid').val()).child($uid).exists()) && (root.child('rooms').child($code).child('seats/3').child('k').val() !== 'p' || !root.child('blocked').child($uid).child(root.child('rooms').child($code).child('seats/3').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/3').child('uid').val()).child($uid).exists()) && (root.child('rooms').child($code).child('seats/4').child('k').val() !== 'p' || !root.child('blocked').child($uid).child(root.child('rooms').child($code).child('seats/4').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/4').child('uid').val()).child($uid).exists()) && (root.child('rooms').child($code).child('seats/5').child('k').val() !== 'p' || !root.child('blocked').child($uid).child(root.child('rooms').child($code).child('seats/5').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/5').child('uid').val()).child($uid).exists()) && (root.child('rooms').child($code).child('seats/6').child('k').val() !== 'p' || !root.child('blocked').child($uid).child(root.child('rooms').child($code).child('seats/6').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/6').child('uid').val()).child($uid).exists()) && (root.child('rooms').child($code).child('seats/7').child('k').val() !== 'p' || !root.child('blocked').child($uid).child(root.child('rooms').child($code).child('seats/7').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/7').child('uid').val()).child($uid).exists()) && (root.child('rooms').child($code).child('seats/8').child('k').val() !== 'p' || !root.child('blocked').child($uid).child(root.child('rooms').child($code).child('seats/8').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/8').child('uid').val()).child($uid).exists()) && (root.child('rooms').child($code).child('seats/9').child('k').val() !== 'p' || !root.child('blocked').child($uid).child(root.child('rooms').child($code).child('seats/9').child('uid').val()).exists() && !root.child('blocked').child(root.child('rooms').child($code).child('seats/9').child('uid').val()).child($uid).exists())",
+          ".write": "auth != null && auth.uid === root.child('rooms').child($code).child('host').val() && !root.child('deletionLocks').child(auth.uid).exists() && root.child('rooms').child($code).child('game').val() === 'maumau' && (!newData.exists() || root.child('rooms').child($code).child('status').val() === 'play' && $uid !== root.child('rooms').child($code).child('host').val() && (root.child('rooms').child($code).child('seats/0').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/0').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/1').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/1').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/2').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/2').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/3').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/3').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/4').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/4').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/5').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/5').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/6').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/6').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/7').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/7').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/8').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/8').child('uid').val() === $uid || root.child('rooms').child($code).child('seats/9').child('k').val() === 'p' && root.child('rooms').child($code).child('seats/9').child('uid').val() === $uid))",
+          ".validate": "newData.isString() && newData.val().length <= 400"
         }
       }
     }
