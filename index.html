@@ -325,7 +325,7 @@ E-Mail: <a href="mailto:projektinfo.kontakt@gmail.com">projektinfo.kontakt@gmail
 <p>Für Online-Funktionen nutze ich die Firebase Realtime Database. Dort können je nach Nutzung folgende Daten gespeichert werden:</p>
 <ul>
 <li><strong>Profil:</strong> Benutzername, technische Nutzerkennung, Erstellungszeitpunkt, Online-Spielstatistiken, dein Spielfortschritt (Erfolge, Siege und Niederlagen je Spiel, Highscores, Matchzähler, Reaktionsbestzeit, Favoriten, zuletzt gespielte Spiele, gewählte Farben sowie die Einstellungen Ton, Animationen, Darstellung, Schwierigkeit und Zielwert) sowie Werte, mit denen die Stärke der Computergegner an dein Spielverhalten angepasst wird.</li>
-<li><strong>Online-Status:</strong> Benutzername, Zeitstempel und gegebenenfalls das Spiel, das du gerade spielst.</li>
+<li><strong>Online-Status:</strong> Benutzername, eine vorübergehende Verbindungskennung pro Tab, Zeitstempel und gegebenenfalls das aktuelle Spiel.</li>
 <li><strong>Kontakte:</strong> Freundschaftsverknüpfungen, Freundschaftsanfragen, Spieleinladungen und von dir gesetzte Blockierungen.</li>
 <li><strong>Spielräume:</strong> Raumcode, Host- und Spielernamen, technische Nutzerkennungen der Teilnehmer, Einstellungen, Sitzplätze und Spielzustände.</li>
 <li><strong>Online-Partien:</strong> Spielkennung, beteiligte Nutzer, Verbindungsinformationen und technische Daten, die zum Aufbau einer Verbindung benötigt werden.</li>
@@ -370,7 +370,7 @@ E-Mail: <a href="mailto:projektinfo.kontakt@gmail.com">projektinfo.kontakt@gmail
 <h2>10. Empfänger und Speicherorte</h2>
 <p>Die wichtigsten Anbieter, die bei der Nutzung von Play2Gether Daten erhalten können, sind:</p>
 <ul>
-<li><strong>GitHub:</strong> Hosting und Auslieferung der Website über GitHub Pages.</li>
+<li><strong>GitHub:</strong> Hosting und Auslieferung der Website über GitHub Pages. Sobald die geplante Bereinigung eingerichtet ist, verarbeitet GitHub Actions auch die vorübergehenden Kennungen und Zeitstempel, die zum Auffinden abgelaufener Online-Einträge erforderlich sind.</li>
 <li><strong>Google Firebase:</strong> Anmeldung, Konten und Online-Datenbank. Die Realtime Database dieses Projekts verwendet die Region <code>europe-west1</code> (Belgien). Firebase Authentication wird laut Google ausschließlich in US-Rechenzentren betrieben. Die Wahl der Datenbankregion legt den Speicherort anderer Firebase-Dienste nicht automatisch fest.</li>
 <li><strong>Google und Cloudflare:</strong> STUN-Dienste für den Aufbau von WebRTC-Verbindungen.</li>
 <li><strong>Picsum Photos sowie Wikimedia/Wikipedia:</strong> Bereitstellung externer Bilder und Bildinformationen.</li>
@@ -378,7 +378,7 @@ E-Mail: <a href="mailto:projektinfo.kontakt@gmail.com">projektinfo.kontakt@gmail
 <p>Die Anbieter verarbeiten Daten nach ihren jeweiligen Datenschutz- und Vertragsbedingungen. Da Firebase Authentication in den USA betrieben wird, kann eine Übermittlung personenbezogener Daten in ein Land außerhalb der EU/des EWR stattfinden. Google stellt hierzu Informationen zu seinen Datenschutzbedingungen und den <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener noreferrer">Datenverarbeitungsbedingungen</a> sowie zu den <a href="https://cloud.google.com/security/compliance/eu-scc" target="_blank" rel="noopener noreferrer">EU-Standardvertragsklauseln</a> bereit.</p>
 
 <h2>11. Wie lange Daten gespeichert werden</h2>
-<p>Ich speichere Kontodaten, solange das Konto besteht und die Online-Funktionen genutzt werden. Spielräume, Präsenzdaten, Einladungen und Verbindungsdaten sind grundsätzlich für die jeweilige Online-Sitzung gedacht und werden im normalen Ablauf beim Verlassen oder Beenden einer Verbindung entfernt. Bei einem unerwarteten Verbindungsabbruch kann die automatische Bereinigung fehlschlagen; für solche Einträge ist derzeit keine feste automatische Löschfrist hinterlegt.</p>
+<p>Ich speichere Kontodaten, solange das Konto besteht und die Online-Funktionen genutzt werden. Spielräume, Präsenzdaten, Einladungen und Verbindungsdaten sind vorübergehend. Firebase versucht die Präsenz eines Tabs zu entfernen, sobald dessen Verbindung endet. Kurze Unterbrechungen schließen einen Spielraum nicht. Wer noch verbunden ist, hält den Raum aktiv. Einladungen verlieren nach fünf Minuten ihre Gültigkeit. Sobald der geplante Bereinigungslauf eingerichtet ist, darf er verbliebene Präsenz nach zehn Minuten und verwaiste Räume und Verbindungsdaten nach fünfzehn Minuten Inaktivität entfernen. Wie schnell das geschieht, hängt vom nächsten erfolgreichen Lauf ab.</p>
 <p>Google gibt für Firebase Authentication an, dass protokollierte IP-Adressen einige Wochen und IP-Adressen sowie User-Agent-Daten der Realtime Database einige Tage gespeichert werden. Nach einer Löschung eines Firebase-Authentifizierungskontos kann die Entfernung der Authentifizierungsdaten aus Live- und Backupsystemen laut Google bis zu 180 Tage dauern. Die Speicherdauer bei GitHub, Picsum, Wikimedia, Google und Cloudflare richtet sich ansonsten nach den jeweiligen Angaben dieser Anbieter.</p>
 
 <h2>12. Kontolöschung und lokale Daten</h2>
@@ -3154,7 +3154,7 @@ function luHostMake(st,emit){
 }
 
 /* ---- Online-Raum ---- */
-const LUN={code:'',role:'',seat:-1,ref:null,g:null,room:null,left:0,lastAct:{},actN:0,lastSeq:0,inv:{}};
+const LUN={code:'',role:'',seat:-1,ref:null,g:null,room:null,left:0,lastAct:{},actN:0,lastSeq:0,inv:{},endedAt:0};
 const LU_CODES='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const luCode=()=>Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>LU_CODES[b&31]).join('');
 async function luReserve(code,game,max){
@@ -3166,7 +3166,11 @@ async function luReserve(code,game,max){
   // Zugriff auf Teilnehmer und Spielzustand. Die Datenbank entscheidet atomar.
   for(let i=1;i<max;i++){
     try{
-      await ref.child('seats/'+i).set({k:'p',uid:OL.me,name:OL.name});
+      await OL.db.ref().update({
+        ['rooms/'+code+'/seats/'+i]:{k:'p',uid:OL.me,name:OL.name},
+        ['rooms/'+code+'/pings/'+OL.me]:olTS(),
+        ['expiry/rooms/'+code]:olTS()
+      });
       return {ref,seat:i};
     }catch(e){if(!/PERMISSION/i.test(String(e&&(e.code||e.message))))throw e}
   }
@@ -3186,17 +3190,55 @@ async function luLogin(){
   return 1
 }
 const luErr=e=>{const m=String(e&&(e.code||e.message)||e);return /PERMISSION/i.test(m)?'Kein Zugriff auf diese Online-Aktion. Der Raum ist möglicherweise geschlossen.':'Online-Fehler: '+m};
+const ROOM_IDLE=15*60*1000;
+const GUEST_GRACE=10*60*1000;
+function luCreate(code,data){
+  const time=olTS();
+  return OL.db.ref().update({
+    ['rooms/'+code]:{...data,pings:{[OL.me]:time}},
+    ['expiry/rooms/'+code]:time
+  });
+}
+function luObserveRoom(room){
+  LUN.room=room;
+  let ended=false;
+  try{ended=JSON.parse(room?.snap||'null')?.snap?.ph==='end'}catch(_){}
+  if(ended){if(!LUN.endedAt)LUN.endedAt=olNow()}else LUN.endedAt=0;
+}
+function luPulse(){
+  if(!LUN.ref||!LUN.code||LUN.left||!OL.me)return;
+  const {code,room,role,endedAt}=LUN,me=OL.me,now=olNow();
+  if(endedAt&&now-endedAt>=GUEST_GRACE){
+    toast('Die beendete Runde wurde geschlossen.');toMenu();return;
+  }
+  if(role==='guest'&&room&&now-Number(room.pings?.[room.host]||room.ts)>=ROOM_IDLE){
+    toast('Der Host war zu lange offline. Der Raum wurde verlassen.');
+    toMenu();return;
+  }
+  OL.db.ref().update({['rooms/'+code+'/pings/'+me]:olTS(),['expiry/rooms/'+code]:olTS()}).catch(()=>{});
+  if(role==='host'&&room)for(const [i,seat] of Object.entries(room.seats||{})){
+    if(i==='0'||seat?.k!=='p'||now-Number(room.pings?.[seat.uid]||room.ts)<GUEST_GRACE)continue;
+    LUN.ref.child('seats/'+i).set({k:'gone',uid:seat.uid,name:seat.name}).catch(()=>{});
+  }
+}
 function luCleanup(){
-  const r=LUN.ref;
-  try{if(OL.me&&OL.db)for(const u in LUN.inv)OL.db.ref('invites/'+u+'/'+OL.me).remove()}catch(e){}LUN.inv={};
-  if(LUN.hr){try{LUN.hr.off()}catch(e){}LUN.hr=null}
-  if(r){try{r.off()}catch(e){}
-    try{
-      if(LUN.role=='host'){r.onDisconnect().cancel();try{OL.db.ref('hands/'+LUN.code).onDisconnect().cancel();OL.db.ref('hands/'+LUN.code).remove()}catch(e){}r.remove()}
-      else if(LUN.role=='guest'&&LUN.seat>=0){r.child('seats/'+LUN.seat).onDisconnect().cancel();r.child('seats/'+LUN.seat).set({k:'gone',uid:OL.me,name:OL.name})}
-    }catch(e){}}
-  if(OL.me&&OL.db)try{olSetGame(null)}catch(e){}
-  LUN.ref=null;LUN.role='';LUN.seat=-1;LUN.room=null;LUN.lastAct={};LUN.lastSeq=0;LUN.code=''
+  const {ref:r,code,role,seat}=LUN,me=OL.me,db=OL.db;
+  if(LUN.hr){LUN.hr.off();LUN.hr=null}
+  LUN.ref=null;LUN.role='';LUN.seat=-1;LUN.room=null;LUN.lastAct={};LUN.lastSeq=0;LUN.code='';LUN.endedAt=0;
+  if(!db||!me)return;
+  const changes={};
+  for(const u in LUN.inv)changes['invites/'+u+'/'+me]=null;
+  LUN.inv={};
+  if(r){
+    r.off();
+    if(role==='host'){
+      changes['rooms/'+code]=null;changes['hands/'+code]=null;changes['expiry/rooms/'+code]=null;
+    }else if(role==='guest'&&seat>=0){
+      r.child('seats/'+seat).set({k:'gone',uid:me,name:OL.name}).catch(()=>{});
+    }
+  }
+  if(Object.keys(changes).length)db.ref().update(changes).catch(()=>{});
+  olSetGame(null);
 }
 
 const luSeatsOf=room=>[0,1,2,3].map(i=>(room&&room.seats&&room.seats[i])||{k:'off'});
@@ -3252,7 +3294,7 @@ function luMk(){
     if(!fr.length)return Object.keys(OL.F||{}).length?'<span class=luhint>Alle deine Freunde sind schon im Raum.</span>':'<span class=luhint>Noch keine Freunde. <button class=mini data-lu=frs>Freunde hinzufügen</button></span>';
     const st_=u=>!OL.P[u]?0:OL.P[u].g?1:2;
     return fr.sort((a,b)=>st_(b)-st_(a)||olNameOf(a).localeCompare(olNameOf(b))).map(u=>{
-      const k=st_(u),sent=LUN.inv[u]&&Date.now()-LUN.inv[u]<45000,col=['#9ca3af','#f59e0b','#22c55e'][k];
+      const k=st_(u),sent=LUN.inv[u]&&olNow()-LUN.inv[u]<45000,col=['#9ca3af','#f59e0b','#22c55e'][k];
       const btn=k==2?(sent?'<button class=mini disabled>Eingeladen ✓</button>':`<button class=mini data-lu=inv data-u=${u}>Einladen</button>`):`<button class=mini disabled>${k?'Beschäftigt':'Offline'}</button>`;
       return`<div class=lurow><i style="background:${col}"></i><b>${luHtml(olNameOf(u))}</b>${btn}</div>`}).join('')
   }
@@ -3263,9 +3305,8 @@ function luMk(){
     if(LUN.role!='host'||!LUN.room||LUN.room.status!='lobby'||!u)return;
     if(!OL.P[u]||OL.P[u].g){toast(olNameOf(u)+' ist gerade nicht frei.');refreshFr();return}
     try{
-      const r=OL.db.ref('invites/'+u+'/'+OL.me);
-      await r.set({mid:'room:'+LUN.code,code:LUN.code,name:OL.name,game:'ludo',t:0,ts:olTS()});
-      r.onDisconnect().remove();LUN.inv[u]=Date.now();
+      await olWriteInvite(u,{mid:'room:'+LUN.code,code:LUN.code,name:OL.name,game:'ludo',t:0,ts:olTS()});
+      LUN.inv[u]=olNow();
       toast('Einladung an '+olNameOf(u)+' gesendet');refreshFr();setTimeout(refreshFr,45500)
     }catch(e){toast(luErr(e))}
   }
@@ -3319,8 +3360,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     if(!await luLogin())return;
     const cfg=cfgOf(),code=luCode(),ref=OL.db.ref('rooms/'+code);
     try{
-      await ref.set({host:OL.me,hn:OL.name,ts:olTS(),status:'lobby',game:'ludo',cfg,seats:{0:{k:'p',uid:OL.me,name:OL.name},1:{k:'open'},2:{k:'open'},3:{k:'open'}}});
-      ref.onDisconnect().remove()
+      await luCreate(code,{host:OL.me,hn:OL.name,ts:olTS(),status:'lobby',game:'ludo',cfg,seats:{0:{k:'p',uid:OL.me,name:OL.name},1:{k:'open'},2:{k:'open'},3:{k:'open'}}});
     }catch(e){toast(luErr(e));return}
     LUN.code=code;LUN.role='host';LUN.seat=0;LUN.ref=ref;LUN.left=0;LUN.g=api;LUN.lastAct={};
     mode='lobby';listen();olSetGame('ludo')
@@ -3335,14 +3375,13 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
       if(!claim)return false;
       const {ref,seat}=claim;
       LUN.code=code;LUN.role='guest';LUN.seat=seat;LUN.ref=ref;LUN.left=0;LUN.g=api;LUN.actN=0;
-      ref.child('seats/'+seat).onDisconnect().set({k:'gone',uid:OL.me,name:OL.name}).catch(()=>{});
       mode='lobby';listen();olSetGame('ludo');
       return true
     }catch(e){toast(luErr(e));return false}
   }
   function listen(){
     LUN.ref.on('value',s=>{
-      const v=s.val();LUN.room=v;if(LUN.left||!LUN.ref)return;
+      const v=s.val();if(LUN.left||!LUN.ref)return;luObserveRoom(v);
       if(!v){exit('Der Raum wurde geschlossen.');return}
       const seats=luSeatsOf(v);
       if(seats.some(x=>x.uid&&x.uid!==OL.me&&OL.BL[x.uid])){exit('Der Raum enthält einen blockierten Spieler.');return}
@@ -3353,7 +3392,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
         if(v.status=='lobby'){if(mode!='lobby'){mode='lobby';st=demo();ani=[]}showOv(lobbyHTML(v));return}
         if(v.status=='play'&&v.snap){
           let o;try{o=JSON.parse(v.snap)}catch(e){return}
-          if(mode!='guest'){mode='guest';my=i;rot=(3-my+4)%4;ani=[];endShown=0;ovHide();st=null;LUN.lastSeq=0;LUN.ref.child('seats/'+i).onDisconnect().set({k:'gone',uid:OL.me,name:OL.name})}
+          if(mode!='guest'){mode='guest';my=i;rot=(3-my+4)%4;ani=[];endShown=0;ovHide();st=null;LUN.lastSeq=0}
           if(o.snap.seq>LUN.lastSeq){LUN.lastSeq=o.snap.seq;onSnap(o.snap,o.ev)}
         }
       }else{
@@ -4888,7 +4927,7 @@ function mmMk(){
     if(!fr.length)return Object.keys(OL.F||{}).length?'<span class=luhint>Alle deine Freunde sind schon im Raum.</span>':'<span class=luhint>Noch keine Freunde. <button class=mini data-lu=frs>Freunde hinzufügen</button></span>';
     const st_=u=>!OL.P[u]?0:OL.P[u].g?1:2;
     return fr.sort((a,b)=>st_(b)-st_(a)||olNameOf(a).localeCompare(olNameOf(b))).map(u=>{
-      const k=st_(u),sent=LUN.inv[u]&&Date.now()-LUN.inv[u]<45000,col=['#9ca3af','#f59e0b','#22c55e'][k];
+      const k=st_(u),sent=LUN.inv[u]&&olNow()-LUN.inv[u]<45000,col=['#9ca3af','#f59e0b','#22c55e'][k];
       const btn=k==2?(sent?'<button class=mini disabled>Eingeladen ✓</button>':`<button class=mini data-lu=inv data-u=${u}>Einladen</button>`):`<button class=mini disabled>${k?'Beschäftigt':'Offline'}</button>`;
       return`<div class=lurow><i style="background:${col}"></i><b>${luHtml(olNameOf(u))}</b>${btn}</div>`}).join('')
   }
@@ -4899,9 +4938,8 @@ function mmMk(){
     if(LUN.role!='host'||!LUN.room||LUN.room.status!='lobby'||!u)return;
     if(!OL.P[u]||OL.P[u].g){toast(olNameOf(u)+' ist gerade nicht frei.');refreshFr();return}
     try{
-      const r=OL.db.ref('invites/'+u+'/'+OL.me);
-      await r.set({mid:'room:'+LUN.code,code:LUN.code,name:OL.name,game:'maumau',t:0,ts:olTS()});
-      r.onDisconnect().remove();LUN.inv[u]=Date.now();
+      await olWriteInvite(u,{mid:'room:'+LUN.code,code:LUN.code,name:OL.name,game:'maumau',t:0,ts:olTS()});
+      LUN.inv[u]=olNow();
       toast('Einladung an '+olNameOf(u)+' gesendet');refreshFr();setTimeout(refreshFr,45500)
     }catch(e){toast(luErr(e))}
   }
@@ -4975,9 +5013,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     if(!await luLogin())return;
     const M=S.mm,cfg={d:S.d==3?Math.max(0,Math.min(2,Math.round(adEff()))):S.d,mau:M.mau},code=luCode(),ref=OL.db.ref('rooms/'+code);
     try{
-      await ref.set({host:OL.me,hn:OL.name,ts:olTS(),status:'lobby',game:'maumau',cfg,seats:Object.fromEntries(MMS.map(i=>[i,i?{k:i<4?'open':'off'}:{k:'p',uid:OL.me,name:OL.name}]))});
-      OL.db.ref('hands/'+code).onDisconnect().remove();
-      ref.onDisconnect().remove()
+      await luCreate(code,{host:OL.me,hn:OL.name,ts:olTS(),status:'lobby',game:'maumau',cfg,seats:Object.fromEntries(MMS.map(i=>[i,i?{k:i<4?'open':'off'}:{k:'p',uid:OL.me,name:OL.name}]))});
     }catch(e){toast(luErr(e));return}
     LUN.code=code;LUN.role='host';LUN.seat=0;LUN.ref=ref;LUN.left=0;LUN.g=api;LUN.lastAct={};
     mode='lobby';listen();olSetGame('maumau')
@@ -4992,14 +5028,13 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
       if(!claim)return false;
       const {ref,seat}=claim;
       LUN.code=code;LUN.role='guest';LUN.seat=seat;LUN.ref=ref;LUN.left=0;LUN.g=api;LUN.actN=0;
-      ref.child('seats/'+seat).onDisconnect().set({k:'gone',uid:OL.me,name:OL.name}).catch(()=>{});
       mode='lobby';listen();olSetGame('maumau');
       return true
     }catch(e){toast(luErr(e));return false}
   }
   function listen(){
     LUN.ref.on('value',s=>{
-      const v=s.val();LUN.room=v;if(LUN.left||!LUN.ref)return;
+      const v=s.val();if(LUN.left||!LUN.ref)return;luObserveRoom(v);
       if(!v){exit('Der Raum wurde geschlossen.');return}
       const seats=mmSeats(v);
       if(seats.some(x=>x.uid&&x.uid!==OL.me&&OL.BL[x.uid])){exit('Der Raum enthält einen blockierten Spieler.');return}
@@ -5012,7 +5047,6 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
           let o;try{o=JSON.parse(v.snap)}catch(e){return}
           if(mode!='guest'){
             mode='guest';my=i;ani=[];endShown=0;ovHide();st=null;LUN.lastSeq=0;myH=[];myDr=-1;
-            LUN.ref.child('seats/'+i).onDisconnect().set({k:'gone',uid:OL.me,name:OL.name});
             LUN.hr=OL.db.ref('hands/'+LUN.code+'/'+OL.me);
             LUN.hr.on('value',hs=>{const t=hs.val();if(!t)return;try{const q=JSON.parse(t);myH=sortH(q.h||[]);myDr=q.dr==null?-1:q.dr}catch(e){}},e=>{if(!LUN.left)toast(luErr(e))})
           }
@@ -5546,17 +5580,68 @@ async function olIn(u){
 }
 function olGone(){
   if(progT)progPush(1);
-  if(OL.unl)OL.unl();OL.unl=null;OL.pready=0;OL.me=null;OL.name='';OL.P={};OL.F={};OL.BL={};OL.blocksReady=false;OL.U={};OL.stats={};OL.seen={};OL.view='main';OL.RQ={};OL.INV={};OL.sent={};
+  if(OL.unl)OL.unl();OL.unl=null;OL.presence?.stop(false);OL.game=null;OL.pready=0;OL.me=null;OL.name='';OL.P={};OL.F={};OL.BL={};OL.blocksReady=false;OL.U={};OL.stats={};OL.seen={};OL.view='main';OL.RQ={};OL.INV={};OL.sent={};
   olBadge();olRender();$('#oli').innerHTML='';
 }
 
+const PRESENCE_IDLE=10*60*1000;
+const INVITE_IDLE=5*60*1000;
+const ONLINE_PULSE=2*60*1000;
+const olNow=()=>Date.now()+(OL.clockOffset||0);
+const olInviteValid=v=>v&&Number(v.ts)>olNow()-INVITE_IDLE;
 function olPresence(){
-  const me=OL.me,r=OL.db.ref('presence/'+me);
-  OL.db.ref('.info/connected').on('value',s=>{
-    if(s.val()===true&&OL.me===me){r.onDisconnect().remove();r.set({name:OL.name,ts:olTS(),g:OL.sess?OL.sess.gid:null})}
-  });
+  OL.presence?.stop(false);
+  const db=OL.db,me=OL.me,connected=db.ref('.info/connected'),offset=db.ref('.info/serverTimeOffset');
+  let session=null,closed=false;
+  const valid=()=>!closed&&OL.me===me&&!OL.deleting;
+  const paths=id=>['presence/'+me+'/tabs/'+id,'expiry/presence/'+me+'/'+id];
+  const touch=()=>{
+    if(!valid()||!session?.ready)return Promise.resolve();
+    const [row,lease]=paths(session.id),ts=olTS();
+    return db.ref().update({[row]:{name:OL.name,ts,g:OL.game||null},[lease]:ts});
+  };
+  const pulse=()=>{
+    if(!valid()||!session?.ready)return;
+    touch().catch(()=>{});luPulse();olInvites();olBadge();
+  };
+  const changed=async snap=>{
+    if(!snap.val()||!valid()){session=null;return}
+    const current={id:db.ref('presence/'+me+'/tabs').push().key,ready:false};
+    session=current;
+    const [row]=paths(current.id);
+    try{
+      // Dieser Tab hat pro Verbindung eine eigene Kennung. Ältere Disconnect-Aufträge
+      // können die Präsenz der neuen Verbindung dadurch nicht entfernen.
+      await db.ref(row).onDisconnect().remove();
+      if(!valid()||session!==current)return;
+      current.ready=true;pulse();
+    }catch(_){}
+  };
+  const skew=snap=>{OL.clockOffset=Number(snap.val())||0};
+  const visible=()=>{if(!document.hidden)pulse()};
+  const timer=setInterval(pulse,ONLINE_PULSE);
+  const stop=remove=>{
+    closed=true;clearInterval(timer);connected.off('value',changed);offset.off('value',skew);
+    document.removeEventListener('visibilitychange',visible);
+    const old=session;session=null;
+    if(OL.presence?.stop===stop)OL.presence=null;
+    if(!remove||!old?.ready)return Promise.resolve();
+    const [row,lease]=paths(old.id);
+    return db.ref().update({[row]:null,[lease]:null}).catch(()=>{});
+  };
+  OL.presence={touch,stop};
+  document.addEventListener('visibilitychange',visible);
+  offset.on('value',skew);
+  connected.on('value',changed);
 }
-const olSetGame=g=>{if(OL.me&&!OL.deleting)OL.db.ref('presence/'+OL.me+'/g').set(g||null)};
+function olSetGame(g){
+  OL.game=g||null;
+  OL.presence?.touch().catch(()=>{});
+}
+function olPeerPresence(data){
+  const tabs=Object.values(data?.tabs||{}).filter(v=>Number(v?.ts)>olNow()-PRESENCE_IDLE).sort((a,b)=>b.ts-a.ts);
+  return tabs.find(v=>v.g)||tabs[0]||null;
+}
 
 function olListen(){
   const d=OL.db,me=OL.me,offs=[];
@@ -5568,14 +5653,21 @@ function olListen(){
   }
   const on=(p,f)=>{const r=d.ref(p),changed=s=>f(s.val()||{});r.on('value',changed);offs.push(()=>r.off('value',changed))};
   const presence=new Map();
-  const refresh=()=>{olUpd();window.luFr&&luFr()};
+  const raw={};
+  const refresh=()=>{
+    for(const [u,value] of Object.entries(raw)){
+      const status=olPeerPresence(value);
+      if(status)OL.P[u]=status;else delete OL.P[u];
+    }
+    olUpd();window.luFr&&luFr()
+  };
   const syncPresence=()=>{
-    for(const [u,stop] of presence){if(OL.F[u]&&olAllowed(u))continue;stop();presence.delete(u);delete OL.P[u];delete OL.U[u]}
+    for(const [u,stop] of presence){if(OL.F[u]&&olAllowed(u))continue;stop();presence.delete(u);delete raw[u];delete OL.P[u];delete OL.U[u]}
     for(const u of Object.keys(OL.F)){
       if(presence.has(u)||!olAllowed(u))continue;
       const ref=d.ref('presence/'+u);
-      const changed=s=>{if(s.exists())OL.P[u]=s.val();else delete OL.P[u];refresh()};
-      const denied=()=>{delete OL.P[u];presence.delete(u);refresh()};
+      const changed=s=>{raw[u]=s.val();refresh()};
+      const denied=()=>{delete raw[u];delete OL.P[u];presence.delete(u);refresh()};
       presence.set(u,()=>ref.off('value',changed));
       ref.on('value',changed,denied)
     }
@@ -5587,7 +5679,7 @@ function olListen(){
   on('friends/'+me,v=>{OL.F=v;syncPresence()});
   on('requests/'+me,v=>{OL.RQ=v;olUpd();olBadge()});
   on('invites/'+me,v=>{OL.INV=v;olInvites();olBadge()});
-  offs.push(()=>d.ref('.info/connected').off());
+  const expiryTimer=setInterval(refresh,30000);offs.push(()=>clearInterval(expiryTimer));
   OL.unl=()=>offs.forEach(f=>f());
 }
 function olNames(ids){
@@ -5600,7 +5692,7 @@ function olNames(ids){
   });
 }
 function olBadge(){
-  const n=Object.keys(OL.RQ).filter(olAllowed).length+Object.keys(OL.INV).filter(olAllowed).length,b=$('#olbd');
+  const n=Object.keys(OL.RQ).filter(olAllowed).length+Object.keys(OL.INV).filter(u=>olAllowed(u)&&olInviteValid(OL.INV[u])).length,b=$('#olbd');
   b.textContent=n;b.classList.toggle('on',n>0);
 }
 
@@ -5642,9 +5734,11 @@ async function olAuth(mode,name,pw){
   OL.busy=0;olRender();
 }
 async function olLogout(){
-  const me=OL.me;
   try{if(progT)progPush(1)}catch(e){}
-  try{if(me)await OL.db.ref('presence/'+me).remove()}catch(e){}
+  olCancelOut();
+  if(OL.sess)olLeave();
+  if(LUN.ref)toMenu();
+  await Promise.race([OL.presence?.stop(true)||Promise.resolve(),new Promise(resolve=>setTimeout(resolve,2500))]);
   try{localStorage.removeItem('2pg_ol')}catch(e){}
   await OL.auth.signOut();
 }
@@ -5756,7 +5850,7 @@ async function olDeleteAccount(){
     olCancelOut();if(OL.sess)olLeave();if(cur&&cur.leave)toMenu();
     if(OL.unl)OL.unl();OL.unl=null;stopped=true;
     const uid=user.uid,db=OL.db;
-    try{await db.ref('presence/'+uid).onDisconnect().cancel()}catch(_){}
+    await OL.presence?.stop(true);
     /* Ohne Cloud Function (kostenloser Spark-Plan): Daten im Browser entfernen, dann Account löschen. */
     const rm=[],low=(OL.name||'').toLowerCase();
     for(const p of ['friends','requests','invites','blocked']){
@@ -5820,16 +5914,21 @@ async function olAddName(){
 
 /* ---- Herausfordern (Absender = Host = Spieler 1) ---- */
 const olIsRoom=v=>!!v&&/^room:/.test(String(v.mid||''));
+function olWriteInvite(to,invite){
+  const me=OL.me;
+  return OL.db.ref().update({['invites/'+to+'/'+me]:invite,['expiry/invites/'+to+'/'+me]:invite.ts});
+}
+
 function olCards(){
   let h='';
   if(OL.out)h+=`<div class=olinv><b>Herausforderung an ${olEsc(olNameOf(OL.out.uid))}</b><span>${olEsc(olGameName(OL.out.gid))}${goalOf(OL.out.gid,OL.out.t)?' · '+goalOf(OL.out.gid,OL.out.t):''} – warte auf Antwort…</span><div class=row><button class="btn g" data-o=cx>Abbrechen</button></div></div>`;
   if(OL.sess&&!OL.sess.live)h+=`<div class=olinv><b>Verbinde mit ${olEsc(OL.sess.names[OL.sess.role?0:1])}…</b><span>${olEsc(olGameName(OL.sess.gid))}</span><div class=row><button class="btn g" data-o=lv>Abbrechen</button></div></div>`;
-  for(const u in OL.INV){if(!olAllowed(u))continue;const v=OL.INV[u];if(olIsRoom(v)){h+=`<div class=olinv><b>${olEsc(v.name)} lädt dich zu „${v.game=='maumau'?'Mau-Mau':'Mensch ärgere dich nicht'}“ ein!</b><span>Online-Raum ${olEsc(String(v.mid).slice(5))}</span><div class=row><button class=btn data-o=acc data-u=${u}>Beitreten</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`;continue}h+=`<div class=olinv><b>${olEsc(v.name)} fordert dich heraus!</b><span>${olEsc(olGameName(v.game))}${goalOf(v.game,+v.t||5)?' · '+goalOf(v.game,+v.t||5):''}</span><div class=row><button class=btn data-o=acc data-u=${u}>Annehmen</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`}
+  for(const u in OL.INV){if(!olAllowed(u))continue;const v=OL.INV[u];if(!olInviteValid(v))continue;if(olIsRoom(v)){h+=`<div class=olinv><b>${olEsc(v.name)} lädt dich zu „${v.game=='maumau'?'Mau-Mau':'Mensch ärgere dich nicht'}“ ein!</b><span>Online-Raum ${olEsc(String(v.mid).slice(5))}</span><div class=row><button class=btn data-o=acc data-u=${u}>Beitreten</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`;continue}h+=`<div class=olinv><b>${olEsc(v.name)} fordert dich heraus!</b><span>${olEsc(olGameName(v.game))}${goalOf(v.game,+v.t||5)?' · '+goalOf(v.game,+v.t||5):''}</span><div class=row><button class=btn data-o=acc data-u=${u}>Annehmen</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`}
   $('#oli').innerHTML=h;
 }
 function olInvites(){
   for(const u in OL.INV){
-    if(!olAllowed(u))continue;
+    if(!olAllowed(u)||!olInviteValid(OL.INV[u]))continue;
     const k=u+OL.INV[u].mid;
     if(!OL.seen[k]){OL.seen[k]=1;if(OL.sess||OL.out){olDecline(u,1);continue}snd(660,.12,'triangle');setTimeout(()=>snd(880,.15,'triangle'),130)}
   }
@@ -5843,10 +5942,11 @@ async function olInvite(u,gid,t){
   OL.out={mid,uid:u,gid,t,timer:setTimeout(()=>olCancelOut('Keine Antwort von '+olNameOf(u)+'.'),60000)};
   olClose();olCards();
   try{
-    await OL.db.ref('matches/'+mid).set({host:me,guest:u,hn:OL.name,gn:olNameOf(u),game:gid,t,state:'invited',ts:olTS()});
-    try{await OL.db.ref('matches/'+mid+'/hc').set(ocI())}catch(e){}
-    await OL.db.ref('invites/'+u+'/'+me).set({mid,name:OL.name,game:gid,t,ts:olTS()});
-    OL.db.ref('matches/'+mid).onDisconnect().remove();OL.db.ref('invites/'+u+'/'+me).onDisconnect().remove();
+    const ts=olTS();
+    await OL.db.ref().update({['matches/'+mid]:{host:me,guest:u,hn:OL.name,gn:olNameOf(u),game:gid,t,state:'invited',ts,hc:ocI()},['expiry/matches/'+mid]:ts});
+    if(OL.out?.mid!==mid)return;
+    await olWriteInvite(u,{mid,name:OL.name,game:gid,t,ts:olTS()});
+    if(OL.out?.mid!==mid)return;
     const r=OL.db.ref('matches/'+mid);OL.out.r=r;
     r.on('value',s=>{
       const v=s.val();if(!OL.out||OL.out.mid!=mid||!v)return;
@@ -5875,7 +5975,7 @@ async function olDecline(u,quiet){
 }
 async function olAccept(u){
   if(!olCanContact(u))return;
-  const v=OL.INV[u];if(!v||OL.sess||OL.out)return;
+  const v=OL.INV[u];if(!olInviteValid(v)||OL.sess||OL.out)return;
   const invite='invites/'+OL.me+'/'+u;
   if(olIsRoom(v)){
     olClose();olCards();
@@ -5976,10 +6076,9 @@ function olNew(role,mid,gid,names,t){
   ss.pc.onconnectionstatechange=()=>{
     const st=ss.pc.connectionState;if(OL.sess!==ss)return;
     if(st=='failed')ss.live?olOppLeft('Die Verbindung wurde unterbrochen.'):olLeave('Verbindung fehlgeschlagen. Möglicherweise blockiert das Netzwerk direkte Verbindungen (TURN-Server nötig).');
-    else if(st=='disconnected'){clearTimeout(ss.dc);ss.dc=setTimeout(()=>{if(OL.sess===ss&&ss.pc.connectionState!='connected')ss.live?olOppLeft('Die Verbindung wurde unterbrochen.'):olLeave('Verbindung fehlgeschlagen.')},6000)}
+    else if(st=='disconnected'){clearTimeout(ss.dc);ss.dc=setTimeout(()=>{if(OL.sess===ss&&ss.pc.connectionState!='connected')ss.live?olOppLeft('Die Verbindung wurde unterbrochen.'):olLeave('Verbindung fehlgeschlagen.')},30000)}
   };
   ss.to=setTimeout(()=>{if(OL.sess===ss&&!ss.live)olLeave('Verbindung fehlgeschlagen. Möglicherweise blockiert das Netzwerk direkte Verbindungen (TURN-Server nötig).')},25000);
-  OL.db.ref('matches/'+mid).onDisconnect().remove();
   olSetGame(gid);olClose();olCards();
   return ss;
 }
@@ -6006,7 +6105,7 @@ async function olHost(o,m){
 }
 function olLive(){
   const ss=OL.sess;if(!ss||ss.live)return;
-  ss.live=1;clearTimeout(ss.to);ss.ref.off();OL.db.ref('matches/'+ss.mid).onDisconnect().cancel();ss.ref.remove().catch(()=>{});
+  ss.live=1;clearTimeout(ss.to);ss.ref.off();ss.ref.remove().catch(()=>{});
   try{const p=ss.snd.getParameters();p.encodings=[{maxBitrate:3500000,maxFramerate:60}];ss.snd.setParameters(p).catch(()=>{})}catch(e){}
   olCards();olRound();
 }
@@ -6080,7 +6179,7 @@ async function olGuest(mid,m){
 }
 function olGuestOpen(){
   const ss=OL.sess;if(!ss||ss.live)return;
-  ss.live=1;clearTimeout(ss.to);ss.ref.off();OL.db.ref('matches/'+ss.mid).onDisconnect().cancel();
+  ss.live=1;clearTimeout(ss.to);ss.ref.off();
   $('#menu').style.display='none';$('#game').style.display='block';fsOn();$('#gt').textContent=olGameName(ss.gid);$('#hint').textContent='';
   olCards();
 }
@@ -6106,7 +6205,7 @@ function olLeave(msg){
   OL.sess=null;clearTimeout(ss.to);clearTimeout(ss.cd);clearTimeout(ss.dc);
   if(!ss.dead)olSend(ss.ctl,{bye:1});
   try{ss.ref.off()}catch(e){}
-  try{OL.db.ref('matches/'+ss.mid).onDisconnect().cancel();if(!ss.live||!ss.role)OL.db.ref('matches/'+ss.mid).remove()}catch(e){}
+  try{if(!ss.live||!ss.role)OL.db.ref('matches/'+ss.mid).remove()}catch(e){}
   setTimeout(()=>{try{ss.pc.close()}catch(e){}},300);
   const o=ON;ON=null;cup=null;TBw=9;skin();pageTurn(9);
   if(o&&o.s0){S.cpu=o.s0.cpu;S.t=o.s0.t}
