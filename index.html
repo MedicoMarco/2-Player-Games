@@ -276,6 +276,9 @@ body.onl #rs,body.onl-guest #rs{display:none}
 #legal .lg-body h1{font-size:22px}#legal .lg-body h2{font-size:18px}#legal .lg-body h3{font-size:16px}
 #legal .lg-body a{color:var(--b)}#legal .lg-body p,#legal .lg-body ul,#legal .lg-body ol{margin:.5em 0}
 </style>
+<link rel="stylesheet" href="./direct-chat.css">
+<link rel="stylesheet" href="./game-chat.css">
+<link rel="stylesheet" href="./chat-moderation.css">
 </head><body>
 <!-- ==================================================================
   RECHTSTEXTE – HIER DEINE HTML-TEXTE EINFÜGEN
@@ -326,7 +329,10 @@ E-Mail: <a href="mailto:projektinfo.kontakt@gmail.com">projektinfo.kontakt@gmail
 <ul>
 <li><strong>Profil:</strong> Benutzername, technische Nutzerkennung, Erstellungszeitpunkt, Online-Spielstatistiken, dein Spielfortschritt (Erfolge, Siege und Niederlagen je Spiel, Highscores, Matchzähler, Reaktionsbestzeit, Favoriten, zuletzt gespielte Spiele, gewählte Farben sowie die Einstellungen Ton, Animationen, Darstellung, Schwierigkeit und Zielwert) sowie Werte, mit denen die Stärke der Computergegner an dein Spielverhalten angepasst wird.</li>
 <li><strong>Online-Status:</strong> Benutzername, eine vorübergehende Verbindungskennung pro Tab, Zeitstempel und gegebenenfalls das aktuelle Spiel.</li>
+<li><strong>Gruppen und Chat-Einstellungen:</strong> Firebase speichert Gruppennamen, Symbole, Mitgliedschaften, Rollen, Einladungen und Gruppennachrichten. Nur aktuelle Mitglieder können Nachrichten seit ihrem jeweiligen Beitritt lesen. Einstellungen für angeheftete und stummgeschaltete Chats und der Zeitpunkt der letzten gesehenen Nachricht sind nur für dein Konto lesbar. In der Website können neue Nachrichten mit einer kurzen Vorschau erscheinen.</li>
+<li><strong>Privatchats:</strong> Firebase speichert Nachrichtentext, Absenderkennung, Benutzername sowie Sende- und Änderungszeit. Bestätigte Freunde können ihren gemeinsamen Verlauf öffnen. Bei Blockierung oder Ende der Freundschaft wird der Zugang gesperrt. Werden beide wieder Freunde, ist der gespeicherte Verlauf wieder sichtbar. Eigene Nachrichten können im geöffneten Chat gelöscht werden. Für die Löschung nach Ende der Freundschaft oder bei Kontolöschung kannst du den Betreiber kontaktieren. Nachrichten bleiben bis zur Löschung gespeichert. Bei einer Meldung erhält die Moderation den gemeldeten Text, beteiligte Kennungen, Meldegrund und Zeitpunkt. Sie speichert außerdem den Bearbeitungsstatus. Für Meldungen während eines laufenden direkten Onlinespiels bleibt für die Dauer der Verbindung ein Firebase-Eintrag für die Spielteilnahme bestehen. Bei solchen Meldungen wird der vom Meldenden übermittelte Wortlaut als unbestätigt gekennzeichnet.</li>
 <li><strong>Kontakte:</strong> Freundschaftsverknüpfungen, Freundschaftsanfragen, Spieleinladungen und von dir gesetzte Blockierungen.</li>
+<li><strong>Spielchat:</strong> Chatnachrichten sind für die Teilnehmer derselben Online-Partie sichtbar. In Ludo und Mau-Mau speichert Firebase die jeweils letzte Nachricht pro Platz mit Absenderkennung und Sendezeit im Spielraum. Beim Löschen des Raums werden diese Nachrichten mitgelöscht. Bei direkten Online-Partien werden die Texte über die bestehende WebRTC-Verbindung übertragen und im Browser bis zum Verlassen der Partie angezeigt.</li>
 <li><strong>Spielräume:</strong> Raumcode, Host- und Spielernamen, technische Nutzerkennungen der Teilnehmer, Einstellungen, Sitzplätze und Spielzustände.</li>
 <li><strong>Online-Partien:</strong> Spielkennung, beteiligte Nutzer, Verbindungsinformationen und technische Daten, die zum Aufbau einer Verbindung benötigt werden.</li>
 <li><strong>Mau-Mau:</strong> Für den Spielablauf erforderliche Kartendaten und Spielzustände.</li>
@@ -490,7 +496,7 @@ Deutschland</p>
 </div>
 <!-- ▲▲▲ ENDE NUTZUNGSREGELN ▲▲▲ -->
 </template>
-<div class="w" id="menu"><div class="top"><svg class="logo" viewBox="0 0 64 64" role="img" aria-label="2 Player Games"><rect x="3" y="3" width="58" height="58" rx="11" style="fill:var(--card);stroke:var(--ln)" stroke-width="3"/><circle cx="24" cy="32" r="16" style="fill:var(--b)"/><circle cx="40" cy="32" r="16" style="fill:var(--r)"/><path d="M32 18.14A16 16 0 0 1 32 45.86A16 16 0 0 1 32 18.14z" style="fill:var(--ln)"/><circle cx="24" cy="32" r="16" fill="none" style="stroke:var(--ln)" stroke-width="3"/><circle cx="40" cy="32" r="16" fill="none" style="stroke:var(--ln)" stroke-width="3"/><path d="M12 27a12 12 0 0 1 7-8M47 19a12 12 0 0 1 6 8" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="3" stroke-linecap="round"/><text x="16" y="38" text-anchor="middle" font-size="15" font-weight="800" fill="#fff" style="font-family:var(--fh)">1</text><text x="48" y="38" text-anchor="middle" font-size="15" font-weight="800" fill="#fff" style="font-family:var(--fh)">2</text></svg><div><h1>2 Player Games</h1><p class="sub" id="cnt"></p></div><div class="seg" style="margin-left:auto"><button id="olb" title="Online spielen" aria-label="Online spielen">🌐<span class="olt"> Online</span><i id="olbd"></i></button></div><div class="seg"><button id="acb" title="Erfolge" aria-label="Erfolge">🏆<span class="olt"> Erfolge</span><i class="spbd" id="acn"></i></button><button id="setb" title="Einstellungen" aria-label="Einstellungen">⚙<span class="olt"> Einstellungen</span></button></div><div class="seg"><button id="bt"></button></div></div>
+<div class="w" id="menu"><div class="top"><svg class="logo" viewBox="0 0 64 64" role="img" aria-label="2 Player Games"><rect x="3" y="3" width="58" height="58" rx="11" style="fill:var(--card);stroke:var(--ln)" stroke-width="3"/><circle cx="24" cy="32" r="16" style="fill:var(--b)"/><circle cx="40" cy="32" r="16" style="fill:var(--r)"/><path d="M32 18.14A16 16 0 0 1 32 45.86A16 16 0 0 1 32 18.14z" style="fill:var(--ln)"/><circle cx="24" cy="32" r="16" fill="none" style="stroke:var(--ln)" stroke-width="3"/><circle cx="40" cy="32" r="16" fill="none" style="stroke:var(--ln)" stroke-width="3"/><path d="M12 27a12 12 0 0 1 7-8M47 19a12 12 0 0 1 6 8" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="3" stroke-linecap="round"/><text x="16" y="38" text-anchor="middle" font-size="15" font-weight="800" fill="#fff" style="font-family:var(--fh)">1</text><text x="48" y="38" text-anchor="middle" font-size="15" font-weight="800" fill="#fff" style="font-family:var(--fh)">2</text></svg><div><h1>2 Player Games</h1><p class="sub" id="cnt"></p></div><div class="seg" style="margin-left:auto"><button id="dm-launch" title="Chats" aria-label="Chats">💬</button><button id="olb" title="Online spielen" aria-label="Online spielen">🌐<span class="olt"> Online</span><i id="olbd"></i></button></div><div class="seg"><button id="acb" title="Erfolge" aria-label="Erfolge">🏆<span class="olt"> Erfolge</span><i class="spbd" id="acn"></i></button><button id="setb" title="Einstellungen" aria-label="Einstellungen">⚙<span class="olt"> Einstellungen</span></button></div><div class="seg"><button id="bt"></button></div></div>
 <div class="bar"><div class="seg" id="sm" style="display:none"></div><div class="seg" id="sd" style="display:none"></div><div class="seg" id="st" style="display:none"></div><div class="seg" style="display:none"><button id="bs"></button><button id="ba"></button><button id="bo" title="Gilt für Ping Pong und Air Hockey"></button><button id="bi" title="Gilt für Ping Pong und Air Hockey gegen den Computer"></button><button id="bf">Vollbild</button></div></div>
 <div class="bar"><button class="btn" id="cup">Cup starten</button><span id="cinfo" style="color:var(--mu)"></span></div>
 <div class="bar"><input id="q" placeholder="Spiel suchen" autocomplete="off"><div class="seg" id="sc"></div></div><div id="rec"></div><div class="grid" id="grid"></div><div id="prog" hidden></div><footer id="legal-foot"><button type="button" data-legal="impressum">Impressum</button><button type="button" data-legal="datenschutz">Datenschutzerklärung</button><button type="button" data-legal="nutzungsregeln">Nutzungsregeln</button></footer></div>
@@ -3201,8 +3207,10 @@ function luCreate(code,data){
 }
 function luObserveRoom(room){
   LUN.room=room;
-  let ended=false;
-  try{ended=JSON.parse(room?.snap||'null')?.snap?.ph==='end'}catch(_){}
+  let snap=null;
+  try{snap=JSON.parse(room?.snap||'null')?.snap}catch(_){}
+  const ended=snap?.ph==='end';
+  window.gameChat?.room(room,snap);
   if(ended){if(!LUN.endedAt)LUN.endedAt=olNow()}else LUN.endedAt=0;
 }
 function luPulse(){
@@ -3222,6 +3230,7 @@ function luPulse(){
   }
 }
 function luCleanup(){
+  window.gameChat?.stop();
   const {ref:r,code,role,seat}=LUN,me=OL.me,db=OL.db;
   if(LUN.hr){LUN.hr.off();LUN.hr=null}
   LUN.ref=null;LUN.role='';LUN.seat=-1;LUN.room=null;LUN.lastAct={};LUN.lastSeq=0;LUN.code='';LUN.endedAt=0;
@@ -3384,7 +3393,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
       const v=s.val();if(LUN.left||!LUN.ref)return;luObserveRoom(v);
       if(!v){exit('Der Raum wurde geschlossen.');return}
       const seats=luSeatsOf(v);
-      if(seats.some(x=>x.uid&&x.uid!==OL.me&&OL.BL[x.uid])){exit('Der Raum enthält einen blockierten Spieler.');return}
+      if(v.status!=='play'&&seats.some(x=>x.uid&&x.uid!==OL.me&&OL.BL[x.uid])){exit('Der Raum enthält einen blockierten Spieler.');return}
       if(LUN.role=='guest'){
         const i=seats.findIndex(x=>x.k=='p'&&x.uid==OL.me);
         if(i<0){exit('Du wurdest aus dem Raum entfernt.');return}
@@ -3429,7 +3438,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     else if(a=='frs')olOpen();
     else if(a=='sk'&&LUN.role=='host'){LUN.ref.child('seats/'+s).set({k:v})}
     else if(a=='start'&&LUN.role=='host'&&LUN.room)startHostOnline(LUN.room);
-    else if(a=='rematch'&&LUN.role=='host'){LUN.ref.update({status:'lobby',snap:null,act:null})}
+    else if(a=='rematch'&&LUN.role=='host'){LUN.ref.update({status:'lobby',snap:null,act:null,chat:null})}
     else if(a=='leave'||a=='menu')toMenu()
   }
   /* ----- Eingaben im Spiel ----- */
@@ -3580,6 +3589,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
       spark(250,240,LU.COL[st.rk[0]],40);showOv(endHTML())}
   }
   const api={update,draw,click,key,luClick,showSetup,
+    chatAnchors(){return Object.fromEntries([0,1,2,3].map(i=>[i,{x:500,y:18+i*68,w:292,h:60,side:'left'}]));},
     canJoin(){return !LUN.ref&&(mode=='setup'||mode=='local')},joinCode(c){return join(c)},
     leave(){window.luFr=null;if(host){host.stop();host=null}LUN.left=1;luCleanup();setTb(null)}};
   return api
@@ -5037,7 +5047,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
       const v=s.val();if(LUN.left||!LUN.ref)return;luObserveRoom(v);
       if(!v){exit('Der Raum wurde geschlossen.');return}
       const seats=mmSeats(v);
-      if(seats.some(x=>x.uid&&x.uid!==OL.me&&OL.BL[x.uid])){exit('Der Raum enthält einen blockierten Spieler.');return}
+      if(v.status!=='play'&&seats.some(x=>x.uid&&x.uid!==OL.me&&OL.BL[x.uid])){exit('Der Raum enthält einen blockierten Spieler.');return}
       if(LUN.role=='guest'){
         const i=seats.findIndex(x=>x.k=='p'&&x.uid==OL.me);
         if(i<0){exit(st&&st.ph=='end'&&mode=='guest'?'Du bist nicht mehr in der Gruppe, weil du keine Revanche gewählt hast.':'Du wurdest aus dem Raum entfernt.');return}
@@ -5299,6 +5309,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     }
   }
   const api={update,draw,click,key,luClick,showSetup,
+    chatAnchors(){return st?{...tiles(),[my]:{x:14,y:300,w:176,h:TILE_H,side:'above'}}:{};},
     canJoin(){return !LUN.ref&&(mode=='setup'||mode=='local')},joinCode(c){return join(c)},
     leave(){window.luFr=null;if(host){host.stop();host=null}LUN.left=1;luCleanup();setTb(null)}};
   return api
@@ -5576,9 +5587,12 @@ async function olIn(u){
   try{progMerge(p&&p.progress);OL.pready=1;progPush(1)}catch(e){OL.pready=0}
   try{localStorage.setItem('2pg_ol','1')}catch(e){}
   try{OL.BL=(await OL.db.ref('blocked/'+u.uid).once('value')).val()||{};OL.blocksReady=true}catch(e){OL.blocksReady=false;toast('Blockierliste konnte nicht geladen werden. Online-Kontakte sind vorübergehend gesperrt.')}
-  olPresence();olListen();olRender();olBadge();
+  olPresence();olListen();olRender();olBadge();window.chatModeration?.sync();
 }
 function olGone(){
+  window.chatModeration?.logout();
+  window.gameChat?.stop();
+  window.directChat?.logout();
   if(progT)progPush(1);
   if(OL.unl)OL.unl();OL.unl=null;OL.presence?.stop(false);OL.game=null;OL.pready=0;OL.me=null;OL.name='';OL.P={};OL.F={};OL.BL={};OL.blocksReady=false;OL.U={};OL.stats={};OL.seen={};OL.view='main';OL.RQ={};OL.INV={};OL.sent={};
   olBadge();olRender();$('#oli').innerHTML='';
@@ -5647,7 +5661,7 @@ function olListen(){
   const d=OL.db,me=OL.me,offs=[];
   function onBlockSetup(){
     const r=d.ref('blocked/'+me);
-    const changed=s=>{OL.BL=s.val()||{};OL.blocksReady=true;syncPresence();olInvites();olBadge()};
+    const changed=s=>{OL.BL=s.val()||{};OL.blocksReady=true;window.gameChat?.refreshBlocks();syncPresence();olInvites();olBadge()};
     r.on('value',changed,()=>{OL.blocksReady=false;syncPresence();olCards()});
     offs.push(()=>r.off('value',changed))
   }
@@ -5767,7 +5781,7 @@ function olRender(){
 ${lg?'':'<p>Merke dir das Passwort gut – es gibt keine Zurücksetzen-Funktion.</p>'}`;
   }else if(OL.view=='delete'){
     t='Account löschen';
-    h=`<p><b>Deinen Account „${olEsc(OL.name)}“ endgültig löschen?</b></p><p>Gelöscht werden deine Anmeldung, dein Profil, dein Fortschritt (Erfolge, Siege usw.) und deine Statistik sowie Freunde, Anfragen, Einladungen und Blockierungen in Firebase. Spielräume mit deinen Daten werden geschlossen. Das kann nicht rückgängig gemacht werden.</p><label>Aktuelles Passwort<input id=oldpw type=password autocomplete=current-password ${OL.deleting?'disabled':''}></label><label style="display:block"><input id=oldconfirm type=checkbox style="width:auto"> Ich möchte meinen Account und die zugehörigen Daten endgültig löschen.</label><div class=olerr role=alert>${olEsc(OL.deleteError||'')}</div><button class="btn r" data-o=delete-confirm ${OL.deleting?'disabled':''}>${OL.deleting?'Account wird gelöscht…':'Endgültig löschen'}</button><button class=btn data-o=back ${OL.deleting?'disabled':''}>Abbrechen</button>`;
+    h=`<p><b>Deinen Account „${olEsc(OL.name)}“ endgültig löschen?</b></p><p>Gelöscht werden deine Anmeldung, dein Profil, dein Fortschritt (Erfolge, Siege usw.) und deine Statistik sowie Freunde, Anfragen, Einladungen und Blockierungen in Firebase. Für das Entfernen gespeicherter Chatnachrichten und Meldedaten kontaktiere den Betreiber. Spielräume mit deinen Daten werden geschlossen. Das kann nicht rückgängig gemacht werden.</p><label>Aktuelles Passwort<input id=oldpw type=password autocomplete=current-password ${OL.deleting?'disabled':''}></label><label style="display:block"><input id=oldconfirm type=checkbox style="width:auto"> Ich möchte meinen Account und die zugehörigen Daten endgültig löschen.</label><div class=olerr role=alert>${olEsc(OL.deleteError||'')}</div><button class="btn r" data-o=delete-confirm ${OL.deleting?'disabled':''}>${OL.deleting?'Account wird gelöscht…':'Endgültig löschen'}</button><button class=btn data-o=back ${OL.deleting?'disabled':''}>Abbrechen</button>`;
   }else if(OL.view=='games'){
 
     const u=OL.pick;t='Spiel wählen';
@@ -5788,6 +5802,7 @@ ${lg?'':'<p>Merke dir das Passwort gut – es gibt keine Zurücksetzen-Funktion.
 }
 
 function olUpd(){
+  window.directChat?.sync();
   if(!OL.open||!OL.me||OL.view!='main')return;
   const box=$('#oll'),tb=$('#olt');if(!box||!tb)return;
   const me=OL.me,online=Object.keys(OL.P).filter(u=>u!=me&&olAllowed(u)),fr=Object.keys(OL.F).filter(olAllowed),rq=Object.keys(OL.RQ).filter(olAllowed);
@@ -5802,7 +5817,7 @@ function olUpd(){
       ||'<div class=olempty>Gerade sind keine bestätigten Freunde online. Du kannst Freunde unten per Benutzername hinzufügen.</div>';
   }else if(OL.tab=='fr'){
     const l=fr.sort((a,b)=>(!!OL.P[b]-!!OL.P[a])||olNameOf(a).localeCompare(olNameOf(b)));
-    h=l.map(u=>row(u,ch(u)+`<button class="btn g" data-o=rm data-u=${u} title="Entfernen">✕</button>`,olStat(u))).join('')
+    h=l.map(u=>row(u,ch(u)+`<button class="btn g" data-o=dm data-u="${olEsc(u)}">Chat</button><button class="btn g" data-o=rm data-u=${u} title="Entfernen">✕</button>`,olStat(u))).join('')
       ||'<div class=olempty>Noch keine Freunde. Füge unten jemanden per Benutzername hinzu oder klicke bei „Online“ auf „＋ Freund“.</div>';
   }else if(OL.tab=='bl'){
     h=Object.keys(OL.BL).map(u=>row(u,`<button class=btn data-o=unblock data-u="${olEsc(u)}">Entblockieren</button>`,'Blockiert')).join('')||'<div class=olempty>Keine blockierten Spieler.</div>';
@@ -5820,21 +5835,23 @@ function olCanContact(u){
   if(!OL.me||!u||u===OL.me||!olAllowed(u)){toast('Kontakt ist nicht möglich. Prüfe deine Blockierliste.');return false}
   return true
 }
-async function olBlock(u){
-  if(!OL.me||!u||u===OL.me||!confirm(olNameOf(u)+' blockieren? Die Freundschaft und offene Einladungen werden entfernt.'))return;
-  const me=OL.me,name=olNameOf(u),changes={};
+async function olBlock(u,label){
+  const name=label||olNameOf(u);
+  if(!OL.me||!u||u===OL.me||!confirm(name+' blockieren? Die Freundschaft und offene Einladungen werden entfernt.'))return;
+  const me=OL.me,changes={};
   changes['blocked/'+me+'/'+u]={name,ts:olTS()};
   for(const p of ['friends','requests','invites']){changes[p+'/'+me+'/'+u]=null;changes[p+'/'+u+'/'+me]=null}
   try{
     await OL.db.ref().update(changes);OL.BL[u]={name};delete OL.sent[u];
     if(OL.out&&OL.out.uid===u)olCancelOut();
-    if(OL.sess&&OL.sess.peer===u)olLeave('Spieler wurde blockiert.');
-    if(typeof LUN!=='undefined'&&LUN.room&&Object.values(LUN.room.seats||{}).some(x=>x.uid===u))toMenu();
+    if(OL.sess&&OL.sess.peer===u&&!OL.sess.live)olLeave('Spieler wurde blockiert.');
+    if(LUN.room&&LUN.room.status!=='play'&&Object.values(LUN.room.seats||{}).some(x=>x.uid===u))toMenu();
+    window.gameChat?.refreshBlocks();
     olUpd();olCards();olBadge();toast(name+' wurde blockiert.');
   }catch(e){toast(olMsg(e))}
 }
 async function olUnblock(u){
-  try{await OL.db.ref('blocked/'+OL.me+'/'+u).remove();delete OL.BL[u];olUpd();olCards();olBadge();toast('Spieler entblockiert. Eine Freundschaft muss neu angefragt werden.')}
+  try{await OL.db.ref('blocked/'+OL.me+'/'+u).remove();delete OL.BL[u];window.gameChat?.refreshBlocks();olUpd();olCards();olBadge();toast('Spieler entblockiert. Eine Freundschaft muss neu angefragt werden.')}
   catch(e){toast(olMsg(e))}
 }
 async function olDeleteAccount(){
@@ -5847,7 +5864,7 @@ async function olDeleteAccount(){
   try{
     await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email,password));
     await user.getIdToken(true);
-    olCancelOut();if(OL.sess)olLeave();if(cur&&cur.leave)toMenu();
+    window.chatModeration?.logout();window.directChat?.logout();olCancelOut();if(OL.sess)olLeave();if(cur&&cur.leave)toMenu();
     if(OL.unl)OL.unl();OL.unl=null;stopped=true;
     const uid=user.uid,db=OL.db;
     await OL.presence?.stop(true);
@@ -6012,6 +6029,7 @@ document.addEventListener('click',e=>{
   if(!b){if(e.target.id=='olp')olClose();return}
   const o=b.dataset.o,u=b.dataset.u;
   if(OL.deleting)return;
+  if(o=='dm'){olClose();directChat.open(u);return}
   if(o=='block')return olBlock(u);
   if(o=='unblock')return olUnblock(u);
   if(o=='delete-open'){OL.view='delete';OL.deleteError='';olRender();return}
@@ -6072,7 +6090,7 @@ function olNew(role,mid,gid,names,t){
   const ss=OL.sess={role,mid,gid,names,t,seen:{},pend:[],ready:0,live:0,again:[0,0],keys:{}};
   ss.pc=new RTCPeerConnection({iceServers:OL_ICE});
   ss.ref=OL.db.ref('matches/'+mid);
-  ss.pc.onicecandidate=e=>{if(e.candidate)ss.ref.child('ice/'+(role?'g':'h')).push(e.candidate.toJSON())};
+  ss.pc.onicecandidate=e=>{if(e.candidate&&!ss.live)ss.ref.child('ice/'+(role?'g':'h')).push(e.candidate.toJSON())};
   ss.pc.onconnectionstatechange=()=>{
     const st=ss.pc.connectionState;if(OL.sess!==ss)return;
     if(st=='failed')ss.live?olOppLeft('Die Verbindung wurde unterbrochen.'):olLeave('Verbindung fehlgeschlagen. Möglicherweise blockiert das Netzwerk direkte Verbindungen (TURN-Server nötig).');
@@ -6105,9 +6123,15 @@ async function olHost(o,m){
 }
 function olLive(){
   const ss=OL.sess;if(!ss||ss.live)return;
-  ss.live=1;clearTimeout(ss.to);ss.ref.off();ss.ref.remove().catch(()=>{});
+  ss.live=1;clearTimeout(ss.to);ss.ref.off();
+  const keepReportContext=()=>{
+    if(OL.sess!==ss||ss.dead||ss.ctl?.readyState!=='open')return;
+    OL.db.ref().update({['matches/'+ss.mid+'/ts']:olTS(),['expiry/matches/'+ss.mid]:olTS()}).catch(()=>{});
+  };
+  keepReportContext();ss.reportPulse=setInterval(keepReportContext,120000);
   try{const p=ss.snd.getParameters();p.encodings=[{maxBitrate:3500000,maxFramerate:60}];ss.snd.setParameters(p).catch(()=>{})}catch(e){}
   olCards();olRound();
+  window.gameChat?.peer(ss);
 }
 function olRound(){
   const ss=OL.sess;if(!ss||ss.dead)return;clearTimeout(ss.cd);ss.again=[0,0];
@@ -6126,6 +6150,7 @@ function olRound(){
 }
 function olHostMsg(m){
   const ss=OL.sess;if(!ss||ss.role)return;
+  if(Object.hasOwn(m,'chat')){window.gameChat?.receivePeer(ss,m.chat);return;}
   if(m.k!==undefined)rKey(String(m.k),m.d?1:0);
   else if(m.p){
     const id='g'+m.i,x=cl(+m.x||0,-60,W+60),y=cl(+m.y||0,-60,H+60);
@@ -6182,9 +6207,11 @@ function olGuestOpen(){
   ss.live=1;clearTimeout(ss.to);ss.ref.off();
   $('#menu').style.display='none';$('#game').style.display='block';fsOn();$('#gt').textContent=olGameName(ss.gid);$('#hint').textContent='';
   olCards();
+  window.gameChat?.peer(ss);
 }
 function olGuestMsg(m){if(m.tn){TNS=m.tn;return}if(m.ch){CHS=m.ch;return}
   const ss=OL.sess;if(!ss||!ss.role)return;
+  if(Object.hasOwn(m,'chat')){window.gameChat?.receivePeer(ss,m.chat);return;}
   if(m.tw!==undefined)pageTurn(m.tw);
   else if(m.g!==undefined){ss.cur=m.g;ss.worldVariant=undefined;$('#gt').textContent=olGameName(m.g)}
   else if((ss.cur||ss.gid)==='racing'&&[0,1,2].includes(m.worldVariant))ss.worldVariant=m.worldVariant;
@@ -6196,16 +6223,17 @@ function olGuestMsg(m){if(m.tn){TNS=m.tn;return}if(m.ch){CHS=m.ch;return}
 
 /* ---- Ende / Aufräumen ---- */
 function olOppLeft(msg){
-  const ss=OL.sess;if(!ss||ss.dead)return;ss.dead=1;clearTimeout(ss.cd);
+  const ss=OL.sess;if(!ss||ss.dead)return;ss.dead=1;clearTimeout(ss.cd);clearInterval(ss.reportPulse);window.gameChat?.stop();ss.ref.remove().catch(()=>{});
   if(!ss.role){over=1;idle=0}
   $('#ov').innerHTML=`<div class=kick>Online-Match</div><h2>${msg}</h2><div><button class="btn r" data-a=leave>Zum Menü</button></div>`;$('#ov').style.display='flex';
 }
 function olLeave(msg){
   const ss=OL.sess;if(!ss)return;
-  OL.sess=null;clearTimeout(ss.to);clearTimeout(ss.cd);clearTimeout(ss.dc);
+  window.gameChat?.stop();
+  OL.sess=null;clearTimeout(ss.to);clearTimeout(ss.cd);clearTimeout(ss.dc);clearInterval(ss.reportPulse);
   if(!ss.dead)olSend(ss.ctl,{bye:1});
   try{ss.ref.off()}catch(e){}
-  try{if(!ss.live||!ss.role)OL.db.ref('matches/'+ss.mid).remove()}catch(e){}
+  try{OL.db.ref('matches/'+ss.mid).remove().catch(()=>{})}catch(e){}
   setTimeout(()=>{try{ss.pc.close()}catch(e){}},300);
   const o=ON;ON=null;cup=null;TBw=9;skin();pageTurn(9);
   if(o&&o.s0){S.cpu=o.s0.cpu;S.t=o.s0.t}
@@ -6278,4 +6306,8 @@ addEventListener('keydown',e=>{if(e.key=='Escape'&&!box.hidden){e.stopPropagatio
 const fromHash=()=>{const k=location.hash.slice(1);if(T[k])open(k)};addEventListener('hashchange',fromHash);fromHash();
 })();
 </script>
+<script src="./group-chat.js"></script>
+<script src="./direct-chat.js"></script>
+<script src="./game-chat.js"></script>
+<script src="./chat-moderation.js"></script>
 </body></html>

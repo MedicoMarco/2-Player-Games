@@ -1,0 +1,8 @@
+.chat-mod-panel{box-sizing:border-box;width:min(42rem,calc(100vw - 1rem));max-height:calc(100dvh - 1.2rem);padding:clamp(.65rem,2.4vw,1.3rem);background:var(--card);color:var(--tx);border:2px solid var(--ln);border-radius:20px;box-shadow:var(--sh);font:inherit}
+.chat-mod-panel::backdrop{background:#141310aa}.chat-mod-panel header,.chat-mod-actions{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap}
+.chat-mod-panel header{justify-content:space-between;border-bottom:1px solid var(--ln);padding-bottom:.55rem;margin-bottom:.6rem}.chat-mod-panel h2,.chat-mod-panel h3{margin:.25rem 0;font-family:var(--fh)}
+.chat-mod-panel blockquote{margin:.5rem 0;padding:.65rem;background:var(--bg);border-left:3px solid var(--b);border-radius:9px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:11rem;overflow:auto}
+.chat-mod-panel select{padding:.44rem;border:1px solid var(--ln);border-radius:9px;color:var(--tx);background:var(--bg);font:inherit}
+#chat-report label{display:block;margin:.5rem 0 .25rem}#chat-report form>.btn{margin-left:.5rem}
+#chat-mod article{border:1px solid var(--ln);border-radius:13px;margin:.6rem 0;padding:.65rem;overflow-wrap:anywhere}#chat-mod article p{margin:.24rem 0;font-size:.81rem;color:var(--mu)}#chat-mod article p.chat-mod-evidence{font-weight:750;color:var(--tx)}
+#chat-mod-launch[hidden]{display:none!important}.gc-actions{display:flex;gap:.25rem;justify-content:flex-end;margin-top:.18rem}#gc-chat .gc-actions .btn{min-height:26px;padding:.2rem .36rem;font-size:.68rem}
