@@ -36,14 +36,16 @@ async function databaseToken(env) {
 function databaseClient(token) {
   return async (path, method='GET', value, headers={}) => {
     let response;
-    try {
+    for (let attempt=0;attempt<2;attempt++) try {
       response = await fetch(database+'/'+path+'.json', {
         method, headers:{Authorization:'Bearer '+token, ...headers,
           ...(value===undefined?{}:{'Content-Type':'application/json'})},
         body:value===undefined?undefined:JSON.stringify(value),redirect:'manual'
       });
+      break;
     } catch (error) {
-      console.error('Firebase transport',method,error.name,error.message);
+      if (attempt===0 && (method==='GET' || headers['If-Match'])) continue;
+      console.error('Firebase transport',method,error.name);
       throw Object.assign(Error('Database network unavailable'), {code:'Database network '+method});
     }
     if (!response.ok && response.status!==412) {
@@ -52,8 +54,8 @@ function databaseClient(token) {
         upstream:response.status
       });
     }
-    const body = await response.text();
     try {
+      const body = await response.text();
       return {ok:response.ok,etag:response.headers.get('etag'),value:body?JSON.parse(body):null};
     } catch {
       throw Object.assign(Error('Database response unreadable'), {code:'Database response '+method});
@@ -162,21 +164,6 @@ export async function onRequest({request,env,waitUntil}) {
   const reply = (value,status=200) => new Response(JSON.stringify(value),{headers,status});
   if (!allowed) return reply({error:'Origin'},403);
   if (request.method==='OPTIONS') return new Response(null,{headers,status:204});
-  if (request.method==='GET' && new URL(request.url).searchParams.has('setup-check')) {
-    let token;
-    try { token = await databaseToken(env); }
-    catch { return reply({error:'Firebase setup'},503); }
-    try {
-      const db = databaseClient(token);
-      const path = 'operations/pushSetupCheck';
-      const result = await db(path,'GET',undefined,{'X-Firebase-ETag':'true'});
-      const written = await db(path,'PUT',{checked:true},{'If-Match':result.etag??'null_etag'});
-      if (written.ok) await db(path,'DELETE');
-      return reply({firebase:'ready',write:written.ok});
-    } catch (error) {
-      return reply({error:error.code||'Database response',upstream:error.upstream},503);
-    }
-  }
   if (request.method!=='POST') return reply({error:'Method'},405);
   let stage = 'Request';
   try {
