@@ -194,20 +194,6 @@ export async function onRequest({request,env,waitUntil}) {
   const reply = (value,status=200) => new Response(JSON.stringify(value),{headers,status});
   if (!allowed) return reply({error:'Origin'},403);
   if (request.method==='OPTIONS') return new Response(null,{headers,status:204});
-  if (request.method==='GET' && new URL(request.url).searchParams.has('push-crypto-check')) {
-    try {
-      const [publicKey,privateKey,subject] = String(env.PLAY2GETHER_PUSH_VAPID||'').split(',').map(part=>part.trim());
-      const pair = await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
-      const p256dh = b64(new Uint8Array(await crypto.subtle.exportKey('raw',pair.publicKey)));
-      const auth = b64(crypto.getRandomValues(new Uint8Array(16)));
-      const endpoint = 'https://web.push.apple.com/';
-      await pushRequest({endpoint,keys:{p256dh,auth}},{publicKey,privateKey,subject},{kind:'test'},60,'probe');
-      const result = await fetch(endpoint,{method:'HEAD',redirect:'manual'});
-      return reply({crypto:'ready',provider:result.status});
-    } catch(error) {
-      return reply({error:error.code||'Push provider connection',type:error.name},503);
-    }
-  }
   if (request.method!=='POST') return reply({error:'Method'},405);
   let stage = 'Request';
   try {
