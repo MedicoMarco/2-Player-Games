@@ -1,5 +1,5 @@
 /* The item indices are stable save-game identifiers. Append new products. */
-function createFactoryCatalog(RH){
+function createFactoryCatalog(RH,chapter=()=>1){
 const ITEMS=[{n:"Rohholz",v:2},{n:"Holzteile",v:6,oq:24},{n:"Rohlinge",v:12,oq:18},{n:"Montierte Spielzeuge",v:22,oq:14},{n:"Lackierte Spielzeuge",v:38,oq:10},{n:"Verpackte Spielzeuge",v:60,oq:8},{n:"Erz",v:3},{n:"Barren",v:15,oq:20},{n:"Metallteile",v:23,oq:16},{n:"Werkzeuge",v:43,oq:8},{n:"Granulat",v:4},{n:"Gehäuse",v:14,oq:18},{n:"Platinen",v:38,oq:12},{n:"Smartphones",v:140,oq:6},{n:"Holzbalken",v:21,oq:20,sh:'beam',cl:'#c99a5b'},{n:"Holzregale",v:48,oq:13,sh:'shelf',cl:'#b57b43'},{n:"Stahlblech",v:42,oq:14,sh:'plate',cl:'#aab4c0'},{n:"Stahlträger",v:125,oq:8,sh:'ibeam',cl:'#8d97a4'},{n:"Panzerplatten",v:240,oq:6,sh:'plate',cl:'#4a525d'},{n:"Sensormodule",v:71,oq:11,sh:'chip',cl:'#2f8f9a'},{n:"Steuerungseinheiten",v:175,oq:7,sh:'chip',cl:'#7a4fb0'},{n:"Getreide",v:3,sh:'wheat',cl:'#d9b24a'},{n:"Konserven",v:15,oq:23,sh:'can',cl:'#c0562c'},{n:"Notrationen",v:60,oq:12,sh:'box',cl:'#7aa75a'},{n:"Rohwasser",v:2,sh:'drop',cl:'#5aa9e6'},{n:"Trinkwasser",v:18,oq:21,sh:'drop',cl:'#8fd3ff'},{n:"Medikamente",v:40,oq:14,sh:'pill',cl:'#e0533d'},{n:"Erste-Hilfe-Sets",v:115,oq:8,sh:'cross',cl:'#f2f4f7'},{n:"Akkus",v:51,oq:13,sh:'cell',cl:'#4f9a3f'},{n:"Elektromotoren",v:110,oq:9,sh:'cog',cl:'#d0902e'},{n:"Solarmodule",v:165,oq:7,sh:'solar',cl:'#2f5f9a'},{n:"Generatoren",v:565,oq:4,sh:'cog',cl:'#d0b02e'},{n:"Reaktorkerne",v:2030,oq:2,sh:'core',cl:'#9a3fb0'},{n:"Räder",v:49,oq:13,sh:'wheel',cl:'#2c2f35'},{n:"Fahrräder",v:200,oq:6,sh:'bike',cl:'#3f8f7a'},{n:"E-Bikes",v:405,oq:4,sh:'bike',cl:'#2f9a62'},{n:"Karosserien",v:165,oq:7,sh:'body',cl:'#8a9ab0'},{n:"Autos",v:715,oq:3,sh:'car',cl:'#c0463c'},{n:"Lastwagen",v:1370,oq:2,sh:'truck',cl:'#c07a2e'},{n:"Industrieroboter",v:1030,oq:3,sh:'robot',cl:'#aab4c0'},{n:"KI-Chips",v:405,oq:4,sh:'chip',cl:'#3d78c4'},{n:"Drohnen",v:825,oq:3,sh:'drone',cl:'#6a5acd'},{n:"Wohnmodule",v:1230,oq:3,sh:'mod',cl:'#8a7a5a'},{n:"Versorgungsmodule",v:1520,oq:2,sh:'mod',cl:'#5a8a6a'},{n:"Bunkertore",v:1690,oq:2,sh:'door',cl:'#6a6f7a'},{n:"Kommandozentralen",v:2500,oq:2,sh:'mod',cl:'#9a5a5a'}];
 ITEMS.push(
  {n:'Gebohrte Leisten',v:18,oq:18,sh:'beam',cl:'#dcb47d'},
@@ -8,7 +8,15 @@ ITEMS.push(
  {n:'Servoantriebe',v:369,oq:8,sh:'cog',cl:'#6e9a9c'},
  {n:'Fertigungszellen',v:3390,oq:3,sh:'robot',cl:'#95c7a6'},
  {n:'Mobile Versorgungssysteme',v:11400,oq:2,sh:'truck',cl:'#4aa6b8'},
- {n:'Möbelsets',v:185,oq:8,sh:'shelf',cl:'#ab8454'});
+ {n:'Möbelsets',v:185,oq:8,sh:'shelf',cl:'#ab8454'},
+ {n:'Verbundplatten',v:520,oq:12,sh:'plate',cl:'#778fb0'},
+ {n:'Strahlenschutzschilde',v:1730,oq:7,sh:'plate',cl:'#9da9c0'},
+ {n:'Raumschiffhüllen',v:6830,oq:4,sh:'body',cl:'#a6c1de'},
+ {n:'Ionentriebwerke',v:5220,oq:4,sh:'cog',cl:'#69acd4'},
+ {n:'Navigationscomputer',v:3440,oq:6,sh:'chip',cl:'#a298ee'},
+ {n:'Lebenserhaltungsmodule',v:8460,oq:4,sh:'mod',cl:'#85c9b8'},
+ {n:'Kryokammern',v:12000,oq:3,sh:'cell',cl:'#9fe2ed'},
+ {n:'Koloniemodule',v:27200,oq:2,sh:'mod',cl:'#c7b8ea'});
 const MD={src:{n:"Holzlager",s:"Holz",c:40,w:4,k:'#8a5a2b',g:'h',a:'gar',o:0,rc:2,dp:0},
  saw:{n:"Säge",s:"Säge",c:60,w:4,k:'#5f87b4',g:'h',a:'gar',r:[[0,1]],o:1,dp:1},
  frm:{n:"Formmaschine",s:"Form",c:200,w:5,k:'#7a6bb0',g:'h',a:'gar',r:[[1,1]],o:2,dp:2},
@@ -85,6 +93,18 @@ Object.assign(MD,{
  fus:{n:'Fusionator',s:'Fusion',c:60,w:0,k:'#6b7a8f',g:'l',j:1,d:'Führt bis zu drei Bänder zu einem zusammen – fair abwechselnd. Jede Seite lässt sich auf Eingang, Ausgang oder Aus stellen.'},
  kre:{n:'Kreuzung',s:'Kreuzung',c:90,w:0,k:'#6b7a8f',g:'l',j:2,d:'Zwei Bänder kreuzen sich, ohne sich zu vermischen: Waren fahren immer geradeaus durch.'},
  prj:{n:'Bunker-Rampe',s:'Bunker',c:800,w:0,k:'#b89b2e',g:'l',d:'Liefert Waren für die aktuelle Bunker-Phase ab. Nimmt nur an, was die Quests gerade brauchen – bringt kein Geld, aber das Überleben.'}});
+const fleet={
+ laminate:{n:'Verbundwerk',s:'Verbund',c:3700,w:8,k:'#536e8a',r:[[16,2],[11,1]],o:53,dp:5,art:'prs',ac:'#b2cfe7'},
+ shield:{n:'Schutzschild-Presse',s:'Schilde',c:5900,w:11,k:'#536b85',r:[[53,2],[18,1]],o:54,dp:6,art:'prs',ac:'#dec79c'},
+ hull:{n:'Hüllenmontage',s:'Hülle',c:9400,w:14,k:'#526f92',r:[[54,2],[17,2],[53,1]],o:55,dp:7,art:'asy',ac:'#b3d3f4'},
+ ion:{n:'Triebwerkbau',s:'Triebwerk',c:8900,w:14,k:'#325b86',r:[[32,1],[29,2],[30,1]],o:56,dp:8,art:'mot',ac:'#80ccfb'},
+ navcore:{n:'Navigationslabor',s:'Navigation',c:9200,w:12,k:'#6f62a2',r:[[40,1],[20,2],[19,2]],o:57,dp:7,art:'chp',ac:'#c9b7ff'},
+ lifebox:{n:'Lebenserhaltungswerk',s:'Lebenserh.',c:9450,w:14,k:'#398483',r:[[43,1],[25,3],[30,2]],o:58,dp:7,art:'tnk',ac:'#b0ebd4'},
+ cryo:{n:'Kryomontage',s:'Kryokammer',c:11000,w:16,k:'#447392',r:[[58,1],[28,2],[54,1]],o:59,dp:8,art:'cel',ac:'#a5e5f5'},
+ colony:{n:'Koloniemodul-Montage',s:'Kolonie',c:15800,w:22,k:'#735d94',r:[[55,1],[58,1],[57,1],[59,1]],o:60,dp:9,art:'mod',ac:'#e3c9f8'}
+};
+for(const [id,machine] of Object.entries(fleet))MD[id]={...machine,g:'o',a:'orb',chapter:2};
+MD.orbitRamp={n:'Werftrampe',s:'Werftrampe',c:900,w:0,k:'#4b92b3',g:'l',chapter:2,unlock:()=>chapter()>=2,need:'Kampagne fortsetzen',d:'Nimmt für den aktuellen Flottenbau benötigte Fracht an.'};
 const jpre=(t,r)=>{const m=[0,0,0,0];if(t=='spl'){m[(r+2)%4]=1;m[r]=2;m[(r+1)%4]=2;m[(r+3)%4]=2}else if(t=='fus'){m[r]=2;m[(r+1)%4]=1;m[(r+2)%4]=1;m[(r+3)%4]=1}return m};
 MD.sme.previousSize=MD.wal.previousSize=[2,1];
 MD.rea.previousSize=MD.hub.previousSize=[2,2];

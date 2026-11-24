@@ -370,7 +370,7 @@ const savedBusiness=save();
 assert.deepEqual(savedBusiness.contracts,retiredContracts);
 assert.equal(savedBusiness.contractWins.long,2);
 assert.equal(savedBusiness.supplyOrders[0].count,5);
-assert.equal(savedBusiness.pu.network,1);
+assert(!('pu' in savedBusiness),'retired prestige upgrades are absent from new snapshots');
 assert(savedBusiness.rs.includes('grd'));
 assert.equal(savedBusiness.saleIncome[1],value);
 
@@ -435,13 +435,13 @@ const saleRow=salesText.filter(row=>row.y===sampleProduct.y).map(row=>row.label)
 assert.deepEqual(saleRow,['Verpackte Spielzeuge','60 €',standardPrice+'–'+managedPrice+' €','2',standardPrice+managedPrice+' €']);
 const productNames=new Set(d.ITEMS.map(item=>item.n));
 const shownProducts=salesText.filter(row=>productNames.has(row.label)).map(row=>row.label);
-for(let page=1;page<Math.ceil(d.ITEMS.length/9);page++){
+for(let page=1;page<Math.ceil(53/9);page++){
  d.tuD().HB.find(hit=>hit.id==='market_next').fn();
  salesText.length=0;
  play.draw();
  shownProducts.push(...salesText.filter(row=>productNames.has(row.label)).map(row=>row.label));
 }
-assert.deepEqual(shownProducts,Array.from(d.ITEMS,item=>item.n));
+assert.deepEqual(shownProducts,Array.from(d.ITEMS.slice(0,53),item=>item.n));
 d.tuD().HB.find(hit=>hit.id==='market_next').fn();
 d.mkOpen(false);
 d.sel(null);
@@ -465,14 +465,10 @@ assert.equal(career.site,'lab');
 d=load(career.o,career);
 assert.equal(d.hlv('lab'),1);
 assert.equal(d.G.milestones.gar,1);
-d.G.tr=20e6;
-const blueprintPoints=d.G.bp;
-d.doPrestige();
-d=core();
-assert(d.G.bp>blueprintPoints);
+assert(!d.beginNextChapter());
 assert.equal(d.G.milestones.gar,1);
 assert.equal(d.cell(7,6).t,'src');
-console.log('Original orders, sites, production records and prestige passed.');
+console.log('Original orders, sites, production records and campaign gate passed.');
 
 const starter = [
  [7, 6, 'src', 0, 1], [8, 6, 'belt', 0, 1], [9, 6, 'saw', 0, 1],
@@ -724,7 +720,7 @@ for(const [width,height,rotated] of viewports){
    tap('shop_next');
   }
   for(const [type,model] of Object.entries(d.MD)){
-   if(model.g===id&&!model.legacyOnly)assert(built.has(type),label+' '+type);
+   if(model.g===id&&!model.legacyOnly&&!model.chapter)assert(built.has(type),label+' '+type);
   }
  }
  for(const id of ['tl_hand','tl_belt','tl_rot','tl_mov','tl_del','zoom_in','zoom_out','camera_home']){
@@ -938,7 +934,8 @@ console.log('Phase 6: first Formmaschine after '+secondsToForm.toFixed(1)+'s, pr
 const recipeTypes = Object.entries(d.MD).filter(([, m]) => m.o != null);
 for (const [type, recipe] of recipeTypes) {
  const ingredients = recipe.r?.map(([, count]) => count) || 0;
- d = load([[7,6,type,0,1,-1,ingredients,-1],[8,6,'sto',0,1]], { m: 1e5 });
+ const x=recipe.chapter?155:7,y=recipe.chapter?12:6;
+ d = load([[x,y,type,0,1,-1,ingredients,-1],[x+1,y,'sto',0,1]], { m: 1e5,...(recipe.chapter?{sp:7,campaign:{level:2}}:{}) });
  const [machine,warehouse] = d.L;
  const before = d.G.m;
  ticks(Math.ceil(recipe.w*8)+2);
@@ -953,7 +950,7 @@ for (const [type, recipe] of recipeTypes) {
   assert.equal(before-d.G.m,recipe.rc,type);
  }
 }
-assert.equal(recipeTypes.length,53);
+assert.equal(recipeTypes.length,61);
 assert(d.recipeTree(51).some(row=>row.id===6&&row.count>1));
 assert(d.recipeTree(51).some(row=>row.id===50&&row.count===1));
 
@@ -1156,16 +1153,61 @@ function simulatedFrames(milliseconds, frameMilliseconds) {
 }
 assert.deepEqual(simulatedFrames(48000,16),simulatedFrames(48000,997));
 
-d=load(starter,{m:120});
-ticks(2400);
-const ordinarySales=d.G.sold;
-d=load(starter,{m:120,tr:10e6,bp:45});
-assert(d.bpCalc().t>=12);
-assert(d.buyP('prd1'));assert(d.buyP('prd1'));
-d.doPrestige();
-const soldAtStart=core().G.sold;
-ticks(2400);
-assert(core().G.sold-soldAtStart>ordinarySales,'prestige should accelerate production in a comparable new run');
+d=load(starter,{m:120,bp:45,pu:{prd1:2},sp:6});
+assert.equal(d.G.m,22620);
+assert(!d.beginNextChapter(),'the last bunker phase still has to be delivered');
+assert(d.bchk(155,12,'hull'));
+const lastPhase=d.PH.at(-1);
+for(const [item,target] of lastPhase.q)for(let i=0;i<target;i++)assert(d.prjIn(item));
+assert.equal(d.G.sp,7);
+assert.equal(d.currentStoryId(),'arche-7');
+assert(!d.beginNextChapter());
+assert(d.finishStory());
+assert.equal(d.currentStoryId(),'arche-finale');
+assert(d.finishStory());
+const startingMoney=d.G.m,startingTime=d.tme(d.cell(9,6));
+assert(d.beginNextChapter());
+assert.equal(d.currentStoryId(),'horizont-intro');
+assert(!d.beginNextChapter());
+assert.equal(d.G.m,startingMoney+75000);
+assert.equal(d.G.sp,7);
+assert.equal(d.cell(9,6).t,'saw');
+assert(d.tme(d.cell(9,6))<startingTime);
+assert(d.place(155,12,'laminate',0));
+const launchRamp=d.put(156,12,'orbitRamp',0);
+assert(!d.prjIn(1,launchRamp));
+assert(d.prjIn(53,launchRamp));
+const fleetSave=save();
+assert(!('bp' in fleetSave));
+d=load(fleetSave.o,fleetSave);
+assert.equal(d.G.campaign.level,2);
+assert.equal(d.G.campaign.delivery[0],1);
+assert.equal(d.G.m,fleetSave.m);
+for(const phase of [[ [53,39],[54,20],[55,12] ],[ [56,16],[57,16],[58,12] ],[ [59,14],[60,8],[56,8] ]]){
+ for(const [item,target] of phase)for(let i=0;i<target;i++)assert(d.prjIn(item,d.cell(156,12)));
+}
+assert.equal(d.G.campaign.stage,3);
+assert(!d.prjIn(60,d.cell(156,12)));
+assert.deepEqual(Array.from(d.G.story.queue),['horizont-intro','horizont-1','horizont-2','horizont-3','horizont-finale']);
+for(const id of Array.from(d.G.story.queue)){
+ assert.equal(d.currentStoryId(),id);
+ d.updateStory(.2);
+ d.G.story.paused=true;d.updateStory(.25);
+ assert.equal(d.G.story.time,.2);
+ const pendingStory=save();
+ d=load(pendingStory.o,pendingStory);
+ assert.equal(d.currentStoryId(),id);
+ assert.equal(d.G.story.time,.2);
+ assert(d.G.story.paused);
+ assert(d.finishStory());
+}
+const beforeReplay=JSON.stringify(d.G.story);
+assert(d.replayStory('arche-finale'));
+assert.equal(d.currentStoryId(),'arche-finale');
+play.draw();
+assert(d.tuD().HB.some(hit=>hit.id==='story_skip'));
+assert(d.finishStory());
+assert.equal(JSON.stringify(d.G.story),beforeReplay);
 
 async function testOfflineAssets() {
  const cache=new Map(), listeners={};
@@ -1368,7 +1410,7 @@ delete nativeTarget.scale;
 const catalogue=Object.keys(d.MD).map((type,i)=>[
  6+i%10,3+Math.floor(i/10),type,i%4,2,-1,0,-1,type==='sto'?[1]:0
 ]);
-d.init({v:2,m:65000,o:catalogue,hl:{gar:3,met:3,elk:3}});
+d.init({v:2,m:65000,o:catalogue,hl:{gar:3,met:3,elk:3},sp:7,campaign:{level:2}});
 d=zoomGame.dbg();
 for(const z of [.22,.41,.42,1.3,2.6]){
  for(const x of [6,10,14]){
@@ -1451,11 +1493,10 @@ data.set('2pg_fe_guest',JSON.stringify(oldSave));
 const migrated=factory();
 migrated.update(.6);
 const oldGame=migrated.dbg();
-assert.equal(oldGame.G.m,oldSave.m);
+assert.equal(oldGame.G.m,oldSave.m+7200);
 assert(oldGame.G.rp>=24);
-assert.equal(oldGame.G.pr,3);
+assert.equal(oldGame.G.legacyIndustry.foundings,3);
 assert.equal(oldGame.G.pc[13],18);
-assert.equal(oldGame.G.pu.cap1,2);
 assert.equal(oldGame.hlv('elk'),1);
 assert.deepEqual(Array.from(oldGame.cell(3,5).q),[1,0]);
 assert.equal(oldGame.cell(8,6).it,0);
@@ -1467,12 +1508,12 @@ assert.deepEqual(JSON.parse(data.get('2pg_fe_guest.before-v2')),oldSave);
 oldGame.sv(false);
 const migratedSave=JSON.parse(data.get('2pg_fe_guest'));
 assert.equal(migratedSave.v,2);
-assert.equal(migratedSave.m,9280);
+assert.equal(migratedSave.m,16480);
 assert.deepEqual(migratedSave.legacyPlots,['w','e']);
 const recoveredFactory=factory();
 recoveredFactory.update(.6);
 assert.equal(recoveredFactory.dbg().cell(24,6).lv,7);
-assert.equal(recoveredFactory.dbg().G.bp,12);
+assert.equal(recoveredFactory.dbg().G.m,migratedSave.m);
 
 const futureSave=JSON.stringify({...oldSave,v:999,original:'must remain'});
 data.set('2pg_fe_guest',futureSave);
@@ -1492,6 +1533,9 @@ guest.update(.6);
 assert.equal(guest.dbg().G.m, 120);
 assert.equal(guest.dbg().G.tu, 0);
 guest.draw();
+assert.equal(guest.dbg().currentStoryId(),'arche-intro');
+assert(!guest.dbg().tuD().HB.some(hit=>hit.id==='tnext'));
+assert(guest.dbg().finishStory());
 assert.equal(guest.dbg().L.length, 5);
 guest.dbg().delAt(11,6);
 guest.update(.016);

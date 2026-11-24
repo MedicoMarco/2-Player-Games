@@ -357,7 +357,7 @@ E-Mail: <a href="mailto:projektinfo.kontakt@gmail.com">projektinfo.kontakt@gmail
 <li><strong>Spielräume:</strong> Raumcode, Host- und Spielernamen, technische Nutzerkennungen der Teilnehmer, Einstellungen, Sitzplätze und Spielzustände.</li>
 <li><strong>Online-Partien:</strong> Spielkennung, beteiligte Nutzer, Verbindungsinformationen und technische Daten, die zum Aufbau einer Verbindung benötigt werden.</li>
 <li><strong>Mau-Mau:</strong> Für den Spielablauf erforderliche Kartendaten und Spielzustände.</li>
-<li><strong>Factory Empire:</strong> Beim Spielen mit Konto speichert Firebase deinen Factory-Empire-Spielstand, einschließlich Fabrikaufbau, Kampagnenfortschritt und Verkaufsstatistiken. Dazu gehören die verkaufte Stückzahl und die erfassten Erlöse je Produkt. Der Spielstand ist nur für dein eigenes Konto lesbar.</li>
+<li><strong>Factory Empire:</strong> Beim Spielen mit Konto speichert Firebase deinen Factory-Empire-Spielstand, einschließlich Fabrikaufbau, Kampagnen- und Tutorialfortschritt, Stand der Storysequenzen und Verkaufsstatistiken. Dazu gehören die verkaufte Stückzahl und die erfassten Erlöse je Produkt. Der Spielstand ist nur für dein eigenes Konto lesbar.</li>
 </ul>
 <p>Die Daten werden verarbeitet, damit Konten, Freundesfunktionen, Chats, Online-Anzeigen, Einladungen und gemeinsame Spiele funktionieren. Die Anpassungswerte für Computergegner dienen nur der Spielschwierigkeit. Sie treffen keine Entscheidungen, die rechtliche Wirkung für dich haben oder dich ähnlich erheblich beeinträchtigen.</p>
 <p>Rechtsgrundlage für die von dir angeforderten Konto-, Chat- und Spielfunktionen ist Art. 6 Abs. 1 lit. b DSGVO. Die Verarbeitung von Blockierungen, technischen Sperrfristen und Meldungen stütze ich auf Art. 6 Abs. 1 lit. f DSGVO. Die berechtigten Interessen bestehen im Schutz der Nutzer, in der Bearbeitung konkreter Beschwerden, der Abwehr von Missbrauch sowie gegebenenfalls in der Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen.</p>
@@ -552,17 +552,20 @@ Deutschland</p>
 <div id="legal" hidden><div class="lg-box" role="dialog" aria-modal="true" aria-labelledby="lg-t"><div class="lg-head"><h2 id="lg-t"></h2><button type="button" id="lg-x" aria-label="Schließen">✕</button></div><div class="lg-body" id="lg-b"></div></div></div>
 <div id="toast"></div><div id="sp" aria-hidden="true"><div class="spc" role="dialog" aria-modal="true" aria-labelledby="spt"><div class="olh"><h2 id="spt">Einstellungen</h2><button id="spx" aria-label="Schließen">✕</button></div><div class="seg" id="spn" role="tablist"></div><div id="spv"></div></div></div><div id="olp"></div><div id="oli"></div><div class="w" id="game"><div class="bar"><button class="btn r" id="back" aria-label="Zurück zum Menü" title="Menü"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h4.5v-6h4v6h4.5V10"/></svg></button><b id="gt"></b><span id="cs"></span><button class="btn" id="rs" aria-label="Neu starten" title="Neu starten">↻</button></div>
 <div class="stage"><button type="button" id="factory-back" aria-label="Zurück zum Menü" title="Menü"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h4.5v-6h4v6h4.5V10"/></svg></button><canvas id="cv" width="800" height="480"></canvas><video id="gv" autoplay muted playsinline></video><canvas id="gc" width="800" height="480"></canvas><div class="ov" id="ov"></div></div><p id="hint" style="text-align:center;color:var(--mu);font-size:14px"></p></div>
-<script src="./factory-empire/catalog.js?v=14"></script>
+<script src="./factory-empire/campaign.js?v=1"></script>
+<script src="./factory-empire/story.js?v=1"></script>
+<script src="./factory-empire/story-art.js?v=1"></script>
+<script src="./factory-empire/catalog.js?v=15"></script>
 <script src="./factory-empire/audio.js"></script>
 <script src="./factory-empire/grid.js?v=2"></script>
 <script src="./factory-empire/runtime.js"></script>
 <script src="./factory-empire/telemetry.js"></script>
 <script src="./factory-empire/drawing.js?v=7"></script>
-<script src="./factory-empire/transport.js?v=7"></script>
+<script src="./factory-empire/transport.js?v=8"></script>
 <script src="./factory-empire/layout.js?v=17"></script>
-<script src="./factory-empire/terrain.js?v=4"></script>
+<script src="./factory-empire/terrain.js?v=5"></script>
 <script src="./factory-empire/world.js?v=4"></script>
-<script src="./factory-empire/game.js?v=21"></script>
+<script src="./factory-empire/game.js?v=22"></script>
 <script src="./poker.js"></script>
 <script src="./poker-table.js"></script>
 <script src="./blackjack.js"></script>

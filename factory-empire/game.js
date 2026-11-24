@@ -2,7 +2,7 @@
 const fabrik=()=>{
 const canvasScope=createFactoryCanvasScope(c);
 const {save:saveCanvas,restore:restoreCanvas,withState:withCanvasState}=canvasScope;
-const TS=48,GW=144,GH=62,TICK=.125,DAYSEC=300,DAYS=1500,BELT=.25,OFF=28800,RRC=1920,DX=[1,0,-1,0],DY=[0,1,0,-1],PI=Math.PI;
+const TS=48,GW=188,GH=62,TICK=.125,DAYSEC=300,DAYS=1500,BELT=.25,OFF=28800,RRC=1920,DX=[1,0,-1,0],DY=[0,1,0,-1],PI=Math.PI;
 let view=FactoryLayout.create(800,480),FW=view.width,FH=view.height,CX=view.cx,CY=view.cy;
 let uiTransform={x:0,y:0,scale:1,clip:null},panelSurface=null;
 let panelScroll={id:null,x:0,y:0},layoutRotated=false;
@@ -34,7 +34,11 @@ const pointerPosition=event=>{
  return FactoryLayout.point(event,cv,FW,FH,layoutRotated);
 };
 const RH=id=>!!G?.rs?.includes(id);
-const { ITEMS, MD, PR, DS, jpre }=createFactoryCatalog(RH);
+const campaignChapter=()=>G?.campaign?.level||1;
+const { chapters,read:readCampaign,legacy:readLegacyIndustry,compensation:legacyCompensation }=FactoryCampaign;
+const visibleItem=i=>visibleModel(MD[PR[i]]);
+const { ITEMS, MD, PR, DS, jpre }=createFactoryCatalog(RH,campaignChapter);
+const legacyIndustry=key=>G?.legacyIndustry?.[key]||0;
 const salePrice=(item,shippingBonus=1)=>Math.max(1,Math.round(ITEMS[item].v*PM*shippingBonus));
 const baseOrderReward=(item,count)=>Math.ceil(count*ITEMS[item].v*.8);
 const orderReward=order=>Math.round(order.r*RM);
@@ -78,7 +82,7 @@ const comp=(d,o)=>!!o&&!o.needsRelocation&&(d.id==='qual'?typeShip(o.t):d.id==='
 const crewCount=(id,role)=>G.crew[id]?.[role]||0;
 const assignedCrew=role=>Object.values(G.crew).reduce((sum,crew)=>sum+(crew[role]||0),0);
 const managerHall=m=>m.hall?hallOf(m.hall):cell(m.x,m.y)&&areaAt(m.x,m.y);
-const meff=(m,d)=>d.base*m.lv*(m.sp==1?1.5:m.sp==2?.6:1)*(1+.1*pul('mgt1'))*(RH('ldr')?1.15:1),hcost=k=>Math.round(150*Math.pow(1.3,G.emp[k])),lcost=(m,d)=>Math.round(d.cost*.5*Math.pow(1.7,m.lv-1));
+const meff=(m,d)=>d.base*m.lv*(m.sp==1?1.5:m.sp==2?.6:1)*(1+.1*legacyIndustry('management'))*(RH('ldr')?1.15:1),hcost=k=>Math.round(150*Math.pow(1.3,G.emp[k])),lcost=(m,d)=>Math.round(d.cost*.5*Math.pow(1.7,m.lv-1));
 function recalc(){for(const o of L){
  const hall=areaAt(o.x,o.y)?.id;
  o.sb=1+(RH('sch')?.03:.02)*crewCount(hall,'p');o.ub=1;
@@ -166,8 +170,8 @@ const AC=[
  ['mg4','Führungsriege','Stelle alle vier Manager ein.',()=>G.mg.length,4,120,'Team'],
  ['mg10','Meisterhaft','Bringe einen Manager auf Level 10.',()=>Math.max(0,...G.mg.map(m=>m.lv)),10,150,'Team'],
  ['e10','Belegschaft','Stelle 10 Mitarbeiter ein.',()=>G.emp.p+G.emp.q+G.emp.l,10,50,'Team'],
- ['pr1','Neuanfang','Schließe deine erste Neugründung ab.',()=>G.pr,1,150,'Kampagne'],
- ['pr5','Serienunternehmer','Schließe fünf Neugründungen ab.',()=>G.pr,5,400,'Kampagne'],
+ ['pr1','Neuanfang','Historischer Erfolg aus einem früheren Spielstand.',()=>legacyIndustry('foundings'),1,150,'Kampagne'],
+ ['pr5','Serienunternehmer','Historischer Erfolg aus einem früheren Spielstand.',()=>legacyIndustry('foundings'),5,400,'Kampagne'],
  ['lv5','Aufsteiger','Erreiche Spielerlevel 5.',()=>LV,5,40,'Kampagne'],
  ['lv10','Profi','Erreiche Spielerlevel 10.',()=>LV,10,120,'Kampagne'],
  ['b1','Fundament gelegt','Schließe die erste Bunkerphase ab.',()=>G.sp,1,100,'Kampagne'],
@@ -185,25 +189,7 @@ function chkAc(){
   sfx('achieve');
  }
 }
-/* ---- Prestige: freiwillige Neugründung gegen Industrie-Blaupausen, permanente Upgrades ---- */
-const pul=id=>(G&&G.pu&&G.pu[id])|0;
-const PU=[{id:'cap1',n:'Startkapital',max:10,base:2,fx:l=>'+'+600*l+' € Start'},{id:'cap2',n:'Maschinenrabatt',max:10,base:3,fx:l=>'−'+3*l+' % Baukosten'},
- {id:'prd1',n:'Grundtempo',max:10,base:3,fx:l=>'+'+5*l+' % Tempo'},{id:'prd2',n:'Frühe Freischaltung',max:2,base:6,fx:l=>['–','Metallhalle gratis','+ Versorgungswerk'][l]},
- {id:'log1',n:'Größere Lager',max:5,base:2,fx:l=>'+'+10*l+' Lagerpl.'},{id:'log2',n:'Verkaufsbonus',max:5,base:2,fx:l=>'+'+2*l+' % Verkaufspreis'},
- {id:'mgt1',n:'Starke Manager',max:5,base:3,fx:l=>'+'+10*l+' % Manager'},{id:'mgt2',n:'Lohnverhandlung',max:5,base:2,fx:l=>'−'+10*l+' % Löhne'},
- {id:'res1',n:'Forschungs-Start',max:5,base:2,fx:l=>'+'+4*l+' Start-FP'},
- {id:'res2',n:'Forschungsarchiv',max:4,base:4,fx:l=>l?'+'+3*l+' Start-Techs':'–'}];
-const ARCH=['spd1','lag','mkt','hnd','bel','off','spd2','brd','exp','sch','vtr','lag2'];
-function startTech(){G.rs=[];for(let i=0;i<3*pul('res2');i++)if(!G.rs.includes(ARCH[i]))G.rs.push(ARCH[i]);G.rp=4*pul('res1')}
-const startMoney=()=>120+600*pul('cap1');
-const PMIN=12,bpCalc=()=>{const a=Math.floor(Math.sqrt(G.tr/60000)),b=Math.max(0,HL.reduce((s,h)=>s+(hlv(h.id)>0?hlv(h.id):0),0)-1),c=Math.floor(G.ordRun/8);return{a,b,c,t:a+b+c}};
 function starter(){put(7,6,'src',0);put(8,6,'belt',0);put(9,6,'saw',0);put(10,6,'belt',0);put(11,6,'shp',0)}
-function buyP(id){const p=PU.find(q=>q.id==id);if(!p)return false;const l=pul(id),c1=Math.ceil(p.base*Math.pow(1.7,l));if(l>=p.max||p.need&&!p.need())return false;if(G.bp<c1){deny('Nicht genug Blaupausen.');return}G.bp-=c1;G.pu[id]=l+1;rfx();recalc();sfx('upgrade');sv(1);return true}
-function doPrestige(){const b=bpCalc();if(b.t<PMIN){deny('Noch zu früh: Mindestens '+PMIN+' Blaupausen nötig.');return}
- G.bp+=b.t;G.bpt+=b.t;G.pr++;resetPlanning();currentSite='main';cam={x:11.5*TS,y:6.5*TS,z:1.3};L=[];g=[];starter();
- projectCargo.clear();projectTrucks.length=0;
- G.m=startMoney();G.tr=0;G.ordRun=0;G.legacyPlots=[];G.hl={gar:1};['met','vrs'].forEach((id,i)=>{if(pul('prd2')>i&&G.sp>=hallOf(id).ph)G.hl[id]=1});startTech();mvO=null;G.emp={...G.emp,p:0,q:0,l:0};G.crew={};teamTrips.length=0;G.mg=[];G.od=[];G.pc={};G.recent=FactoryTelemetry.create(G.tk,TICK);sb.fill(0);rw=0;sel=null;selA=null;PO=[];asg=null;tool='hand';
- refreshIndustrialArea();rfx();recalc();analyze();xp(100);pfl=1;sfx('prestige');toast('Neues Unternehmen gegründet! +'+b.t+' Blaupausen');sv(1)}
 /* ===== Audio: Web Audio API, komplett synthetisiert (keine Dateien), Start erst nach Nutzer-Interaktion ===== */
 let wMsg='',wT=-99;
 function deny(message){toast(message);sfx('deny')}
@@ -217,10 +203,10 @@ function auTab(X,Y,W,H){tx('Audio',X+26,Y+68,15,'#fff','left',800);
  btn(X+26,Y+256,304,32,()=>{AS.ma=AS.ma?0:1;audApply();audSave()},AS.ma?'#b91c1c':'#334155');tx(AS.ma?'🔇 Ton ist aus – tippen zum Einschalten':'🔊 Alles stumm schalten',X+178,Y+276,12.5,'#fff','center',800);
  tx('Der Ton startet nach dem ersten Klick (Browser-Vorgabe). Einstellungen werden im Konto gespeichert.',X+26,Y+306,10,'#94a3b8')}
 const rOK=n=>!RH(n.id)&&n.p.every(p=>RH(p))&&(!n.rq||n.rq[1]());
-function rfx(){SPm=(1+(RH('spd1')?.1:0)+(RH('spd2')?.15:0)+(RH('spd3')?.2:0)+(RH('mas')?.2:0)-(RH('prm')?.05:0))*(1+.01*Math.min(24,LV-1))*(1+.05*pul('prd1'));STC=(RH('lag2')?80:RH('lag')?40:20)+10*pul('log1');BTv=RH('bel2')?BELT/3:RH('bel')?BELT/2:BELT;RM=RH('hnd')?1.25:1;
+function rfx(){SPm=(1+(RH('spd1')?.1:0)+(RH('spd2')?.15:0)+(RH('spd3')?.2:0)+(RH('mas')?.2:0)-(RH('prm')?.05:0))*(1+.01*Math.min(24,LV-1))*(1+.05*legacyIndustry('speed'))*(chapters[campaignChapter()]?.speed||1);STC=(RH('lag2')?80:RH('lag')?40:20)+10*legacyIndustry('storage');BTv=RH('bel2')?BELT/3:RH('bel')?BELT/2:BELT;RM=RH('hnd')?1.25:1;
  PM=(RH('mkt')?1.05:1)*(RH('brd')?1.08:1)*(RH('exp')?1.08:1)*(RH('vtr')?1.05:1)*
-  (RH('prm')?1.12:1)*(RH('mas')?.95:1)*(1+.02*G.bpt)*(1+.02*pul('log2'));
- OS=RH('off')?4:3;WG=crewRoles.reduce((sum,role)=>sum+assignedCrew(role.id),0)*WAGE*(1-.1*pul('mgt2'));KUC=RH('lean')?.88:1;KBC=RH('bau')?.85:1;KOF=RH('nst')?43200:OFF;OFFE=RH('nst')?.4:.25;RCm=RH('wrk')?.85:1}
+  (RH('prm')?1.12:1)*(RH('mas')?.95:1)*(1+.02*legacyIndustry('experience'))*(1+.02*legacyIndustry('sales'));
+ OS=RH('off')?4:3;WG=crewRoles.reduce((sum,role)=>sum+assignedCrew(role.id),0)*WAGE*(1-.1*legacyIndustry('wages'));KUC=RH('lean')?.88:1;KBC=RH('bau')?.85:1;KOF=RH('nst')?43200:OFF;OFFE=RH('nst')?.4:.25;RCm=RH('wrk')?.85:1}
 function buyR(n){if(!rOK(n)){deny('Voraussetzungen noch nicht erfüllt.');return}const cost=researchCost(n);if(G.rp<cost){deny('Nicht genug Forschungspunkte.');return}G.rp-=cost;G.rs.push(n.id);rfx();xp(30);sfx('unlock');toast('Erforscht: '+n.n);rflash[n.id]=1;sv(1);analyze()}
 const LVQ=n=>({t:'Spielerlevel '+n,ok:()=>LV>=n,p:()=>Math.min(LV,n)+'/'+n});
 const REQ=(t,n,k)=>({t,ok:()=>G[k]>=n,p:()=>Math.min(G[k],n)+'/'+n});
@@ -233,19 +219,24 @@ const REGIONS=[
   need:'Bunker-Phase 2 erreicht · 10 Aufträge erfüllt',open:()=>G.sp>=1&&G.ord>=10},
  {id:'lab',name:'Versuchsfabrik',rect:[82,33,111,61],center:[95,47],hall:'lab',cost:45000,
   need:'Vollautomatisierung · Spielerlevel 10',open:()=>RH('spd3')&&LV>=10},
+ {id:'orbit',name:'Raumwerft Horizont',rect:[146,4,187,59],center:[164,25],hall:'orb',chapter:2},
  {id:'port',name:'Bestandswerk',rect:[114,2,143,59],center:[128,26],hall:'prt',retired:true,
   need:'Dieser Standort ist nur in bestehenden Fabriken verfügbar.',open:()=>false}
 ];
 HL.push(
  {id:'nor',n:'Nordwerk',ln:'Holz, Metall & Versorgung',tab:'m',site:'north',allow:['gar','met','vrs'],rc:[[87,7,103,20]],c:[85000],ph:0,f:['#c9d6d7','#9fb6b5']},
  {id:'lab',n:'Versuchsfabrik',ln:'Holz, Metall & Elektronik',tab:'e',site:'lab',allow:['gar','met','elk','ene'],rc:[[87,41,103,54]],c:[45000],ph:0,f:['#d4d0e7','#aea9cc']},
- {id:'prt',n:'Bestandswerk',ln:'Robotik · Versorgung · Bunkermodule',tab:'t',site:'port',retired:true,allow:['gar','met','vrs','elk','ene','fzg','hit','bnk'],rc:[[119,14,137,37]],c:[12e6],ph:0,f:['#c0d6df','#8baebf']}
+ {id:'prt',n:'Bestandswerk',ln:'Robotik · Versorgung · Bunkermodule',tab:'t',site:'port',retired:true,allow:['gar','met','vrs','elk','ene','fzg','hit','bnk'],rc:[[119,14,137,37]],c:[12e6],ph:0,f:['#c0d6df','#8baebf']},
+ {id:'orb',n:'Raumwerft',ln:'Flottenbau und Warenversorgung',tab:'o',site:'orbit',chapter:2,allow:['gar','met','vrs','elk','ene','fzg','hit','bnk'],rc:[[154,10,174,39],[154,8,178,42]],c:[0,95000],ph:0,f:['#c3d6e5','#8298b0']}
 );
-const siteAvailable=site=>!site.retired||hlv(site.hall);
-const hallAvailable=hall=>!hall.retired||hlv(hall.id);
+const siteAvailable=site=>(site.chapter||1)<=campaignChapter()&&(!site.retired||hlv(site.hall));
+const hallAvailable=hall=>(hall.chapter||1)<=campaignChapter()&&(!hall.retired||hlv(hall.id));
 const siteAt=(x,y)=>REGIONS.find(site=>inR(site.rect,x,y)&&siteAvailable(site));
 let currentSite='main';
 const hlv=id=>(G&&G.hl&&G.hl[id])|0,hallOf=id=>HL.find(h=>h.id==id),inR=(r,x,y)=>x>=r[0]&&x<=r[2]&&y>=r[1]&&y<=r[3],hrect=h=>h.rc[Math.max(1,hlv(h.id))-1],SITE=[66,42,81,61];
+const FLEET=[179,29,186,48];
+const isProjectRamp=t=>t==='prj'||t==='orbitRamp';
+const mapWidth=()=>campaignChapter()>=2?GW:144;
 const hSize=h=>{const r=hrect(h);return(r[2]-r[0]+1)+'×'+(r[3]-r[1]+1)},hArea=r=>(r[2]-r[0]+1)*(r[3]-r[1]+1);
 const ORD=['saw','frm','asm','pnt','pck'],QT=[1,10,25,0];
 const fm=n=>{n=Math.floor(n);for(const[v,s]of[[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'K']])if(n>=v)return(n/v).toFixed(n>=v*100?0:n>=v*10?1:2).replace(/(\.\d*?)0+$/,'$1').replace(/\.$/,'').replace('.',',')+' '+s;return n.toLocaleString('de-DE')};
@@ -256,6 +247,7 @@ const sb=new Array(60).fill(0),cell=(x,y)=>x<0||y<0||x>=GW||y>=GH?null:g[y*GW+x]
 const qvalue=value=>Number.isFinite(value)?Math.max(60,Math.min(160,value)):100;
 const isStorage=t=>t=='sto'||!!MD[t]?.storage;
 const typeShip=t=>t=='shp'||!!MD[t]?.ship;
+const visibleModel=m=>!m?.chapter||m.chapter<=campaignChapter();
 const knownType=t=>t=='belt'||Object.hasOwn(MD,t);
 const isBelt=t=>t=='belt'||!!MD[t]?.belt;
 const isLogistics=t=>isBelt(t)||MD[t]?.g==='l'||isStorage(t)||typeShip(t)||!!MD[t]?.inspect;
@@ -263,7 +255,7 @@ const beltSize=t=>MD[t]?.belt?.[1]||1;
 const beltTime=t=>BTv*(MD[t]?.belt?.[0]||1);
 const beltCount=o=>o.it<0?0:1+o.queue.length;
 const beltCapacity=o=>Math.min(60/beltTime(o.t),60*beltSize(o.t)/TICK);
-const terminal=t=>typeShip(t)||t=='prj'||!!(MD[t]?.supply||MD[t]?.distribution);
+const terminal=t=>typeShip(t)||isProjectRamp(t)||!!(MD[t]?.supply||MD[t]?.distribution);
 const prod=o=>MD[o.t]?.o!=null;
 const cap=o=>Math.floor((STC+(o.extraStorage||0))*(1+(o.cb||0)));
 const inputCap=(o,i)=>MD[o.t].r[i][1]*2;
@@ -294,7 +286,7 @@ function record(o,key,value=1){
 }
 const currentStats=o=>FactoryTelemetry.rates(o.recent,G.tk,TICK,o.stats.since);
 const companyRates=()=>FactoryTelemetry.rates(G.recent,G.tk,TICK);
-const uc=(o,l)=>Math.ceil(MD[o.t].c*.55*(Math.pow(1.5,l-1))*(o.ub||1)*KUC),cst=t=>Math.max(1,Math.round((t=='belt'?2:MD[t].c)*(1-.03*pul('cap2'))*KBC));
+const uc=(o,l)=>Math.ceil(MD[o.t].c*.55*(Math.pow(1.5,l-1))*(o.ub||1)*KUC),cst=t=>Math.max(1,Math.round((t=='belt'?2:MD[t].c)*(1-.03*legacyIndustry('construction'))*KBC));
 const xsp=o=>{const m=MD[o.t];return(RH('met')&&m.rc!=null?1.2:1)*(RH('elk')&&(m.a=='elk'||m.a=='ene'||m.a=='hit'&&o.t!=='mobile')?1.12:1)};
 function put(x,y,t,r,lv,base=defaultSize(t)){const m=MD[t],o={t,x,y,r,lv:lv||1,it:-1,ein:(r+2)%4,wt:0,q:[],iv:(m&&m.r||[]).map(()=>0),wk:0,out:-1,p:0,ag:0,st:2,ew:0,es:0,eb:0,dv:0,fl:0,bt:1,bad:0};
  if(m&&m.j){o.j=m.j;o.rr=0;o.pr=0;o.xs=[-1,-1,-1,-1];o.xa=[0,0,0,0];o.jm=m.j==1?jpre(t,r):[0,0,0,0]}
@@ -322,7 +314,7 @@ function refreshIndustrialArea(){
  industrial=FactoryGrid.industrialArea(plots,{
   width:GW,height:GH,protectedTile:worldArt.protectedTile,
   usable:(x,y,site)=>{
-   if(!site||siteAt(x,y)!==site||inR(SITE,x,y))return false;
+   if(!site||siteAt(x,y)!==site||inR(SITE,x,y)||campaignChapter()>=2&&inR(FLEET,x,y))return false;
    const hall=areaAt(x,y);
    return !hall||hlv(hall.id)>0||logisticsHall(x,y);
   }
@@ -383,9 +375,10 @@ function init(value){
  projectCargo.clear();projectTrucks.length=0;
  rejectedBuild=null;
  currentSite='main';traffic.clear();teamPaths.clear();teamTrips.length=0;teamHall='gar';teamTab=0;teamSpecialty=null;
- G={plans:[],crew:{},contracts:[],contractWins:{},supplyOrders:{},epoch:0,stock:{},activeBoosts:{},milestones:{},lineCounts:{},wins:{},history:[],units:0,productTracks:{},recent:FactoryTelemetry.create(0,TICK),goals:{mass:0,quality:0,efficiency:0,logistics:0,lab:0},legacyPlots:[],m:120,te:0,sold:0,made:0,pk:0,cost:0,tk:0,ord:0,od:[],hl:{gar:1},pc:{},sl:new Array(ITEMS.length).fill(0),saleIncome:{},rp:0,rs:[],ds:new Array(ITEMS.length).fill(0),emp:{p:0,q:0,l:0,w:0,d:0,a:0},mg:[],wc:0,xp:0,pl:0,bt:[],ac:[],bp:0,bpt:0,pr:0,pu:{},tr:0,ordRun:0,tu:-1,th:[],sp:0,sq:[],st:0,sd:0,sf:{},late:0,end:0};L=[];g=[];
+ G={plans:[],crew:{},contracts:[],contractWins:{},supplyOrders:{},epoch:0,stock:{},activeBoosts:{},milestones:{},lineCounts:{},wins:{},history:[],units:0,productTracks:{},recent:FactoryTelemetry.create(0,TICK),goals:{mass:0,quality:0,efficiency:0,logistics:0,lab:0},legacyPlots:[],m:120,te:0,sold:0,made:0,pk:0,cost:0,tk:0,ord:0,od:[],hl:{gar:1},pc:{},sl:new Array(ITEMS.length).fill(0),saleIncome:{},rp:0,rs:[],ds:new Array(ITEMS.length).fill(0),emp:{p:0,q:0,l:0,w:0,d:0,a:0},mg:[],wc:0,xp:0,pl:0,bt:[],ac:[],campaign:readCampaign(d,false),legacyIndustry:readLegacyIndustry(d),tu:-1,th:[],sp:0,sq:[],st:0,sd:0,sf:{},late:0,end:0};L=[];g=[];
+ if(d)G.campaign=readCampaign(d,d.sp>=PH.length);
  const compacted=new Map();
- if(d){for(const k of['m','te','sold','made','pk','cost','tk','ord','rp','wc','xp','pl','bp','bpt','pr','tr','ordRun','sp','st','sd','late','end'])if(typeof d[k]=='number')G[k]=d[k];
+ if(d){for(const k of['m','te','sold','made','pk','cost','tk','ord','rp','wc','xp','pl','sp','st','sd','late','end'])if(typeof d[k]=='number')G[k]=d[k];
   for(let i=0;i<ITEMS.length;i++){
    if(Number.isFinite(d.sl?.[i])&&d.sl[i]>=0)G.sl[i]=d.sl[i];
    if(Number.isFinite(d.ds?.[i])&&d.ds[i]>=0)G.ds[i]=d.ds[i];
@@ -393,7 +386,7 @@ function init(value){
   }
   // Keep the old market data intact for save compatibility. It has no effect on sales.
   if(d.sa&&typeof d.sa==='object')G.legacySaturation=d.sa;
-  for(const row of Object.values(d.o||{})){if(!row||typeof row!='object')continue;const e=row;const t=e[2];if(!knownType(t))continue;
+  for(const row of Object.values(d.o||{})){if(!row||typeof row!='object')continue;const e=row;const t=e[2];if(!knownType(t)||!visibleModel(MD[t]))continue;
    const base=e[10]?.large===true?defaultSize(t):[1,1],shape={x:e[0],y:e[1],r:(e[3]|0)&3,base};
    if(!Number.isInteger(shape.x)||!Number.isInteger(shape.y)||footprint(shape).some(([x,y])=>x<0||y<0||x>=GW||y>=GH||cell(x,y)))continue;
    const o=put(shape.x,shape.y,t,shape.r,Math.max(1,Math.min(100,e[4]|0)),base);o.it=Number.isInteger(e[5])&&ITEMS[e[5]]?e[5]:-1;{const v=e[6],r=MD[t]&&MD[t].r;if(r){if(typeof v=='number'){const i=r.findIndex(a=>a[0]==v);if(v>=0&&i>=0)o.iv[i]=1}else if(v)Object.values(v).forEach((n,i)=>{if(i<o.iv.length)o.iv[i]=Math.max(0,Math.min(500,n|0))})}}o.out=Number.isInteger(e[7])&&ITEMS[e[7]]?e[7]:-1;if(isStorage(t)&&e[8]&&typeof e[8]=='object')o.q=Object.values(e[8]).filter(v=>Number.isInteger(v)&&ITEMS[v]).slice(0,500);
@@ -426,7 +419,7 @@ function init(value){
    }
   }
   G.legacyPlots=legacyPlots.filter(plot=>Object.values(d.legacyPlots||{}).includes(plot.id)).map(plot=>plot.id);
-  G.hl={gar:1};if(d.hl)for(const h of HL){const l=d.hl[h.id]|0;if(l>0)G.hl[h.id]=Math.min(h.rc.length,l)}
+  G.hl={gar:1};if(d.hl)for(const h of HL){const l=d.hl[h.id]|0;if(l>0&&(h.chapter||1)<=campaignChapter())G.hl[h.id]=Math.min(h.rc.length,l)}
   G.rs=Object.values(d.rs||{}).filter(id=>id==='grd'||RN.some(n=>n.id==id));
   if(d.emp)for(const k of Object.keys(G.emp))G.emp[k]=Math.max(0,Math.min(12,d.emp[k]|0));
   for(const {id} of crewRoles){
@@ -440,9 +433,12 @@ function init(value){
   }
   G.mg=Object.values(d.mg||{}).filter(e=>e&&MG.some(g=>g.id===e.id)).map(e=>({id:e.id,lv:Math.max(1,Math.min(10,e.lv|0||1)),sp:Math.max(0,Math.min(2,e.sp|0)),x:e.x==null?-1:e.x|0,y:e.y==null?-1:e.y|0,hall:hlv(e.hall)?e.hall:undefined}));
   G.bt=Object.values(d.bt||{}).filter(t=>t=='belt'||MD[t]);G.ac=Object.values(d.ac||{}).filter(id=>AC.some(a=>a.id===id));
-  G.pu={...d.pu};for(const p of PU)G.pu[p.id]=Math.max(0,Math.min(p.max,d.pu?.[p.id]|0));
   G.tu=typeof d.tu=='number'?d.tu:-1;if(G.tu>=TU.length)G.tu=-1;G.th=d.th?Object.values(d.th).filter(x=>typeof x=='string'):[];
   G.sp=Math.max(0,Math.min(PH.length,G.sp|0));G.sq=Object.values(d.sq||{}).map(v=>Math.max(0,v|0));G.sf=d.sf&&typeof d.sf=='object'&&!Array.isArray(d.sf)?d.sf:{};
+  G.campaign=readCampaign(d,G.sp===PH.length);
+  if(campaignChapter()>=2)G.hl.orb=Math.max(1,G.hl.orb||0);
+  const compensation=legacyCompensation(d);
+  G.m+=compensation.money;G.rp+=compensation.research;
   G.plans=readPlans(d.plans);
   // Retired expansion data is kept in saves without applying its former effects.
   G.epoch=Math.max(0,d.epoch|0);
@@ -460,7 +456,7 @@ function init(value){
    G.lineCounts[hall.id]=Math.max(0,Number(d.lineCounts?.[hall.id])||0);
    G.milestones[hall.id]=Math.max(0,Math.min(LINE_LEVELS.length,d.milestones?.[hall.id]|0));
   }
-  const savedSite=REGIONS.find(site=>site.id==d.site&&(!site.hall||hlv(site.hall)));
+  const savedSite=REGIONS.find(site=>site.id==d.site&&siteAvailable(site)&&(!site.hall||hlv(site.hall)));
   if(savedSite&&savedSite.id!='main')switchSite(savedSite);
   G.contracts=Object.values(d.contracts||{});
   G.contractWins={...d.contractWins};
@@ -468,11 +464,13 @@ function init(value){
   G.rr=d.rr==null?null:d.rr|0;G.pc={};if(d.pc&&typeof d.pc=='object')for(const k in d.pc)if(typeof d.pc[k]=='number'&&d.pc[k]>0)G.pc[k]=d.pc[k];
   for(const entry of Object.values(d.od||{})){
    const s=entry?.[0],n=entry?.[1],done=entry?.[2]??0,reward=entry?.[3];
-   if(!Number.isInteger(s)||!ITEMS[s]?.oq||!Number.isInteger(n)||n<=0||!Number.isInteger(done)||done<0||done>=n)continue;
+   if(!Number.isInteger(s)||!visibleItem(s)||!ITEMS[s]?.oq||!Number.isInteger(n)||n<=0||!Number.isInteger(done)||done<0||done>=n)continue;
    G.od.push({s,n,d:done,r:Number.isFinite(reward)&&reward>=0?reward:baseOrderReward(s,n)});
   }
  }
  else{starter();G.tu=0;storyIntro()}
+ G.story=FactoryStory.read(d,storyUnlocked);
+ storyReplay=null;storyFocus=false;storyLastCue='';
  refreshIndustrialArea();
  const bridges=compactPortBridges(L,compacted,(x,y,a,b)=>siteAt(a,b)===siteAt(x,y)&&!bchk(x,y,'belt',true,true));
  for(const {x,y,t,r} of bridges)put(x,y,t,r);
@@ -512,22 +510,29 @@ function feeders(o){
 }
 const ups=q=>{const seen=new Set([q]),st=[q],res=new Set();while(st.length){for(const n of feeders(st.pop()))if(!seen.has(n)){seen.add(n);st.push(n);if(MD[n.t]&&MD[n.t].o!=null)res.add(n)}}return res};
 const mixed=(b,id)=>{const seen=new Set([b]),st=[b];while(st.length&&seen.size<60){for(const n of feeders(st.pop())){if(seen.has(n))continue;seen.add(n);if(isBelt(n.t)){if(n.it==id||n.queue.some(row=>row[0]==id))return true;st.push(n)}else if(n.j){if(n.it==id||(n.xs&&n.xs.includes(id)))return true;st.push(n)}else if(isStorage(n.t)){if(n.q.includes(id))return true;st.push(n)}else if(n.out==id)return true}}return false};
-const prjNeed=s=>{const q=PH[G.sp];return!!q&&q.q.some(([it,n],i)=>it==s&&(G.sq[i]||0)<n)};
+const activeRamp=()=>campaignChapter()===1?'prj':'orbitRamp';
+const projectPhase=(type=activeRamp())=>type==='prj'?PH[G.sp]:chapters[campaignChapter()]?.phases[G.campaign.stage];
+const projectStock=(type=activeRamp())=>type==='prj'?G.sq:G.campaign.delivery;
+const prjNeed=(item,type=activeRamp())=>projectPhase(type)?.q.some(([id,target],i)=>id===item&&(projectStock(type)[i]||0)<target)===true;
 function prjIn(item,ramp){
- const phase=PH[G.sp];
+ const type=ramp?.t??'prj',phase=projectPhase(type),stock=projectStock(type);
  if(!phase)return false;
- const index=phase.q.findIndex(([id,target],i)=>id===item&&(G.sq[i]||0)<target);
+ const index=phase.q.findIndex(([id,target],i)=>id===item&&(stock[i]||0)<target);
  if(index<0)return false;
- G.sq[index]=(G.sq[index]||0)+1;G.sd++;xp(.3);
- if(ramp&&!fs&&!ff&&!reducedMotion)queueProjectCargo(ramp,item);
- if(phase.q.every(([,target],i)=>(G.sq[i]||0)>=target))phaseDone();
+ stock[index]=(stock[index]||0)+1;
+ if(type==='prj'){
+  G.sd++;
+  if(ramp&&!fs&&!ff&&!reducedMotion)queueProjectCargo(ramp,item);
+ }else G.campaign.total++;
+ xp(.3);
+ finishProjectPhase(type);
  return true;
 }
 function sellProduct(q,item){
  const value=salePrice(item,q.pb||1);
  G.sl[item]++;
  G.saleIncome[item]=(G.saleIncome[item]||0)+value;
- G.m+=value;G.te+=value;G.tr+=value;G.sold++;record(q,'sold');record(q,'value',value);q.activity=G.tk;
+ G.m+=value;G.te+=value;G.sold++;record(q,'sold');record(q,'value',value);q.activity=G.tk;
  xp(.2);
  if(G.sold%200==0){
   G.rp+=2;
@@ -571,7 +576,7 @@ function give(o,d,s,quality=100,jump=null){
   if(isBelt(o.t)||q.xs[entry]>=0)return false;
   q.xs[entry]=s;q.xq[entry]=quality;q.xa[entry]=0;return true;
  }
- if(q.t=='prj')return prjIn(s,q);
+ if(isProjectRamp(q.t))return prjIn(s,q);
  if(isStorage(q.t))return receiveStorage(q,s,quality);
  if(MD[q.t]?.inspect){
   if(q.it>=0)return false;
@@ -671,10 +676,9 @@ if(isBelt(o.t)){moveBelt(o);continue}
  if(G.tk%8===0)workCrews();
 }
 function analyze(){
- const phase=PH[G.sp];
- if(phase&&phase.q.every(([,target],i)=>(G.sq[i]||0)>=target))phaseDone();
+ finishProjectPhase(activeRamp());
  fillOrders();recalc();chkAc();progressChecks();bn=null;const ms=L.filter(o=>MD[o.t]&&MD[o.t].o!=null),bad=L.find(o=>o.bad);
- if(bad&&neighbor(bad,beltDirections(bad)[0])){const q=neighbor(bad,beltDirections(bad)[0]),nd=q.t=='prj'?(PH[G.sp]?PH[G.sp].q.filter(a=>(G.sq[PH[G.sp].q.indexOf(a)]||0)<a[1]).map(a=>ITEMS[a[0]].n).join(' / '):''):(MD[q.t].r||[]).map(a=>ITEMS[a[0]].n).join(' + ');bn=q;msg=`Falsches Material: ${MD[q.t].n} bekommt ${ITEMS[bad.it].n}, braucht aber ${nd||'keine Lieferung'}.`;return}
+ if(bad&&neighbor(bad,beltDirections(bad)[0])){const q=neighbor(bad,beltDirections(bad)[0]),nd=isProjectRamp(q.t)?projectPhase(q.t)?.q.filter(([item])=>prjNeed(item,q.t)).map(([item])=>ITEMS[item].n).join(' / '):(MD[q.t].r||[]).map(a=>ITEMS[a[0]].n).join(' + ');bn=q;msg=`Falsches Material: ${MD[q.t].n} bekommt ${ITEMS[bad.it].n}, braucht aber ${nd||'keine Lieferung'}.`;return}
  for(const b of L)if(isBelt(b.t)&&b.wt&&b.it>=0){const q=cell(b.x+DX[b.r],b.y+DY[b.r]),r=q&&MD[q.t]&&MD[q.t].r;if(r&&r.length>1&&acc2(q,b.it)<0){const mi=r.findIndex((a,i)=>q.iv[i]<a[1]);if(mi>=0&&mixed(b,r[mi][0])){bn=q;msg=`${MD[q.t].n} ist verstopft: Das Band liefert nur ${ITEMS[b.it].n}, ${ITEMS[r[mi][0]].n} fehlt. Führe die Materialien über getrennte Bänder zu.`;return}}}
  const sat=ms.filter(o=>o.ew>.8),stv=ms.filter(o=>MD[o.t].r&&o.es>.2);let c1=null,q1=null;
  for(const q of stv){const U=ups(q);for(const x of sat)if(U.has(x)&&(!c1||MD[x.t].dp>=MD[c1.t].dp)){c1=x;q1=q}}
@@ -689,14 +693,15 @@ function analyze(){
  const bl=lossPoint(ms);if(bl){bn=bl.object;msg=`Rückstau bei ${MD[bn.t].n}: bis zu ${bl.margin.toFixed(1)} €/Min. Marge. Abnahme hinter der Maschine prüfen.`;return}
  const mi=ORD.findIndex(t=>!L.some(o=>o.t==t));
  msg=mi>=0?`Tipp: ${MD[ORD[mi]].n} in die Linie bauen – Grundwert ${ITEMS[mi+1].v} € pro Stück.`:tipStory()}
-function tipStory(){const q=PH[G.sp];if(!q)return'Der Bunker steht! Kaufe Upgrades, erweitere Hallen oder gründe neu.';
+function tipStory(){if(campaignChapter()>=2){const next=projectPhase();return next?'Horizont · '+next.n+' – benötigte Waren an die Werftrampe liefern.':'Die Flotte ist startbereit.'}
+ const q=PH[G.sp];if(!q)return'ARCHE ist fertig. Öffne das Bunkerprojekt, um die Kampagne fortzusetzen.';
  if(!hasProjectRamp())return`Bunker-Phase ${G.sp+1} „${q.n}“: Baue eine Bunker-Rampe neben der Linie und liefere die Quest-Waren an.`;
  const h=hallOf(q.hall);if(hlv(h.id)<1)return`Bunker-Phase ${G.sp+1} braucht die ${h.n}: Im Menü 🏭 Hallen freischalten (${fm(h.c[0])} €).`;
  const i=q.q.findIndex(([it,n],k)=>(G.sq[k]||0)<n);return i<0?'Phase abgeschlossen!':`Quest: ${ITEMS[q.q[i][0]].n} ${fm(G.sq[i]||0)} / ${fm(q.q[i][1])} – per Band zur Bunker-Rampe.`}
 const rate=()=>{const total=sb.reduce((sum,value)=>sum+value,0);return total*60/Math.max(20,rw)};
 /* ---- Aufträge (ohne Zeitdruck): Stücke einer Stufe liefern, Bonus bei Abschluss ---- */
 const mk=(i,d)=>{const t=PR[i];if(!t||(d||0)>9||!L.some(o=>o.t==t))return false;return(MD[t].r||[]).every(a=>mk(a[0],(d||0)+1))};
-function fillOrders(ban){const ok=ITEMS.map((x,i)=>x.oq&&mk(i)?i:-1).filter(i=>i>=0);
+function fillOrders(ban){const ok=ITEMS.map((x,i)=>x.oq&&visibleItem(i)&&mk(i)?i:-1).filter(i=>i>=0);
  G.od=(G.od||[]).filter(q=>q.d>0||ok.includes(q.s));
  while(G.od.length<OS){let f=ok.filter(i=>!G.od.some(q=>q.s==i)&&i!=ban);if(!f.length)f=ok.filter(i=>!G.od.some(q=>q.s==i));if(!f.length)break;const s=f[(G.ord+G.od.length+Math.floor(G.tk/2400)+(ban||0))%f.length],n=ITEMS[s].oq;G.od.push({s,n,d:0,r:baseOrderReward(s,n)})}}
 const rrLeft=()=>G.rr==null?0:Math.max(0,Math.min(RRC,G.rr+RRC-G.tk)),rrFmt=()=>{const t=Math.ceil(rrLeft()*TICK);return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
@@ -705,7 +710,7 @@ const orderFor=item=>G.od.find(q=>q.s==item&&q.d<q.n);
 function ordD(s,ship){
  const result=orderFor(s);
  if(!result)return;
- const q=result;q.d++;if(q.d>=q.n){const rw=orderReward(q);G.m+=rw;G.te+=rw;G.tr+=rw;G.ord++;G.ordRun++;G.rp+=3;xp(25);record(ship,'value',rw);sb[sc%60]+=rw;if(!fs){toast('Auftrag erfüllt: +'+fm(rw)+' € und 3 Forschungspunkte');sfx('order')}G.od=G.od.filter(x=>x!=q);fillOrders()}}
+ const q=result;q.d++;if(q.d>=q.n){const rw=orderReward(q);G.m+=rw;G.te+=rw;G.ord++;G.rp+=3;xp(25);record(ship,'value',rw);sb[sc%60]+=rw;if(!fs){toast('Auftrag erfüllt: +'+fm(rw)+' € und 3 Forschungspunkte');sfx('order')}G.od=G.od.filter(x=>x!=q);fillOrders()}}
 /* ---- Kurven: Eingangsseite eines Bands bestimmen, Position eines Stücks auf Gerade/Bogen ---- */
 function feed(o){const b=(o.r+2)%4;let sd=-1;for(const d of[b,(o.r+1)%4,(o.r+3)%4]){const q=cell(o.x+DX[d],o.y+DY[d]);if(fdn(q,d)){if(d==b)return b;sd=sd<0?d:-2}}return sd>=0?sd:b}
 function itemPos(o){const b=(o.r+2)%4,e=o.ein==null||o.ein==o.r?b:o.ein,R=TS/2,cx=(o.x+.5)*TS,cy=(o.y+.5)*TS;let t=Math.min(1,(o.ag+acc)/beltTime(o.t));if(o.wt)t=Math.min(t,.78);
@@ -744,7 +749,8 @@ function backupBeforeMigration(save){
  if(save.v!==2)return backupOriginal(save,'before-v2');
  const oversized=Object.values(save.o||{}).some(row=>row?.[10]?.large===true&&MD[row[2]]?.previousSize);
  const oldTeam=save.crewVersion!==1&&(crewRoles.some(role=>save.emp?.[role.id]>0)||Object.values(save.mg||{}).length>0);
- return (!oversized||backupOriginal(save,'before-compact-buildings'))&&(!oldTeam||backupOriginal(save,'before-hall-teams'));
+ const oldIndustry=!save.legacyIndustry&&(save.bp>0||save.bpt>0||save.pr>0||Object.keys(save.pu||{}).length>0);
+ return (!oversized||backupOriginal(save,'before-compact-buildings'))&&(!oldTeam||backupOriginal(save,'before-hall-teams'))&&(!oldIndustry||backupOriginal(save,'before-campaign'));
 }
 function applySave(value){
  stQ=[];ff=null;saveAfterTick=false;closeP2();
@@ -802,9 +808,9 @@ function snapshot(){
  return {
   v:2,ts,rev:ts.toString(36)+'-'+Math.random().toString(36).slice(2,12),base:cloud.base,
   carry:Math.max(0,acc),m:G.m,te:G.te,sold:G.sold,made:G.made,units:G.units,productTracks:G.productTracks,pk:G.pk,cost:G.cost,
-  tk:G.tk,ord:G.ord,tr:G.tr,ordRun:G.ordRun,history:G.history,rt:Math.round(rate()*10)/10,
-  hl:G.hl,legacyPlots:G.legacyPlots,site:currentSite,sp:G.sp,sq:G.sq.map(v=>v|0),st:G.st,sd:G.sd,sf:G.sf,late:G.late,end:G.end,
-  emp:G.emp,crew:G.crew,crewVersion:1,mg:G.mg,wc:G.wc,xp:G.xp,pl:G.pl,bt:G.bt,ac:G.ac,bp:G.bp,bpt:G.bpt,pr:G.pr,pu:G.pu,
+  tk:G.tk,ord:G.ord,history:G.history,rt:Math.round(rate()*10)/10,
+  hl:G.hl,legacyPlots:G.legacyPlots,site:currentSite,campaign:G.campaign,story:G.story,legacyIndustry:G.legacyIndustry,sp:G.sp,sq:G.sq.map(v=>v|0),st:G.st,sd:G.sd,sf:G.sf,late:G.late,end:G.end,
+  emp:G.emp,crew:G.crew,crewVersion:1,mg:G.mg,wc:G.wc,xp:G.xp,pl:G.pl,bt:G.bt,ac:G.ac,
   tu:G.tu,th:G.th,rp:G.rp,rs:G.rs,ds:G.ds,sl:G.sl,saleIncome:G.saleIncome,pc:G.pc,
   ...(G.legacySaturation?{sa:G.legacySaturation}:{}),
   plans:G.plans,epoch:G.epoch,stock:G.stock,activeBoosts:G.activeBoosts,milestones:G.milestones,
@@ -969,13 +975,15 @@ function movEnd(p){if(!mvO||!L.includes(mvO)){mvO=null;return}const[a,b]=tileAt(
  if(p.pick)return;
  const q=cell(a,b);if(q&&q!=mvO){mvO=q;sfx('select');return}if(q==mvO){mvO=null;return}
  if(moveObj(mvO,a,b))mvO=null}
-const hasProjectRamp=()=>L.some(o=>o.t==='prj'&&!o.needsRelocation);
+const hasProjectRamp=()=>L.some(o=>o.t===activeRamp()&&!o.needsRelocation);
 function bchk(x,y,t,existing=false,keepGround=false){
  const m=MD[t],logistics=isLogistics(t);
+ if(!visibleModel(m))return 'Kampagnenfortschritt erforderlich.';
  if(!(existing&&logistics)&&m?.unlock&&!m.unlock())return m.need+'.';
- if(x<0||y<0||x>=GW||y>=GH)return'Außerhalb der Karte.';
+ if(x<0||y<0||x>=mapWidth()||y>=GH)return'Außerhalb der Karte.';
  const h=areaAt(x,y),site=siteAt(x,y);
  if(inR(SITE,x,y))return'Für ARCHE reserviert. Beliefere den Bunker über eine Rampe auf deinem Werkshof.';
+ if(campaignChapter()>=2&&inR(FLEET,x,y))return'Für den Flottenbau reserviert. Liefere an eine Werftrampe.';
  if(logistics){
   if(logisticsHall(x,y))return '';
   if(!site)return logisticsSiteError;
@@ -1031,7 +1039,7 @@ function place(x,y,t,r){
  PO.push({x:(x+.5)*TS,y:y*TS,t:0,v:'-'+cost,n:1});
  sfx(isBelt(t)?'belt':'place');analyze();sv(0);return true;
 }
-const hReq=h=>h.site?REGIONS.find(site=>site.id==h.site).open():G.sp>=h.ph,hNext=h=>hlv(h.id)<h.rc.length?h.c[hlv(h.id)]:0;
+const hReq=h=>hallAvailable(h)&&(h.site?(REGIONS.find(site=>site.id===h.site).open?.()??hlv(h.id)>0):G.sp>=h.ph),hNext=h=>hlv(h.id)<h.rc.length?h.c[hlv(h.id)]:0;
 function buyHall(h){const l=hlv(h.id);if(l>=h.rc.length){deny('Diese Halle hat ihre maximale Größe.');return}
  if(!hReq(h)&&h.site){deny(REGIONS.find(site=>site.id==h.site).need);return}
  if(!hReq(h)){deny('Gesperrt: Erst Bunker-Phase '+h.ph+' ('+PH[h.ph-1].n+') abschließen.');return}
@@ -1059,7 +1067,7 @@ function buy(o){const p=plan(o);if(!p.n||G.m<p.tot){deny('Nicht genug Geld.');re
 const tileAt=(x,y)=>viewToWorld(x,y).map(n=>Math.floor(n/TS));
 let lastCameraMotion=-Infinity;
 function clampCam(){
- cam.x=Math.max(0,Math.min(GW*TS,cam.x));
+ cam.x=Math.max(0,Math.min(mapWidth()*TS,cam.x));
  const edge=GH*TS+(cam.bottomPadding||0)/cameraZoom();
  cam.y=Math.max(0,Math.min(edge,cam.y));
 }
@@ -1094,6 +1102,7 @@ function zoomAt(factor,x,y,previousX=x,previousY=y){
  return true;
 }
 function wh(event){
+ if(storyOnScreen())return;
  const [x,y]=pointerPosition(event);
  if(!Number.isFinite(x)||!Number.isFinite(y))return;
  const unit=event.deltaMode===1?32:event.deltaMode===2?FH:1;
@@ -1237,7 +1246,7 @@ function dm(o,wk){
  else if(t=='ele'){const a=w?Math.sin(tm*4)*.8-.2:-.3;c.fillStyle='#2f3640';c.fillRect(-14,9,28,5);c.fillStyle='#10151c';c.beginPath();c.roundRect(-14,-15,11,19,2);c.fill();c.fillStyle=w?'#5ad1ff':'#2a5a70';c.fillRect(-12.5,-13.5,8,13);c.strokeStyle='#eef1f5';c.lineWidth=3.2;c.lineCap='round';const ex=8+Math.sin(a)*10,ey=9-Math.cos(a)*10,tx2=ex-8*Math.cos(a)-2,ty2=ey-8*Math.sin(a)*.4-5;c.beginPath();c.moveTo(8,9);c.lineTo(ex,ey);c.lineTo(tx2,ty2);c.stroke();c.lineCap='butt';c.fillStyle='#d9b24a';c.fillRect(tx2-2.5,ty2-2.5,5,5)}
  else if(isStorage(t)){const qq=o.q||[],n=Math.ceil(qq.length/cap(o)*6);for(let i=0;i<6;i++){const x=-13+(i%3)*9.5,y=-12+Math.floor(i/3)*12;c.fillStyle=i<n?'#c79a63':'#0004';c.fillRect(x,y,8.5,10);if(i<n){c.fillStyle='#e8d7a8';c.fillRect(x+3.2,y,2,10)}}if(o.incoming!=null&&G.tk-o.activity<6){saveCanvas();c.translate(11-(G.tk-o.activity)*2,-5);c.scale(.65,.65);di(o.incoming);restoreCanvas()}
  tx(qq.length+'/'+cap(o),0,17,8,'#fff','center',700)}
- else if(t=='prj'){dprj(o,w)}else if(MD[t].art){
+ else if(isProjectRamp(t)){dprj(o,w)}else if(MD[t].art){
   dart(o,w);
   if((MD[t].inspect||MD[t].sortStation)&&o.it>=0){
    const ratio=Math.min(1,(o.ag||0)/(MD[t].inspect?.5:beltTime(t)));
@@ -1245,11 +1254,11 @@ function dm(o,wk){
   }
  }else{c.fillStyle='#24774a';c.fillRect(-13,-9,26,18);c.strokeStyle='#ffffff55';c.lineWidth=1;for(let i=-6;i<9;i+=4){c.beginPath();c.moveTo(-13,i);c.lineTo(13,i);c.stroke()}c.fillStyle='#fff';c.beginPath();c.moveTo(11,0);c.lineTo(3,-6);c.lineTo(3,6);c.fill()}
  restoreCanvas();
- c.fillStyle=o.t=='shp'||o.t=='prj'?'#4ade80':['','#4ade80','#facc15','#ef4444'][o.st]||'#888';if(w){c.shadowColor=c.fillStyle;c.shadowBlur=8}c.beginPath();c.arc(h-8,-h+8,3.2,0,PI*2);c.fill();c.shadowBlur=0;
+ c.fillStyle=o.t=='shp'||isProjectRamp(o.t)?'#4ade80':['','#4ade80','#facc15','#ef4444'][o.st]||'#888';if(w){c.shadowColor=c.fillStyle;c.shadowBlur=8}c.beginPath();c.arc(h-8,-h+8,3.2,0,PI*2);c.fill();c.shadowBlur=0;
  if(!terminal(o.t)){saveCanvas();c.rotate(o.r*PI/2);c.fillStyle='#ffd23f';c.beginPath();c.moveTo(h-1,0);c.lineTo(h-9,-6);c.lineTo(h-9,6);c.fill();restoreCanvas()}
  if(o.mg){c.fillStyle='#fde68a';c.strokeStyle='#7c5a00';c.lineWidth=1;c.beginPath();c.arc(-h+9,-h+9,5.5,0,PI*2);c.fill();c.stroke();tx('M',-h+9,-h+12.5,8,'#5b3d00','center',800)}
   if(o.teamDepot&&inG(o.x,o.y)){rr(h-18,-h+4,13,12,3,'#246554');tx('T',h-11.5,-h+13,8,'#d7f9e7','center',800)}
- if(o.lv>1&&o.t!='shp'&&o.t!='prj')tx('L'+o.lv,-h+5,h-6,9,'#fff','left',800)}
+ if(o.lv>1&&o.t!='shp'&&!isProjectRamp(o.t))tx('L'+o.lv,-h+5,h-6,9,'#fff','left',800)}
 function db(o){const e=feed(o),b=(o.r+2)%4;saveCanvas();c.translate((o.x+.5)*TS,(o.y+.5)*TS);c.rotate(o.r*PI/2);
  if(e!=b){const s=e==(o.r+1)%4?1:-1,R=TS/2,W=19,a0=s>0?PI:PI/2,a1=s>0?1.5*PI:PI,ar=(x,y,r,p,q,cc)=>c.arc(x,y,r,p,q,cc);
   c.fillStyle='#0003';c.beginPath();ar(R+3,R*s+5,R+W,a0,a1);ar(R+3,R*s+5,R-W,a1,a0,true);c.fill();
@@ -1286,7 +1295,7 @@ function dj(o){const h=TS/2,jm=o.jm||jpre(o.t,o.r||0);c.fillStyle='#0004';c.begi
  if(o.st==3){c.fillStyle='#ef4444';c.beginPath();c.arc(h-8,-h+8,3.2,0,PI*2);c.fill()}}
 function dprj(o,w){c.fillStyle='#1b1e23';c.beginPath();c.roundRect(-14,-13,28,25,3);c.fill();c.fillStyle='#b89b2e';c.fillRect(-14,-13,28,5);c.fillStyle='#10151c';for(let i=-14;i<14;i+=8){c.beginPath();c.moveTo(i,-13);c.lineTo(i+4,-13);c.lineTo(i+8,-8);c.lineTo(i+4,-8);c.closePath();c.fill()}
  c.fillStyle='#5a6270';c.fillRect(-10,-5,20,15);c.strokeStyle='#ffd23f';c.lineWidth=1.2;c.strokeRect(-10,-5,20,15);c.beginPath();c.moveTo(0,-5);c.lineTo(0,10);c.stroke();
- const q=PH[G.sp];if(q){const i=q.q.findIndex(([it,n],k)=>(G.sq[k]||0)<n);if(i>=0)ico(q.q[i][0],0,3,.62)}else tx('✓',0,8,14,'#86efac','center',800)}
+ const q=projectPhase(o.t);if(q){const i=q.q.findIndex(([item])=>prjNeed(item,o.t));if(i>=0)ico(q.q[i][0],0,3,.62)}else tx('✓',0,8,14,'#86efac','center',800)}
 function ghost(t,r,x,y,ok,base=defaultSize(t)){
  const [w,h]=dimensions({r,base}),belt=isBelt(t)&&!MD[t]?.sortStation;
  withCanvasState(()=>{
@@ -1322,7 +1331,7 @@ function teamRoute(from,to,hall){
 function completeHallJob(hall,from,to,item,quality,color,remove){
  const path=teamRoute(from,to,hall);
  if(!path.length)return false;
- const delivered=isStorage(to.t)?receiveStorage(to,item,quality):to.t==='prj'?prjIn(item,to):typeShip(to.t)?sellProduct(to,item):receiveRecipe(to,item,quality);
+ const delivered=isStorage(to.t)?receiveStorage(to,item,quality):isProjectRamp(to.t)?prjIn(item,to):typeShip(to.t)?sellProduct(to,item):receiveRecipe(to,item,quality);
  if(!delivered)return false;
  remove();
  if(!fs){
@@ -1334,7 +1343,7 @@ function completeHallJob(hall,from,to,item,quality,color,remove){
 function hallJobs(hall,objects){
  const depots=objects.filter(o=>isStorage(o.t)&&o.teamDepot),machines=objects.filter(prod);
  const misrouted=o=>isBelt(o.t)&&o.it>=0&&o.bad;
- const goesToProject=o=>neighbor(o,beltDirections(o)[0])?.t==='prj';
+ const goesToProject=o=>isProjectRamp(neighbor(o,beltDirections(o)[0])?.t);
  function fromDepot(depot,i,to,color){
   return completeHallJob(hall,depot,to,depot.q[i],depot.qq[i],color,()=>{
    depot.q.splice(i,1);depot.qq.splice(i,1);record(depot,'moves');
@@ -1354,8 +1363,8 @@ function hallJobs(hall,objects){
   q:color=>objects.some(o=>misrouted(o)&&!goesToProject(o)&&store(o,o.it,o.iq,color,()=>{
    record(o,'moves');clearBelt(o);
   })),
-  l:color=>objects.filter(o=>o.t==='prj'||typeShip(o.t)).sort((a,b)=>Number(b.t==='prj')-Number(a.t==='prj')).some(sink=>depots.some(depot=>{
-   const index=depot.q.findIndex(item=>sink.t==='prj'?prjNeed(item):!prjNeed(item)&&orderFor(item));
+  l:color=>objects.filter(o=>isProjectRamp(o.t)||typeShip(o.t)).sort((a,b)=>Number(isProjectRamp(b.t))-Number(isProjectRamp(a.t))).some(sink=>depots.some(depot=>{
+   const index=depot.q.findIndex(item=>isProjectRamp(sink.t)?prjNeed(item,sink.t):!prjNeed(item)&&orderFor(item));
    return index>=0&&fromDepot(depot,index,sink,color);
   })),
   prod:color=>machines.some(o=>o.out>=0&&o.st===3&&store(o,o.out,o.oq,color,()=>{o.out=-1})),
@@ -1460,6 +1469,39 @@ function applyCamera(){
  c.translate(x,y);
  c.scale(zoom,zoom);
 }
+function drawFleet(){
+ withCanvasState(()=>{
+  c.translate(FLEET[0]*TS,FLEET[1]*TS);c.scale(TS,TS);
+  const {stage,delivery}=G.campaign,phase=projectPhase('orbitRamp');
+  const ratio=phase?phaseProgress(phase.q.map(([,goal],i)=>(delivery[i]||0)/goal)):1;
+  const w=FLEET[2]-FLEET[0]+1,h=FLEET[3]-FLEET[1]+1,mid=w/2;
+  rr(-.16,-.05,w+.36,h+.32,.42,'#26383c77');rr(0,0,w,h,.35,'#364759');
+  rr(.36,.34,w-.72,h-.7,.28,'#506777');rr(1.11,1.18,w-2.22,h-2.3,.21,'#2d4051');
+  for(let y=1.8;y<h-1;y+=1.36){
+   rr(.72,y,.16,.68,.03,'#e1ba76');rr(w-.88,y,.16,.68,.03,'#8bd3e1');
+   rr(1.32,y,w-2.64,.055,.01,'#8a9cac70');
+  }
+  const panels=Math.floor(stage>=1?9:ratio*9);
+  for(let i=0;i<9;i++){
+   const y=2.2+i*1.61,span=1.9+Math.sin(i/8*Math.PI)*1.15;
+   rr(mid-span/2,y,span,1.48,.21,i<panels?'#9ebcd0':'#657a8544');
+   if(i<panels)rr(mid-span/2+.18,y+.15,span-.36,.15,.035,'#c7e0ef');
+  }
+  if(stage>=1){
+   const power=stage>1?1:ratio;
+   for(const side of [-1,1]){
+    rr(mid+side*1.33-.3,12.9,.83,4.2,.26,'#617c9b');
+    rr(mid+side*1.33-.12,15.2,.46,1.76,.18,power>.55?'#82d2e7':'#41556b');
+   }
+  }
+  if(stage>=2){
+   for(let i=0;i<6;i++)if(i<1+ratio*5)rr(2.62+(i%2)*1.78,5+Math.floor(i/2)*1.1,.72,.56,.14,'#abe3ca');
+  }
+  rr(.8,.3,w-1.6,.65,.13,'#192c3c');tx('WERFT HORIZONT',mid,.74,.34,'#c4e7ef','center',800);
+  rr(1.1,h-1.12,w-2.2,.55,.13,'#192c3c');
+  tx(phase?.n||'STARTBEREIT',mid,h-.74,.26,'#e9d8a4','center',700);
+ });
+}
 function world(){
  const [left,top]=viewToWorld(0,0),[right,bottom]=viewToWorld(FW,FH);
  const intersects=(x,y,w,h,margin=0)=>x+w+margin>left&&x-margin<right&&y+h+margin>top&&y-margin<bottom;
@@ -1482,7 +1524,7 @@ function world(){
  const gridIn=rect=>editing&&(hv&&inR(rect,...hv)||buildPreview?.rows.some(row=>inR(rect,row.x,row.y)));
  const time=reducedMotion?0:tm,detail=cameraZoom()>=.38,moving=tm-lastCameraMotion<.12;
  saveCanvas();applyCamera();
- drawLayer('Landschaft',()=>worldArt.terrain({left,top,right,bottom,intersects,detail,time,plots,occupied:cell,industrial}));
+ drawLayer('Landschaft',()=>worldArt.terrain({left,top,right,bottom,intersects,detail,time,plots,occupied:cell,industrial,worldWidth:mapWidth()}));
  for(const plot of plots){
   if(isVisible(plot.rect))drawLayer('Halle '+plot.id,()=>worldArt.hall({...plot,grid:gridIn(plot.rect),detail,intersects}));
  }
@@ -1523,6 +1565,7 @@ function world(){
    if(MD[o.t].rc==null&&!terminal(o.t)&&o.st==3)tx('⏸',(o.x+.5)*TS,o.y*TS-2,12,'#fff','center');
   });
  }
+ if(campaignChapter()>=2&&isVisible(FLEET,2*TS))drawLayer('Flottenbau',drawFleet);
  if(bn&&isBelt(bn.t)&&visible.includes(bn)){
   c.strokeStyle='#ef4444';c.lineWidth=3;c.strokeRect(bn.x*TS+1,bn.y*TS+1,TS-2,TS-2);
  }
@@ -1571,21 +1614,129 @@ function storyCard(kick,title,paras,btn){return`<div class=kick>${kick}</div><h2
 const nf=n=>String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
 const qLine=q=>q.q.map(([it,n])=>nf(n)+'× '+ITEMS[it].n).join(' · ');
 function phaseCard(i){const q=PH[i];return storyCard('Kapitel '+(i+1)+' von '+PH.length,'Phase '+(i+1)+': '+q.n,[STX[i][0],'<b>Aufgaben:</b> '+qLine(q),'<span style="opacity:.8;font-size:14px">Baue eine Bunker-Rampe neben der Linie (Reiter Logistik) und führe die Waren per Förderband dorthin.'+(i?' Benötigt: '+hallOf(q.hall).n+'.':'')+'</span>'],'Los geht’s')}
-function storyIntro(){stQ.push(
- storyCard('Eilmeldung · Tag 0','Der Countdown läuft',['Die Abrüstungsgespräche sind endgültig gescheitert. Ein automatisiertes Waffensystem, das niemand mehr abschalten kann, wird die Zivilisation auslöschen – die Experten rechnen mit '+nf(DAYS)+' Tagen.','Die Vereinten Nationen haben nur noch eine Hoffnung: ein Bunker, groß genug für die gesamte Menschheit, gebaut von allen, die etwas herstellen können.']),
- storyCard('Projekt ARCHE','Du wirst gebraucht',['Deine kleine Garage hat sich einen Namen gemacht. Kommandantin Reyes vom Notfallstab schickt dir den ersten Bauauftrag.','Du hast viel Zeit – '+nf(DAYS)+' Tage. Es gibt keinen Stress und keine Strafen. Aber jeder Tag zählt, und sieben Bauabschnitte liegen vor dir. Baue Fabriken, liefere an die Bunker-Rampe und rette alle.']),
- phaseCard(0))}
-function endStory(){G.end=1;stQ.push(storyCard(G.late?'Spät, aber nicht zu spät':'Finale','Der Bunker ist fertig',[G.late?'Die Frist war längst verstrichen, doch das Waffensystem hat gezögert – und du hast jede Minute genutzt. Die Tore schließen sich, die Menschheit ist in Sicherheit.':'Mit '+nf(dLeft())+' Tagen Reserve schließen sich die Tore hinter den Letzten. Draußen verglüht die alte Welt – drinnen beginnt eine neue.','Aus einer kleinen Garage ist das größte Industrieimperium der Welt geworden. Das Projekt ARCHE ist abgeschlossen.','Du kannst weiterspielen: Baue aus, optimiere und gründe neu – dein Bunker bleibt bestehen.'],'Weiterspielen'))}
+let storyReplay=null,storyFocus=false,storyLastCue='';
+const storyArt=createFactoryStoryArt(c,{rr,tx,withState:withCanvasState});
+function storyUnlocked(id){
+ if(id==='arche-intro')return true;
+ if(id==='arche-finale')return G.sp===PH.length;
+ if(id==='horizont-intro')return campaignChapter()>=2;
+ if(id==='horizont-finale')return campaignChapter()>=2&&G.campaign.stage===chapters[2].phases.length;
+ const step=Number(id.split('-').at(-1));
+ return id.startsWith('arche-')?G.sp>=step:campaignChapter()>=2&&G.campaign.stage>=step;
+}
+function queueStory(id){
+ const state=G.story;
+ if(!state||!storyUnlocked(id)||state.done[id]||state.queue.includes(id))return;
+ state.queue.push(id);saveAfterTick=true;
+}
+const currentStory=()=>storyReplay||G?.story;
+const currentStoryId=()=>storyReplay?.id??G?.story?.queue[0];
+const storyOnScreen=()=>!!currentStoryId()&&(!window.NOFIN||!!storyReplay);
+function finishStory(){
+ const id=currentStoryId();
+ if(!id)return false;
+ storyFocus=false;storyLastCue='';
+ if(storyReplay){storyReplay=null;return true}
+ const state=G.story;
+ state.done[id]=true;state.queue.shift();state.time=0;state.paused=false;
+ sv(1);
+ return true;
+}
+function replayStory(id){
+ if(!G.story.done[id]||currentStoryId())return false;
+ storyReplay={id,time:0,paused:false};
+ storyFocus=false;storyLastCue='';
+ return true;
+}
+function updateStory(dt){
+ const id=currentStoryId(),state=currentStory();
+ if(!id||state.paused)return;
+ const before=state.time;
+ state.time+=Math.max(0,Math.min(.25,dt));
+ if(state.time>=FactoryStory.duration(id)){finishStory();return}
+ const {beat,index}=FactoryStory.cue(id,state.time),key=id+':'+index;
+ if(key!==storyLastCue){
+  storyLastCue=key;storyFocus=false;
+  if(beat.sound&&!G.story.muted&&state.time-before>=state.time-FactoryStory.cue(id,state.time).start-.1)sfx(beat.sound);
+  if(!storyReplay)sv(0);
+ }
+}
+function drawStory(){
+ const id=currentStoryId(),state=currentStory(),scene=FactoryStory.scenes[id],cue=FactoryStory.cue(id,state.time);
+ const barH=52,shadeH=Math.min(146,FH*.34),pictureH=FH-barH;
+ const scale=Math.max(FW/960,pictureH/540);
+ c.fillStyle='#101926';c.fillRect(0,0,FW,FH);
+ withCanvasState(()=>{
+  c.beginPath();c.rect(0,0,FW,pictureH);c.clip();
+  c.translate((FW-960*scale)/2,(pictureH-540*scale)/2);
+  c.scale(scale,scale);storyArt(scene,cue,state.time,storyFocus);
+ });
+ const left=view.inset+8,content=FW-2*left;
+ const fade=c.createLinearGradient(0,pictureH-shadeH,0,pictureH);
+ fade.addColorStop(0,'#10192600');fade.addColorStop(.37,'#101926e9');fade.addColorStop(1,'#101926');
+ c.fillStyle=fade;c.fillRect(0,pictureH-shadeH,FW,shadeH);
+ rr(left+44,left-4,Math.min(392,content-44),34,7,'#102134db');
+ fitText(scene.title,left+55,left+18,Math.min(369,content-66),15,'#d7e8ef','left',800);
+ if(G.story.subtitles){
+  const detail=storyFocus&&cue.beat.detail;
+  const text=detail||cue.beat.line;
+  const font=FW<600?12:15,w=Math.min(710,content);
+  const lines=tuWrap(text,w,'600 '+font+'px system-ui').slice(0,4);
+  const y=pictureH-13-lines.length*(font+4);
+  tx(detail?'Detail':cue.beat.speaker,left,y-5,font,'#f1cb85','left',800);
+  lines.forEach((line,i)=>tx(line,left,y+(i+1)*(font+4),font,'#e5edf5','left',600));
+ }
+ const options=[
+  ['story_pause',state.paused?'Weiter':'Pause',()=>{state.paused=!state.paused;if(!storyReplay)sv(0)}],
+  ['story_subtitles','Text '+(G.story.subtitles?'an':'aus'),()=>{G.story.subtitles=!G.story.subtitles;sv(0)}],
+  ['story_audio','Ton '+(G.story.muted?'aus':'an'),()=>{G.story.muted=!G.story.muted;sv(0)}]
+ ];
+ if(cue.beat.detail)options.push(['story_focus',storyFocus?'Übersicht':'Detail',()=>{storyFocus=!storyFocus}]);
+ options.push(['story_skip',storyReplay?'Schließen':'Überspringen',finishStory]);
+ const width=Math.min(126,(content-(options.length-1)*4)/options.length);
+ for(const [i,[key,label,action]] of options.entries()){
+  const x=left+i*(width+4),y=FH-40;
+  btn(x,y,width,32,action,key==='story_skip'?'#415471':'#233c52',0,key);
+  fitText(label,x+width/2,y+20,width-7,11.5,'#fff','center',700);
+ }
+ rr(left,pictureH,content,3,1.5,'#415468');
+ if(state.time)rr(left,pictureH,content*Math.min(1,state.time/FactoryStory.duration(id)),3,1.5,'#e8c987');
+}
+function storyIntro(){queueStory('arche-intro')}
+function endStory(){G.end=1;queueStory('arche-finale')}
 function lateStory(){G.late=1;stQ.push(storyCard('Tag '+nf(DAYS),'Die Frist ist abgelaufen',['Nichts ist passiert – noch nicht. Die Wissenschaftler melden, dass sich das Waffensystem selbst verzögert hat. Niemand weiß, wie lange.','Es gibt keine Strafe und keinen Zeitdruck. Baue weiter, so gut du kannst: Jeder Bunkerplatz zählt.']))}
 const dLeft=()=>Math.max(0,DAYS-Math.floor(G.st/DAYSEC));
 const bunkerMaterials=()=>PH[G.sp]?.q.map(([,target],i)=>Math.min(1,(G.sq[i]||0)/target))||[];
 const phaseProgress=materials=>materials.length?materials.reduce((sum,n)=>sum+n,0)/materials.length:1;
 const bProg=()=>Math.min(1,(G.sp+phaseProgress(bunkerMaterials()))/PH.length);
-function phaseDone(){const q=PH[G.sp],i=G.sp;G.m+=q.rw[0];G.te+=q.rw[0];G.rp+=q.rw[1];xp(150+60*i);G.sp++;G.sq=[];if(!fs)sfx('prestige');
- const nx=PH[G.sp],nh=HL.filter(h=>h.ph==G.sp).map(h=>h.n).join(' & ');
- stQ.push(storyCard('Kapitel '+(i+1)+' abgeschlossen','✔ '+q.n,[STX[i][1],'Belohnung: <b>+'+fm(q.rw[0])+' €</b> und <b>+'+q.rw[1]+' Forschungspunkte</b>.'+(nx&&nh?' Jetzt bestellbar: <b>'+nh+'</b>.':'')],nx?'Weiter':'Weiter'));
- if(nx)stQ.push(phaseCard(G.sp));else endStory();chkAc();saveAfterTick=true;analyze()}
-function stShow(){if(!stQ.length||stOpen||ff||window.NOFIN)return;const o=$('#ov');if(!o||o.style.display=='flex')return;stOpen=1;showOv(stQ.shift());bd('stok',()=>{$('#ov').style.display='none';stOpen=0;sfx('click')})}
+let projectView=1;
+function beginNextChapter(){
+ const next=chapters[campaignChapter()+1];
+ if(G.sp!==PH.length||!next)return false;
+ if(!G.story.done['arche-finale']){queueStory('arche-finale');return false}
+ const region=REGIONS.find(site=>site.id===next.site);
+ G.campaign={level:campaignChapter()+1,stage:0,delivery:[],total:0};
+ G.end=1;G.hl[region.hall]=1;G.m+=next.grant;
+ closeP2();resetPlanning();tool='hand';sel=null;asg=null;
+ refreshIndustrialArea();switchSite(region);focusWorld(hrect(hallOf(region.hall)));
+ rfx();recalc();analyze();queueStory('horizont-intro');sv(1);
+ return true;
+}
+function finishProjectPhase(type){
+ const q=projectPhase(type),stock=projectStock(type);
+ if(!q||!q.q.every(([,target],i)=>(stock[i]||0)>=target))return;
+ if(type==='prj'){phaseDone();return}
+ const state=G.campaign;
+ G.m+=q.rw[0];G.te+=q.rw[0];G.rp+=q.rw[1];xp(300+80*state.stage);
+ state.stage++;state.delivery=[];
+ queueStory('horizont-'+state.stage);
+ if(state.stage===chapters[state.level].phases.length)queueStory('horizont-finale');
+ sfx('unlock');saveAfterTick=true;
+ if(!fs)toast(q.n+' abgeschlossen');
+}
+function phaseDone(){const q=PH[G.sp],i=G.sp;G.m+=q.rw[0];G.te+=q.rw[0];G.rp+=q.rw[1];xp(150+60*i);G.sp++;G.sq=[];if(!fs)sfx('unlock');
+ queueStory('arche-'+G.sp);if(G.sp===PH.length)endStory();chkAc();saveAfterTick=true;analyze()}
+function stShow(){if(storyOnScreen()||!stQ.length||stOpen||ff||window.NOFIN)return;const o=$('#ov');if(!o||o.style.display=='flex')return;stOpen=1;showOv(stQ.shift());bd('stok',()=>{$('#ov').style.display='none';stOpen=0;sfx('click')})}
 const ico=(i,x,y,s)=>{saveCanvas();c.translate(x,y);c.scale(s,s);di(i);restoreCanvas()};
 function rcpRow(t,x,y,full){const m=MD[t],r=m.r||[];let px=x;
  if(!r.length){tx('Rohstoff →',px,y+4,10.5,'#94a3b8','left',700);px+=64}
@@ -1597,15 +1748,48 @@ function panelClose(X,Y,W,close){
  tx('✕',X+W-26,Y+27,14,'#fff','center',700);
 }
 function pnlBox(X,Y,W,H,title,close){btn(X,Y,W,H,()=>{},'#0f141bf8');c.strokeStyle='#ffffff22';c.lineWidth=1;c.beginPath();c.roundRect(X,Y,W,H,12);c.stroke();tx(title,X+16,Y+26,16,'#fff','left',800);panelClose(X,Y,W,close)}
-function bkPanel(){const [X,Y,W,H]=MENUS.bk.box;pnlBox(X,Y,W,H,'📖 Projekt ARCHE – Bunker für die Menschheit',()=>{bkO=false});
+function fleetPanel(){
+ const [X,Y,W,H]=MENUS.bk.box,state=G.campaign,chapter=chapters[state.level],phase=chapter.phases[state.stage];
+ pnlBox(X,Y,W,H,'Horizont · Evakuierungsflotte',()=>{bkO=false});
+ const taskX=X+224,taskW=W-242;
+ for(const [i,row] of chapter.phases.entries()){
+  const y=Y+55+i*46;
+  rr(X+13,y,195,40,7,state.stage===i?'#295478':'#223241');
+  fitText((state.stage>i?'✓ ':'' )+(i+1)+'. '+row.n,X+22,y+24,177,12,'#e1eff8','left',700);
+ }
+ tx(nf(state.total)+' Teile geliefert',X+18,Y+221,11,'#a4bac8');
+ const action=(x,w,label,id,fn)=>{btn(x,Y+H-43,w,30,fn,'#334e66',0,id);fitText(label,x+w/2,Y+H-23,w-12,11.5,'#fff','center',700)};
+ action(X+13,195,'Projekt ARCHE · abgeschlossen','campaign_bunker',()=>{projectView=1});
+ action(taskX,160,'Zur Raumwerft','fleet_location',()=>{switchSite(REGIONS.find(site=>site.id===chapter.site));focusWorld(FLEET);bkO=false});
+ if(!phase){tx('Die Flotte ist startbereit',taskX,Y+72,19,'#9fe0c6','left',800);tx('Kapitel 2 abgeschlossen',taskX,Y+95,13,'#cbd5e1');return}
+ tx(phase.n,taskX,Y+66,17,'#e2eef7','left',800);
+ tuWrap(phase.brief,taskW,'600 11px system-ui').slice(0,3).forEach((line,i)=>tx(line,taskX,Y+86+i*14,11,'#cbd5e1'));
+ for(const [i,[item,target]] of phase.q.entries()){
+  const y=Y+124+i*40,have=state.delivery[i]||0;
+  rr(taskX,y,taskW,34,6,'#223241');ico(item,taskX+18,y+17,.9);
+  fitText(ITEMS[item].n,taskX+36,y+20,taskW-148,12,'#e2eef7','left',700);
+  tx(nf(have)+' / '+nf(target),taskX+taskW-14,y+20,12,'#c3dda6','right',700);
+  rr(taskX+9,y+28,(taskW-18)*Math.max(.003,have/target),3,1.5,'#64bfa2');
+ }
+ tx('Lieferziel Werftrampe · Prämie '+fm(phase.rw[0])+' € und '+phase.rw[1]+' FP',taskX,Y+261,11,'#f1cb85');
+}
+function bkPanel(){if(projectView===2&&campaignChapter()>=2){fleetPanel();return}
+ const [X,Y,W,H]=MENUS.bk.box;pnlBox(X,Y,W,H,'📖 Projekt ARCHE – Bunker für die Menschheit',()=>{bkO=false});
  const dl=dLeft(),late=G.late;tx(late?'⏳ Frist überschritten – kein Zeitdruck':'⏳ '+nf(dl)+' Tage bis zur Frist',X+W-54,Y+26,12.5,late?'#fde68a':dl<DAYS*.15?'#fca5a5':'#a7f3d0','right',700);
  PH.forEach((q,i)=>{const y=Y+50+i*34,done=G.sp>i,cur=G.sp==i;if(cur)rr(X+10,y-4,196,32,8,'#3a7bd533');c.fillStyle=done?'#4ade80':cur?'#ffd23f':'#475569';c.beginPath();c.arc(X+24,y+12,6,0,PI*2);c.fill();if(done)tx('✓',X+24,y+16,10,'#052e16','center',800);if(i<PH.length-1){c.fillStyle=done?'#4ade8088':'#47556955';c.fillRect(X+23,y+19,2,15)}
   tx((i+1)+'. '+q.n,X+38,y+10,12,done||cur?'#fff':'#94a3b8','left',cur?800:600);tx(hallOf(q.hall).n,X+38,y+23,9.5,'#94a3b8','left',600)});
  rr(X+14,Y+H-30,188,8,4,'#ffffff18');rr(X+14,Y+H-30,188*bProg(),8,4,'#4ade80');tx('Gesamtfortschritt '+Math.round(bProg()*100)+' %',X+14,Y+H-36,10.5,'#cbd5e1','left',700);
  const x0=X+222,w0=W-236;rr(x0-8,Y+44,w0+16,H-54,10,'#ffffff08');
- btn(x0,Y+H-34,150,26,()=>{focusWorld(SITE);bkO=false;sfx('select')},'#334155',0,'bunker_location');
+ btn(x0,Y+H-34,150,26,()=>{if(currentSite!=='main')switchSite(REGIONS[0]);focusWorld(SITE);bkO=false;sfx('select')},'#334155',0,'bunker_location');
  tx('📍 Zu ARCHE',x0+75,Y+H-16,11.5,'#fff','center',700);
- if(G.sp>=PH.length){tx('✔ Der Bunker ist fertig!',x0,Y+80,20,'#86efac','left',800);tuWrap('Die Menschheit ist in Sicherheit. Du hast '+nf(G.sd)+' Waren geliefert. Spiele weiter, baue aus oder gründe neu – dein Bunker bleibt bestehen.',w0,'600 12px system-ui,sans-serif').forEach((l,i)=>tx(l,x0,Y+108+i*17,12,'#cbd5e1'));return}
+ if(G.sp>=PH.length){
+  tx('✔ Der Bunker ist fertig!',x0,Y+80,20,'#86efac','left',800);
+  tx(nf(G.sd)+' Waren geliefert. Projekt ARCHE bleibt erhalten.',x0,Y+106,12,'#cbd5e1');
+  const next=campaignChapter()===1;
+  btn(x0,Y+135,205,36,next?beginNextChapter:()=>{projectView=2},'#2f6d54',0,'campaign_continue');
+  tx(next?'Kampagne fortsetzen':'Zum laufenden Kapitel',x0+102.5,Y+159,12,'#fff','center',800);
+  return;
+ }
  const q=PH[G.sp];tx('Phase '+(G.sp+1)+': '+q.n,x0,Y+66,17,'#fff','left',800);tuWrap(STX[G.sp][0],w0,'600 11px system-ui,sans-serif').slice(0,3).forEach((l,i)=>tx(l,x0,Y+82+i*12.5,11,'#cbd5e1','left',600));
  q.q.forEach(([it,n],i)=>{const y=Y+120+i*35,d=Math.min(n,G.sq[i]||0),done=d>=n,mt=MD[PR[it]];rr(x0,y,w0,32,8,'#ffffff0a');ico(it,x0+20,y+16,1.15);tx(nf(n)+'× '+ITEMS[it].n,x0+40,y+14,12.5,done?'#86efac':'#fff','left',800);
   tx((done?'✓ ':'')+'Gebaut in: '+mt.n+' ('+hallOf(mt.a).n+')'+(hlv(mt.a)<1?' 🔒':''),x0+40,y+27,9.5,'#94a3b8','left',600);rr(x0+250,y+9,w0-330,10,5,'#ffffff18');rr(x0+250,y+9,Math.max(0,(w0-330)*d/n),10,5,done?'#4ade80':'#3a7bd5');tx(nf(d)+' / '+nf(n),x0+w0-8,y+19,12,done?'#86efac':'#e2e8f0','right',800)});
@@ -1632,7 +1816,7 @@ function mkPanel(){const [X,Y,W,H]=MENUS.mk.box;pnlBox(X,Y,W,H,'📊 Verkauf',()
   tx(label,X+162+index*90,Y+26,11,'#fff','center',700);
  });
  if(mkTab==2){ordersPanel(X,Y,W);return}
- const rows=ITEMS.map((_,i)=>i).filter(i=>!mkTab||PR[i]!=null);
+ const rows=ITEMS.map((_,i)=>i).filter(i=>visibleItem(i)&&(!mkTab||PR[i]!=null));
  const pageSize=9,np=Math.max(1,Math.ceil(rows.length/pageSize));
  mkPg=Math.min(mkPg,np-1);
  const pr=rows.slice(mkPg*pageSize,(mkPg+1)*pageSize);
@@ -1699,27 +1883,40 @@ function ordersPanel(X,Y,W){
  });
  tx('Die Prämie kommt zum normalen Stückpreis hinzu. Offene Aufträge lassen sich alle vier Minuten tauschen.',X+18,Y+308,11,'#94a3b8');
 }
-let prestigePage=0;
-function prTab(X,Y,W,H){const b=bpCalc(),ok=b.t>=PMIN;
- rr(X+12,Y+46,330,H-58,10,'#ffffff08');tx('Unternehmen neu gründen',X+26,Y+66,14,'#fff','left',800);
- tx('+'+b.t+' Blaupausen',X+26,Y+94,24,ok?'#7dd3fc':'#64748b','left',800);if(!ok)tx('Möglich ab '+PMIN+' Blaupausen',X+26,Y+110,10.5,'#fca5a5','left',700);else{const rec=Math.max(18,Math.ceil(.6*G.bpt));tx(b.t>=rec?'Empfohlen: Das Einkommen stagniert meist ab hier.':'Empfehlung: ab '+rec+' – dein Einkommen wächst noch.',X+26,Y+110,10.5,b.t>=rec?'#86efac':'#fde68a','left',700)}
- tx('Umsatz dieses Durchlaufs '+fm(G.tr)+' € → '+b.a,X+26,Y+127,11,'#cbd5e1');tx('Hallen & Ausbaustufen → '+b.b,X+26,Y+141,11,'#cbd5e1');tx('Erfüllte Aufträge (Durchlauf) '+G.ordRun+' → '+b.c,X+26,Y+155,11,'#cbd5e1');
- tx('Nächste Umsatz-Blaupause ab '+fm(60000*(b.a+1)*(b.a+1))+' €',X+26,Y+171,10.5,'#94a3b8');
- tx('Zurückgesetzt: Geld, Maschinen, Hallen,',X+26,Y+190,10.5,'#fca5a5');tx('Forschung, Personal und Aufträge.',X+26,Y+203,10.5,'#fca5a5');
- tx('Bleibt: Story & Bunker-Fortschritt, Erfolge,',X+26,Y+221,10.5,'#86efac');tx('Level, Baupläne, Produkte, Rekorde.',X+26,Y+234,10.5,'#86efac');
- tx('Nächster Start: '+fm(startMoney())+' €'+(pul('prd1')?' · Tempo ×'+(1+.05*pul('prd1')).toFixed(2):'')+(pul('cap2')?' · Bau −'+3*pul('cap2')+' %':'')+(pul('res2')?' · '+3*pul('res2')+' Techs':''),X+26,Y+252,10,'#cbd5e1');
- tx('Preisbonus nach Neustart: +'+Math.round((prestigeFactor(G.bpt+b.t)-1)*100)+' %',X+26,Y+266,10.5,'#7dd3fc','left',700);
- if(!pcf){btn(X+26,Y+H-48,302,32,()=>{if(ok)pcf=true;else deny('Erst ab '+PMIN+' Blaupausen möglich.')},ok?'#2f9e6b':'#475569');tx('Neu gründen · +'+b.t+' Blaupausen',X+177,Y+H-27,12.5,'#fff','center',800)}
- else{tx('Wirklich? Dein Fortschritt wird zurückgesetzt.',X+26,Y+H-58,11,'#fde68a','left',700);btn(X+26,Y+H-48,190,32,()=>{pcf=false;doPrestige()},'#b91c1c');tx('Ja, neu gründen',X+121,Y+H-27,12.5,'#fff','center',800);btn(X+224,Y+H-48,104,32,()=>{pcf=false},'#334155');tx('Abbrechen',X+276,Y+H-27,12,'#fff','center',700)}
- const x0=X+352;tx('Prestige-Upgrades',x0+4,Y+66,14,'#fff','left',800);tx('Blaupausen: '+G.bp,X+W-14,Y+66,14,'#7dd3fc','right',800);
- const perPage=9,maxPage=Math.ceil(PU.length/perPage);
- btn(x0+4,Y+H-29,128,22,()=>{prestigePage=(prestigePage+1)%maxPage},'#334155');
- tx('Upgrades '+(prestigePage+1)+' / '+maxPage,x0+68,Y+H-14,10.5,'#fff','center',700);
- PU.slice(prestigePage*perPage,(prestigePage+1)*perPage).forEach((p,i)=>{const y=Y+74+i*24,l=pul(p.id),c1=Math.ceil(p.base*Math.pow(1.7,l));rr(x0,y,356,22,6,'#ffffff0a');tx(p.n,x0+8,y+15,11,'#fff','left',700);tx(p.need&&!p.need()?p.require||'Weitere Neugründungen nötig':p.fx(l),x0+136,y+15,9.5,'#cbd5e1','left',600);tx(l+'/'+p.max,x0+272,y+15,10,'#94a3b8','right',600);
-  if(l<p.max){btn(x0+280,y+1,72,20,()=>buyP(p.id),G.bp>=c1?'#2f9e6b':'#475569');tx(c1+' BP',x0+316,y+15,10.5,'#fff','center',700)}else tx('Max.',x0+316,y+15,10.5,'#86efac','center',800)});
- tx('Start-Upgrades wirken ab dem nächsten Durchlauf.',x0+4,Y+H-6,9.5,'#94a3b8')}
+function campaignTab(X,Y,W){
+ tx('Kampagne',X+18,Y+67,17,'#e2edf6','left',800);
+ const current=campaignChapter(),project=chapters[current];
+ rr(X+16,Y+82,W-32,68,8,'#243545');
+ tx('Kapitel 1 · Projekt ARCHE',X+28,Y+106,13,'#fff','left',800);
+ tx(G.sp===PH.length?'Abgeschlossen':G.sp+' / '+PH.length+' Bauphasen fertig',X+28,Y+130,12,'#bcd3de');
+ if(project){
+  rr(X+16,Y+162,W-32,77,8,'#243545');
+  tx('Kapitel '+current+' · '+project.title,X+28,Y+186,13,'#fff','left',800);
+  tx(G.campaign.stage===project.phases.length?'Abgeschlossen':G.campaign.stage+' / '+project.phases.length+' Bauphasen fertig',X+28,Y+207,12,'#bcd3de');
+  tx('Werft eröffnet · +6 % Maschinentempo · '+fm(project.grant)+' € Aufbauhilfe',X+28,Y+225,11,'#bcd3de');
+ }
+ btn(X+16,Y+257,180,33,()=>{closeP2();projectView=current;bkO=true},'#334e66',0,'campaign_open');
+ tx('Zum Projekt',X+106,Y+279,12,'#fff','center',700);
+}
+function storyArchive(X,Y,W){
+ tx('Story-Archiv',X+18,Y+65,17,'#e2edf6','left',800);
+ const list=Object.keys(FactoryStory.scenes).filter(id=>G.story.done[id]);
+ if(!list.length){tx('Angesehene Szenen erscheinen hier.',X+18,Y+103,12,'#bcd3de');return}
+ const count=5,page=Math.min(storyArchivePage,Math.floor((list.length-1)/count));
+ for(const [i,id] of list.slice(page*count,(page+1)*count).entries()){
+  const y=Y+81+i*39;
+  rr(X+13,y,W-26,33,6,'#223241');fitText(FactoryStory.scenes[id].title,X+23,y+21,W-134,12,'#e2edf6','left',700);
+  btn(X+W-100,y+3,80,27,()=>{if(replayStory(id))closeP2()},'#34526c',0,'story_replay_'+id);
+  tx('Ansehen',X+W-60,y+21,11,'#fff','center',700);
+ }
+ if(list.length>count){
+  btn(X+16,Y+286,141,27,()=>{storyArchivePage=(page+1)%Math.ceil(list.length/count)},'#34526c',0,'story_next_page');
+  tx('Seite '+(page+1)+' / '+Math.ceil(list.length/count)+' ›',X+86,Y+304,11,'#fff','center',700);
+ }
+}
+let storyArchivePage=0;
 function companyBox(){
- return [40,64,fTab===0?Math.min(720,FW-18):720,330];
+ return [40,64,fTab===0||fTab===5?Math.min(720,FW-18):720,330];
 }
 function acPanel([X,Y,W,H]){
  if(fTab===0)pnlBox(X,Y,W,H,'Firma',()=>{acO=false});
@@ -1727,16 +1924,17 @@ function acPanel([X,Y,W,H]){
   btn(X,Y,W,H,()=>{},'#0f141bf8');
   panelClose(X,Y,W,()=>{acO=false});
  }
- const tabWidth=Math.min(107,(W-(fTab===0?22:64))/5);
- ['Übersicht','Prestige','Audio','Hilfe','Werkzeuge'].forEach((label,i)=>{
+ const tabWidth=Math.min(106,(W-(fTab===0?22:fTab===5?48:64))/6);
+ ['Übersicht','Kampagne','Audio','Hilfe','Werkzeuge','Story'].forEach((label,i)=>{
   const x=X+11+i*tabWidth,y=Y+(fTab===0?38:8);
   btn(x,y,tabWidth-4,29,()=>{fTab=i;pcf=false;sfx('click')},fTab===i?'#336ca5':'#253344',0,'ft'+i);
   fitText(label,x+(tabWidth-4)/2,y+19,tabWidth-10,12,'#fff','center',700);
  });
- if(fTab===1){prTab(X,Y,W,H);return}
+ if(fTab===1){campaignTab(X,Y,W);return}
  if(fTab===2){auTab(X,Y,W,H);return}
  if(fTab===3){heTab(X,Y,W,H);return}
  if(fTab===4){toolsTab(X,Y);return}
+ if(fTab===5){storyArchive(X,Y,W);return}
  const completions=G.ac.length,phase=Math.min(G.sp,PH.length),cardWidth=(W-38)/2;
  const bar=(x,y,w,ratio,color)=>{
   rr(x,y,w,6,3,'#334155');
@@ -1763,7 +1961,7 @@ function acPanel([X,Y,W,H]){
  open(X+14,'Zu den Erfolgen','company_achievements',()=>{
   closeP2();achievementsOpen=true;sfx('click');
  });
- open(X+24+cardWidth,'Zum Bunkerprojekt','company_bunker',()=>{closeP2();bkO=true;sfx('click')});
+ open(X+24+cardWidth,'Zum Bunkerprojekt','company_bunker',()=>{closeP2();projectView=campaignChapter();bkO=true;sfx('click')});
 }
 let achievementsOpen=false,achievementGroup=0;
 function achievementBox(){
@@ -2024,7 +2222,7 @@ function rotObj(o,r=(o.r+1)%4){
  if(o.j==1)o.jm=[o.jm[3],o.jm[0],o.jm[1],o.jm[2]];
  o.r=r;o.needsRelocation=false;mapObject(o,o);sfx('rotate');analyze();sv(0);return true;
 }
-function togP(k){const w=MENUS[k].show(),fromAchievements=achievementsOpen;closeP2();if(!w){if(k=='mk')mkO=true;else if(k=='rs')rsO=true;else if(k=='pn')pnO=true;else if(k=='hl')hlO=true;else if(k=='bk')bkO=true;else{acO=true;if(fromAchievements)fTab=0}}sfx('click')}
+function togP(k){const w=MENUS[k].show(),fromAchievements=achievementsOpen;closeP2();if(!w){if(k=='mk')mkO=true;else if(k=='rs')rsO=true;else if(k=='pn')pnO=true;else if(k=='hl')hlO=true;else if(k=='bk'){projectView=campaignChapter();bkO=true}else{acO=true;if(fromAchievements)fTab=0}}sfx('click')}
 const TIPS={hand:['Hand','Antippen: Upgrade, Drehen und Einstellungen eines Gebäudes. Tippe auf ARCHE, um den Baufortschritt anzusehen.'],belt:['Förderband','Transportiert 4 Felder pro Sekunde. Ziehen verlegt viele Stücke in einem Zug; ein Band antippen dreht es.'],rot:['Richtung','Dreht, was du als Nächstes baust (oder gerade trägst).'],mov:['Bewegen','Gebäude antippen und Zielfeld antippen – oder direkt ziehen. Inhalt und Level bleiben erhalten. Teams arbeiten in der zugewiesenen Halle.'],del:['Löschen','Antippen oder über Gebäude ziehen: 50 % Erstattung. Mit „Alles verkaufen“ räumst du die ganze Fabrik.']};
 function fitText(text,x,y,width,size,color,align='left',weight=700){
  c.font=weight+' '+size+'px system-ui,sans-serif';
@@ -2138,7 +2336,7 @@ function drawHeader(){
     closeP2();planningOpen=!active;sfx('click');
    }else togP(id);
   },active?'#3a7bd5':'#0b0f14dd',id==='planning'?'blueprints':id);
-  const caption=id==='rs'?fm(G.rp)+' FP':label;
+  const caption=id==='rs'?fm(G.rp)+' FP':id==='bk'&&campaignChapter()>=2?'Kampagne':label;
   fitText((box.w>=62?icon+' ':'')+caption,mid,box.y+box.h/2+4,box.w-8,12*view.labelScale,'#fff','center');
   const attention=!active&&(id==='rs'&&RN.some(n=>rOK(n)&&G.rp>=researchCost(n))||
    id==='hl'&&HL.some(h=>hlv(h.id)<1&&hReq(h)&&G.m>=h.c[0]));
@@ -2230,7 +2428,7 @@ function drawDock(){
  const first=view.shortcuts[0],last=view.shortcuts.at(-1);
  dockBackdrop({...first,w:last.x+last.w-first.x});
  TOOLS.forEach(([id,icon,label],i)=>toolButton(view.shortcuts[i],id,icon,label,id==='belt'?'2 €':''));
- const models=Object.keys(MD).filter(t=>MD[t].g===pg&&!MD[t].legacyOnly);
+ const models=Object.keys(MD).filter(t=>MD[t].g===pg&&!MD[t].legacyOnly&&visibleModel(MD[t]));
  drawDockTrack('shop',view.machines,models.length,view.machineWidth,(box,i)=>{
   const id=models[i];
   toolButton(box,id,'',MD[id].s,fm(cst(id))+' €');
@@ -2310,7 +2508,7 @@ function objectPanelBox(o){
  else if(d.inspect)h=120;
  else if(d.supply||d.distribution)h=116;
  else if(d.j)h=o.j===1?208:150;
- else if(o.t==='prj')h=112+28*(PH[G.sp]?.q.length||0);
+ else if(isProjectRamp(o.t))h=112+28*(projectPhase(o.t)?.q.length||0);
  return [548,96,240,h];
 }
 function panel(o){
@@ -2333,9 +2531,9 @@ function panel(o){
    c.fillStyle='#ffffff22';c.beginPath();c.arc(X+W/2,y+58+13,7,0,PI*2);c.fill();y+=92}
   else{tx('Waren fahren geradeaus durch – zwei Bänder',X+14,y,10.5,'#94a3b8');tx('können sich überqueren, ohne zu mischen.',X+14,y+14,10.5,'#94a3b8');y+=34}
   btn(X+14,y,80,28,()=>{rotObj(o)},'#334155');tx('↻ Drehen',X+54,y+19,12,'#fff','center',700);delB(100,W-114,'Abbauen (50 %)')}
- else if(o.t=='prj'){const q=PH[G.sp];tx(q?'Phase '+(G.sp+1)+': '+q.n:'Bunker fertig – Danke!',X+14,y,12,'#fde68a','left',800);y+=16;
-  if(q)q.q.forEach(([it,n],i)=>{const dn=Math.min(n,G.sq[i]||0);ico(it,X+24,y+8,.8);tx(ITEMS[it].n,X+40,y+8,10.5,'#fff','left',700);rr(X+14,y+14,W-28,6,3,'#ffffff18');rr(X+14,y+14,(W-28)*dn/n,6,3,dn>=n?'#4ade80':'#3a7bd5');tx(nf(dn)+'/'+nf(n),X+W-14,y+8,10.5,'#cbd5e1','right',700);y+=28});else y+=8;
-  btn(X+14,y,100,28,()=>{closeP2();bkO=true;sfx('click')},'#334155');tx('📖 Quests',X+64,y+19,12,'#fff','center',700);delB(120,W-134,'Abbauen (50 %)')}
+ else if(isProjectRamp(o.t)){const q=projectPhase(o.t);tx(q?q.n:'Projekt abgeschlossen',X+14,y,12,'#fde68a','left',800);y+=16;
+  if(q)q.q.forEach(([it,n],i)=>{const dn=Math.min(n,projectStock(o.t)[i]||0);ico(it,X+24,y+8,.8);tx(ITEMS[it].n,X+40,y+8,10.5,'#fff','left',700);rr(X+14,y+14,W-28,6,3,'#ffffff18');rr(X+14,y+14,(W-28)*dn/n,6,3,dn>=n?'#4ade80':'#3a7bd5');tx(nf(dn)+'/'+nf(n),X+W-14,y+8,10.5,'#cbd5e1','right',700);y+=28});else y+=8;
+  btn(X+14,y,100,28,()=>{closeP2();projectView=campaignChapter();bkO=true;sfx('click')},'#334155');tx('📖 Quests',X+64,y+19,12,'#fff','center',700);delB(120,W-134,'Abbauen (50 %)')}
  else if(isB){
   tx((1/beltTime(o.t)).toFixed(1)+' Felder/s · '+beltCount(o)+'/'+beltSize(o.t)+' Stück',X+14,y,12,'#cbd5e1');y+=17;
   tx(perMinute(o,'moves').toFixed(1)+' Transfers/Min · Bauwert '+cst(o.t)+' €',X+14,y,11,'#94a3b8');y+=18;
@@ -2407,7 +2605,7 @@ function upgradeBelt(o){
 function resetPlanning(){
  buildSelection=new Set();planningOpen=false;buildMode='';routeSource=buildPreview=activePlan=null;
 }
-const planLimit=()=>3+pul('log1')+(RH('bau')?3:0);
+const planLimit=()=>3+legacyIndustry('storage')+(RH('bau')?3:0);
 function readPlans(raw){
  return Object.values(raw||{}).slice(0,20).map(value=>Object.values(value||{}).slice(0,100)
   .filter(e=>e&&Number.isInteger(e[0])&&Number.isInteger(e[1])&&e[0]>=0&&e[0]<GW&&e[1]>=0&&e[1]<GH&&knownType(e[2]))
@@ -2859,7 +3057,7 @@ const TOUR=[
  {ti:'Personal',tx:'Im Team-Menü weist du Personal einer Halle zu. Aktiviere ein Team-Lager, damit dein Team Waren transportieren kann.',hl:()=>[['u','pn']]},
  {ti:'Hallen',tx:'Hier kaufst und erweiterst du Hallen. Maschinen brauchen ihre Produktionshalle. Neue Hallen erweitern den Betonboden, auf dem du Logistik bauen kannst.',hl:()=>[['u','hl']]},
  {ti:'Bunker-Projekt',tx:'Sieben Bauabschnitte, jeder mit schweren Quests. Liefere die Waren per Band an die Bunker-Rampe. Die Frist ist sehr großzügig – ohne Strafen.',hl:()=>[['u','bk']]},
- {ti:'Firma',tx:'Erfolge, Prestige (immer freiwillig), Audio-Einstellungen und diese Hilfe. Die Kurztour startest du hier jederzeit neu.',hl:()=>[['u','ac']],nx:'Fertig'}];
+ {ti:'Firma',tx:'Erfolge, Kampagne, Audio-Einstellungen und diese Hilfe. Die Kurztour startest du hier jederzeit neu.',hl:()=>[['u','ac']],nx:'Fertig'}];
 TOUR.forEach(t=>{t.nx=t.nx||'Weiter'});
 const HNT=[
  {id:'res',ti:'Forschung verfügbar 🔬',tx:'Du hast Forschungspunkte gesammelt! Mit 🔬 öffnest du den Technologiebaum: schnellere Maschinen und Bänder, neue Märkte und mehr. Für jede Technologie siehst du die Voraussetzungen.',hl:()=>[['u','rs']],cd:()=>G.rp>=4},
@@ -2867,8 +3065,7 @@ const HNT=[
  {id:'bn',ti:'Engpass erkannt ⚠️',tx:'Die rot umrandete Maschine bremst deine Linie. Die Meldung oben nennt den Grund – oft hilft ein Upgrade genau dort, manchmal ein zweites Band oder mehr Material.',hl:()=>bn?[['t',bn.x,bn.y,1,1]]:[],cd:()=>!!bn&&/^Engpass/.test(msg)},
  {id:'hal',ti:'Neue Halle möglich 🏗️',tx:'Du kannst dir eine neue Halle leisten! Im Menü 🏭 Hallen siehst du Preise, Voraussetzungen und Erweiterungen. Jede Halle ist eine eigene Produktionslinie.',hl:()=>[['u','hl']],cd:()=>HL.some(h=>hlv(h.id)<1&&hReq(h)&&G.m>=h.c[0])},
  {id:'rmp',ti:'Bunker-Rampe bauen 📖',tx:'Baue die Bunker-Rampe aus dem Reiter Logistik am Ende einer Produktionslinie. Sie nimmt nur an, was das Bunker-Projekt gerade braucht.',hl:()=>[['u','pg_l']],cd:()=>G.sold>=30&&!hasProjectRamp()},
- {id:'mg',ti:'Personal einstellen 👥',tx:'Setze im Team-Menü Mitarbeiter oder Manager in einer Halle ein. Ihre Rollen bestimmen, wie sie das Team-Lager und die Produktionslinie unterstützen.',hl:()=>[['u','pn']],cd:()=>!G.mg.length&&G.sold>=50&&G.m>=800},
- {id:'pr',ti:'Prestige: Neugründung ♻',tx:'Du kannst dein Unternehmen freiwillig neu gründen und bekommst dauerhafte Blaupausen-Boni. Nichts passiert automatisch – alle Details stehen unter 🏢 Firma → Prestige.',hl:()=>[['u','ac']],cd:()=>bpCalc().t>=PMIN}];
+ {id:'mg',ti:'Personal einstellen 👥',tx:'Setze im Team-Menü Mitarbeiter oder Manager in einer Halle ein. Ihre Rollen bestimmen, wie sie das Team-Lager und die Produktionslinie unterstützen.',hl:()=>[['u','pn']],cd:()=>!G.mg.length&&G.sold>=50&&G.m>=800}];
 HNT.forEach(h=>{h.h=1});
 const alteredStart={
  ti:'Deine Startlinie wurde umgebaut',
@@ -2891,7 +3088,7 @@ function tuAdv(){const it=tuCur();if(!it)return;tuA=0;
  if(it.h){G.th.push(it.id);tuHn=null;tuHT=tm;sfx('click');sv(0);return}
  sfx(it.sf||'select');G.tu++;if(G.tu>=TU.length)tuFin();else sv(0)}
 function tuSkip(){G.tu=-1;tuA=0;tuHT=tm;sfx('click');toast('Tutorial übersprungen – die Hilfe findest du unter 🏢 Firma → ❓ Hilfe.');sv(1)}
-function tuUpd(dt){if(!ready||!G||ff)return;tuA+=dt;
+function tuUpd(dt){if(!ready||!G||ff||storyOnScreen())return;tuA+=dt;
  try{const key=tuTour?'T'+tuTI:G.tu>=0&&G.tu<TU.length?'U'+G.tu:tuHn?'H'+tuHn.id:'';if(key!=tuKey){if(tuKey&&key)sfx('select');tuKey=key;tuA=0}
   if(tuTour)return;
   if(G.tu>=0&&G.tu<TU.length){
@@ -2918,7 +3115,7 @@ function tuHi(h){let x,y,w,hh;
  c.shadowColor='#ffd23f';c.shadowBlur=10+8*p;c.strokeStyle=`rgba(255,210,63,${.65+.35*p})`;c.lineWidth=3;c.beginPath();c.roundRect(x-4-p*2,y-4-p*2,w+8+p*4,hh+8+p*4,10);c.stroke();c.shadowBlur=0;
  if(!(h[0]=='u'&&(h[1]=='upg'||h[1]=='del'))){c.fillStyle='#ffd23f';c.beginPath();if(cy<CY){const ay=y+hh+12+bob;c.moveTo(cx,ay);c.lineTo(cx-8,ay+12);c.lineTo(cx+8,ay+12)}else{const ay=y-12-bob;c.moveTo(cx,ay);c.lineTo(cx-8,ay-12);c.lineTo(cx+8,ay-12)}c.closePath();c.fill()}restoreCanvas()}
 function tuDraw(){
- if(window.NOFIN||!ready||ff||!G)return;
+ if(window.NOFIN||!ready||ff||!G||storyOnScreen())return;
  if(openMenu())return;
  const it=tuCur();if(!it)return;
  try{const tour=tuTour>0,iv=!tour&&!it.h,N=tour?TOUR.length:TU.length,ix=tour?tuTI:G.tu;
@@ -2951,12 +3148,12 @@ function demo(){init(null);stQ=[];G.tu=-1;G.th=[];G.hl={gar:1,met:1};L=[];g=[];p
  G.m=4820;G.sold=312;G.pk=64;G.ord=2;Object.assign(G.sl,[0,60,40,30,22,64,0,18,30,48]);G.tk=2900;refreshIndustrialArea();recalc();fs=1;for(let i=0;i<640;i++)tick();fs=0;sb.fill(2.3);rw=60;ready=1;cam={x:12*TS,y:6.2*TS,z:1};analyze();lr=Date.now()}
 const {loadParcel,clearBelt,beltDirections,moveBelt,jtick,sortingGroups}=createFactoryTransport({
  TICK,MD,PR,isBelt,beltSize,beltTime,currentTick:()=>G.tk,junctionTime:()=>BTv,neighbor,tunnelExit,
- give,record,prod,uses,prjNeed,orderFor
+ give,record,prod,uses,prjNeed,isProjectRamp,orderFor
 });
 const audio=createFactoryAudio({
  time:()=>tm,
  frame:()=>({cam:{...cam,z:cameraZoom()},CX,CY,FW,FH,L,TS}),
- mood:()=>{const count=HL.filter(h=>hlv(h.id)>0).length;return G?.pr>0||count>=5?3:count>=3?2:count>=2?1:0},
+ mood:()=>{const count=HL.filter(h=>hlv(h.id)>0).length;return legacyIndustry('foundings')>0||count>=5?3:count>=3?2:count>=2?1:0},
  cloudRef:()=>stillSignedIn()&&cloud.base!=null?OL.db.ref('users/'+cloud.uid+'/factoryAudio'):null,
  writeLocal,toast,isBelt,tme
 });
@@ -2994,6 +3191,7 @@ function drawFrame(){
   c.fillStyle='#14181e';c.fillRect(0,0,FW,FH);
   if(!ready){tx('Lade deine Fabrik …',FW/2,FH/2,22,'#cbd5e1','center',700);return}
 
+  if(storyOnScreen()&&!ff){drawLayer('Filmszene',drawStory);return}
   if(!acO&&!achievementsOpen)drawLayer('Kartenansicht',world);
   if(!drawLayer('Bedienelemente',ui)){
    HB=[];closeP2();
@@ -3010,7 +3208,7 @@ boot(){tuTour=0;tuHn=null;tuG=null;tuKey='';audLoad();audioStart();document.addE
 leave(){sv(1);audStop();document.removeEventListener('pointerdown',audG);document.removeEventListener('keydown',audG);document.removeEventListener('visibilitychange',onHide);removeEventListener('pagehide',onHide);removeEventListener('blur',resetCameraInput);cv.removeEventListener('wheel',wh);cv.removeEventListener('mousemove',mm);cv.removeEventListener('mouseleave',ml);resetCameraInput()},
 click(x,y,_player,id,pointerType){
  if(!ready||ff||!Number.isFinite(x)||!Number.isFinite(y))return;
- const h=hitAt(x,y),blocked=!!openMenu();
+ const h=hitAt(x,y),blocked=!!openMenu()||storyOnScreen();
  const touch=pointerType==='touch';
  if(touch&&(touchPointers.size||!h&&!blocked)&&(trackTouch(x,y,id)||multiTouch))return;
  if(pdn&&pdn.id!==id)return;
@@ -3084,7 +3282,7 @@ dragEnd(x,y,_player,id){
  if(asg){assignTap(a,b);return}
  if(tool==='hand'){
   sel=cell(a,b)||null;
-  if(!sel&&inR(SITE,a,b)){closeP2();bkO=true;sfx('click')}
+  if(!sel&&(inR(SITE,a,b)||campaignChapter()>=2&&inR(FLEET,a,b))){closeP2();projectView=inR(SITE,a,b)?1:2;bkO=true;sfx('click')}
  }else if(MD[tool]&&(!isBelt(tool)||MD[tool].sortStation))place(a,b,tool,rot);
 },
 update(dt){
@@ -3117,6 +3315,6 @@ update(dt){
  }
  if(projectCargo.size||projectTrucks.length)launchProjectTrucks();
  for(const o of L){if(o.bt<1)o.bt=Math.min(1,o.bt+dt*3);if(o.fl>0)o.fl=Math.max(0,o.fl-dt*1.6);o.dv+=(o.ew-o.dv)*.1}
- for(const k in afl)afl[k]=Math.max(0,afl[k]-dt*1.2);for(const k in rflash)rflash[k]=Math.max(0,rflash[k]-dt*1.5);pfl=Math.max(0,pfl-dt*1.2);PO=PO.filter(p=>(p.t+=dt)<1.2);tl+=dt;if(tl>1){tl=0;analyze();warnChk()}at+=dt;if(at>20){at=0;sv(0)}tuUpd(dt);stShow();audMach(dt);audCloudSync();},
+ for(const k in afl)afl[k]=Math.max(0,afl[k]-dt*1.2);for(const k in rflash)rflash[k]=Math.max(0,rflash[k]-dt*1.5);pfl=Math.max(0,pfl-dt*1.2);PO=PO.filter(p=>(p.t+=dt)<1.2);tl+=dt;if(tl>1){tl=0;analyze();warnChk()}at+=dt;if(at>20){at=0;sv(0)}if(storyOnScreen()&&!ff)updateStory(dt);tuUpd(dt);stShow();if(!storyOnScreen())audMach(dt);audCloudSync();},
 draw:drawFrame,pointerPosition,
-dbg:()=>({AUD:audio.getContext,ASg:()=>AS,audStart:audioStart,audTick:musTick,musFill,audMach,sfxAt:sfx,mshot,SFX,MS,MOODS,audSetK:(k,v)=>{AS[k]=v;audApply();audSave()},aud,audCloudSync,audFlush:audio.clearPending,bpCalc,doPrestige,buyP,PU,pul,pcfSet:v=>{pcf=v},fTabSet:v=>{fTab=v},del,xp,setLv,lv:()=>LV,AC,chkAc,acOpen:v=>{acO=v},pnOpen:v=>{pnO=v},RN,rOK,buyR,rfx,RH,rsOpen:v=>{rsO=v},rsel:id=>{rsel=id},fx:()=>({STC,BTv,SPm,RM,PM,OS,WG,OFFE,KOF,RCm}),MG,hireE,setCrew,hireM,lvlM,specM,recalc,cap,assignTo:(id,x,y)=>assignManager(G.mg.find(q=>q.id===id),areaAt(x,y),cell(x,y)),salePrice,rawCost,mkOpen:v=>{mkO=v},ITEMS,MD,acc2,view:(x,y,z)=>{cam={x:x*TS,y:y*TS,z}},fm,cst,nf,uc,tme,doPrestige,bpCalc,rrLeft,fillOrders,get ff(){return ff},get lr(){return lr},HL,PH,STX,hlv,hReq,hNext,buyHall,bchk,delAt,sellAll,moveObj,prjIn,phaseDone,get stQ(){return stQ},bProg,dLeft,hallOf,hrect,areaAt,inG,jtick,put,setTool:t=>{tool=t},mvSet:o=>{mvO=o},hselGet:()=>hsel,togP,rotObj,storyIntro,feed,itemPos,rate,G,L,g,tick,analyze,place,plan,buy,sb,give,sv,init,inputCap,currentStats,upgradeBelt,lineMetrics,allProductionLines,lostConnections,recipeTree,beltCapacity,cell,footprint,placement,makePlan,previewPlan,commitBuild,planRoute,checkBuild,connectedLine,REGIONS,SITE,projectTrucks,get industrial(){return industrial},switchSite,companyValue,cloud,flushCloud,chooseSave,applySave,get msg(){return msg},get bn(){return bn},sel:o=>{sel=o},tuD:()=>({HB,view,panelSurface,panelScroll,dockTracks,dockOffsets,cur:tuCur(),TU,TOUR,HNT,tuHn,tuTour,tuTI,tuG,rot,tool,pg,sel,cam,fTab,acO,hlO,bkO,mkO,mvO,delAsk})})}};
+dbg:()=>({AUD:audio.getContext,ASg:()=>AS,audStart:audioStart,audTick:musTick,musFill,audMach,sfxAt:sfx,mshot,SFX,MS,MOODS,audSetK:(k,v)=>{AS[k]=v;audApply();audSave()},aud,audCloudSync,audFlush:audio.clearPending,pcfSet:v=>{pcf=v},fTabSet:v=>{fTab=v},del,xp,setLv,lv:()=>LV,AC,chkAc,acOpen:v=>{acO=v},pnOpen:v=>{pnO=v},RN,rOK,buyR,rfx,RH,rsOpen:v=>{rsO=v},rsel:id=>{rsel=id},fx:()=>({STC,BTv,SPm,RM,PM,OS,WG,OFFE,KOF,RCm}),MG,hireE,setCrew,hireM,lvlM,specM,recalc,cap,assignTo:(id,x,y)=>assignManager(G.mg.find(q=>q.id===id),areaAt(x,y),cell(x,y)),salePrice,rawCost,mkOpen:v=>{mkO=v},ITEMS,MD,acc2,view:(x,y,z)=>{cam={x:x*TS,y:y*TS,z}},fm,cst,nf,uc,tme,rrLeft,fillOrders,get ff(){return ff},get lr(){return lr},HL,PH,STX,hlv,hReq,hNext,buyHall,bchk,delAt,sellAll,moveObj,prjIn,phaseDone,get stQ(){return stQ},bProg,dLeft,hallOf,hrect,areaAt,inG,jtick,put,setTool:t=>{tool=t},mvSet:o=>{mvO=o},hselGet:()=>hsel,togP,rotObj,storyIntro,beginNextChapter,currentStoryId,finishStory,replayStory,updateStory,feed,itemPos,rate,G,L,g,tick,analyze,place,plan,buy,sb,give,sv,init,inputCap,currentStats,upgradeBelt,lineMetrics,allProductionLines,lostConnections,recipeTree,beltCapacity,cell,footprint,placement,makePlan,previewPlan,commitBuild,planRoute,checkBuild,connectedLine,REGIONS,SITE,FLEET,projectTrucks,get industrial(){return industrial},switchSite,companyValue,cloud,flushCloud,chooseSave,applySave,get msg(){return msg},get bn(){return bn},sel:o=>{sel=o},tuD:()=>({HB,view,panelSurface,panelScroll,dockTracks,dockOffsets,cur:tuCur(),TU,TOUR,HNT,tuHn,tuTour,tuTI,tuG,rot,tool,pg,sel,cam,fTab,acO,hlO,bkO,mkO,mvO,delAsk})})}};

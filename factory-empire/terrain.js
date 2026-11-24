@@ -8,7 +8,7 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
  };
  const j=junction,gateX=(bunker[0]+bunker[2]+1)/2+.06,gateY=bunker[1]+(bunker[3]-bunker[1]+1)*.719;
  const roads=[
-  {id:'motor',w:2.66,path:[[-40,-5],[-14,-3],j.motorWest,j.westMerge,[14.8,-1.75],[27.5,-2.3],[45.7,-1.85],[58,-1.75],[71.7,-2.25],[80.6,-1.88],[96,.46],[109.9,.25],[125.8,4.35],j.motorEast,j.eastMerge,[171,3.8]]},
+  {id:'motor',w:2.66,path:[[-40,-5],[-14,-3],j.motorWest,j.westMerge,[14.8,-1.75],[27.5,-2.3],[45.7,-1.85],[58,-1.75],[71.7,-2.25],[80.6,-1.88],[96,.46],[109.9,.25],[125.8,4.35],j.motorEast,j.eastMerge,[159.6,1.4],[175.4,-1.44],[201,-2.5]]},
   {id:'west',w:1.28,path:[[-9,-21],[-5.7,-11],[-4.8,-5.7],j.motorWest,j.westService,[-3.4,17.2],[-1.63,26],[-1.51,34.2],[-2.21,41.1],[-5.2,48.1],[-3.75,54],j.westSouth,[-6.3,73.4],[-1.2,83.5]]},
   {id:'east',w:1.27,path:[j.motorEast,j.eastService,[146.55,23.4],[145.4,32.8],[147.3,40.6],[145.6,53],j.eastSouth,[149.2,76.4]]},
   {id:'ring',w:1.57,path:[[-28,59.3],[-16,62.1],j.westSouth,[8.6,65.3],[24.6,63.85],[47.2,64.4],[63.2,63.65],j.southGate,[98.2,64.2],j.portSouth,[129.5,66.1],j.eastSouth,[157.9,67.1],[169.2,63.4]]},
@@ -360,11 +360,11 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
    if(long)rr(-center+.072,-h*.39,w*.56,h*.78,.033,shipment?'#e4cc94':'#e0e0cb8a');
   });
  }
- function climate(l,t,r,b,time,visible){
+ function climate(l,t,r,b,time,visible,worldWidth){
   const cloud='#a9b5b3';
   const bands=[];
   if(l<0)bands.push([[0,0,-20,0],[l-1,t-1,1-l,b-t+2]]);
-  if(r>columns)bands.push([[columns,0,columns+20,0],[columns,t-1,r-columns+1,b-t+2]]);
+  if(r>worldWidth)bands.push([[worldWidth,0,worldWidth+20,0],[worldWidth,t-1,r-worldWidth+1,b-t+2]]);
   if(t<0)bands.push([[0,0,0,-19],[l-1,t-1,r-l+2,1-t]]);
   if(b>rows)bands.push([[0,rows,0,rows+20],[l-1,rows,r-l+2,b-rows+1]]);
   for(const [axis,rect] of bands){
@@ -374,7 +374,7 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
   }
   for(let i=0;i<26;i++){
    const side=i%4,pos=hash(i,8,2),spread=3+hash(i,7,9)*7;
-   const x=(side===0?-8:side===1?columns+8:pos*columns)+Math.sin(time*.031+i)*1.6;
+   const x=(side===0?-8:side===1?worldWidth+8:pos*worldWidth)+Math.sin(time*.031+i)*1.6;
    const y=(side===2?-6:side===3?rows+7:pos*rows)+Math.cos(time*.026+i)*1.2;
    if(!visible(x-spread,y-spread,spread*2,spread*2))continue;
    const haze=c.createRadialGradient(x,y,.23,x,y,spread);
@@ -459,7 +459,7 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
   c.strokeStyle='#3d4c50';c.lineWidth=.105;c.stroke();
   if(detail){c.strokeStyle='#c6b483';c.lineWidth=.037;c.stroke()}
  }
- function terrain({left,top,right,bottom,intersects,detail,time,plots,occupied,industrial}){
+ function terrain({left,top,right,bottom,intersects,detail,time,plots,occupied,industrial,worldWidth=columns}){
   withState(()=>{
    c.scale(tile,tile);
    const l=left/tile,t=top/tile,r=right/tile,b=bottom/tile;
@@ -508,7 +508,7 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
     const yaw=angle+(reverse?Math.PI:0),shift=main?0:.24;
     if(visible(x-.7,y-.7,1.4,1.4))vehicle(x-Math.sin(yaw)*shift,y+Math.cos(yaw)*shift,yaw,colors[i%colors.length],i%5===0,detail,false);
    }
-   climate(l,t,r,b,time,visible);
+   climate(l,t,r,b,time,visible,worldWidth);
   });
  }
  function deliveryVehicles(trips,time,detail,intersects,items,speed){

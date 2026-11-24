@@ -1,7 +1,7 @@
 /* Parcel queues, splitters, crossings, sorters and tunnel transfers. */
 function createFactoryTransport({
  TICK,MD,PR,isBelt,beltSize,beltTime,currentTick,junctionTime,neighbor,tunnelExit,
- give,record,prod,uses,prjNeed,orderFor
+ give,record,prod,uses,prjNeed,isProjectRamp=t=>t==='prj',orderFor
 }){
 function loadParcel(o,[item,quality,entry,tick,jumped]){
  o.it=item;o.iq=quality;
@@ -43,7 +43,7 @@ function moveBelt(o){
   }
   o.wt=1;record(o,'blocked');
   const target=jump||neighbor(o,dirs[0]);
-  o.bad=!!target&&(target.t=='prj'?!prjNeed(o.it):prod(target)&&!uses(target,o.it));
+  o.bad=!!target&&(isProjectRamp(target.t)?!prjNeed(o.it,target.t):prod(target)&&!uses(target,o.it));
   return;
  }
 }
