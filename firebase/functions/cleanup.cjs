@@ -1,7 +1,7 @@
 'use strict';
 // Operates only on the data paths used by index.html. No other profiles are removed.
 function cleanup(data,uid){
-  for(const path of ['users','presence','friends','requests','invites','blocked']){
+  for(const path of ['users','presence','friends','requests','invites','blocked','pushSubscriptions']){
     if(data[path])delete data[path][uid];
   }
   for(const path of ['friends','requests','invites','blocked']){

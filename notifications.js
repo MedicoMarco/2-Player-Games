@@ -1,0 +1,238 @@
+(() => {
+  const supported = 'serviceWorker' in navigator && 'Notification' in window && 'PushManager' in window;
+  const storageKey = '2pg-push-account';
+  let registration, config, enabled = false, busy = false, preparing = false, status = '', pending = null, opening = false;
+  const service = () => firebase.app().functions('europe-west1').httpsCallable('gamePushSubscription', {timeout: 12000});
+  const owner = () => {
+    try { return localStorage.getItem(storageKey); } catch { return null; }
+  };
+  const remember = uid => {
+    try {
+      if (uid) localStorage.setItem(storageKey, uid);
+      else localStorage.removeItem(storageKey);
+    } catch {}
+  };
+  const register = () => registration ||= navigator.serviceWorker.register('./service-worker.js')
+    .then(() => navigator.serviceWorker.ready)
+    .catch(error => { registration = null; throw error; });
+  if ('serviceWorker' in navigator) register().catch(() => {});
+
+  function render() {
+    const button = document.querySelector('[data-o=push]');
+    if (!button) return;
+    button.hidden = !supported;
+    button.disabled = busy || preparing;
+    button.textContent = enabled ? 'Benachrichtigungen ausschalten' : 'Benachrichtigungen einschalten';
+    document.querySelector('#push-status').textContent = status || (!supported
+      ? 'Systembenachrichtigungen sind hier nicht verfügbar. Auf iPhone und iPad öffne die Seite als Home-Bildschirm-App.'
+      : '');
+  }
+
+  async function prepare() {
+    const uid = OL.me;
+    if (!uid || !supported || preparing || config?.uid === uid) return;
+    preparing = true;
+    render();
+    try {
+      const manager = (await register()).pushManager;
+      const sub = await manager.getSubscription();
+      if (uid !== OL.me) return;
+      enabled = !!sub && Notification.permission === 'granted' && owner() === uid;
+      if (enabled || Notification.permission === 'denied') return;
+      const {data:{key}} = await service()({action:'key'});
+      const bytes = Uint8Array.from(atob(key.replace(/-/g,'+').replace(/_/g,'/')), char => char.charCodeAt(0));
+      if (bytes.length !== 65) throw Error('invalid key');
+      if (uid === OL.me) config = {uid, manager, sub, bytes};
+    } catch {
+      if (uid === OL.me) status = 'Der Benachrichtigungsdienst ist gerade nicht verfügbar.';
+    } finally {
+      preparing = false;
+      render();
+      if (OL.me && OL.me !== uid) prepare();
+    }
+  }
+
+  async function revoke() {
+    if (!supported) return;
+    const uid = OL.me;
+    const reg = await register();
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      const removal = owner() === uid ? service()({action:'remove', subscription:sub.toJSON()}).catch(() => {}) : null;
+      await sub.unsubscribe();
+      await removal;
+    }
+    if (OL.me !== uid) return;
+    remember(null);
+    config = null;
+    enabled = false;
+    render();
+    for (const notification of await reg.getNotifications()) {
+      if (notification.data?.account === uid) notification.close();
+    }
+  }
+
+  function logout() {
+    return Promise.race([
+      revoke().catch(() => {}),
+      new Promise(resolve => setTimeout(resolve, 1800))
+    ]);
+  }
+
+  async function toggle() {
+    const uid = OL.me;
+    if (!supported || !uid || busy || preparing) return;
+    busy = true;
+    status = '';
+    render();
+    try {
+      if (enabled) {
+        await revoke();
+        status = 'Systembenachrichtigungen auf diesem Gerät sind aus.';
+        prepare();
+        return;
+      }
+      if (Notification.permission === 'denied') {
+        status = 'Erlaube Benachrichtigungen in den Website-Einstellungen.';
+        return;
+      }
+      if (config?.uid !== uid) {
+        await prepare();
+        if (config?.uid === uid) status = 'Tippe erneut, um die Geräteberechtigung zu erteilen.';
+        return;
+      }
+      const {manager, bytes} = config;
+      let {sub} = config;
+      if (sub && new Uint8Array(sub.options.applicationServerKey).join() !== bytes.join()) {
+        await sub.unsubscribe();
+        config.sub = null;
+        status = 'Tippe erneut, um Benachrichtigungen einzuschalten.';
+        return;
+      }
+      // Invoke subscribe within the click. WebKit requires a user gesture.
+      sub ||= await manager.subscribe({userVisibleOnly:true, applicationServerKey:bytes});
+      if (OL.auth.currentUser?.uid !== uid) {
+        await sub.unsubscribe();
+        return;
+      }
+      config.sub = sub;
+      await service()({action:'add', subscription:sub.toJSON()});
+      if (OL.auth.currentUser?.uid !== uid) { await sub.unsubscribe(); return; }
+      remember(uid);
+      enabled = true;
+      status = 'Systembenachrichtigungen auf diesem Gerät sind an.';
+    } catch {
+      status = Notification.permission === 'denied' ? 'Erlaube Benachrichtigungen in den Website-Einstellungen.'
+        : 'Benachrichtigungen konnten gerade nicht eingerichtet werden.';
+    } finally {
+      busy = false;
+      render();
+    }
+  }
+
+  async function openPending() {
+    if (!pending || !OL.me || !OL.blocksReady || opening) return;
+    const target = pending;
+    pending = null;
+    if (target.account !== OL.me) {
+      toast('Diese Benachrichtigung gehört zu einem anderen Konto.');
+      return;
+    }
+    opening = true;
+    try {
+      if (target.kind === 'invite') {
+        const invite = (await OL.db.ref('invites/'+OL.me+'/'+target.sender).once('value')).val();
+        if (OL.me !== target.account) return;
+        if (!olAllowed(target.sender) || invite?.mid !== target.id || invite.ts !== Number(target.ts) || !olInviteValid(invite)) {
+          toast('Diese Einladung ist nicht mehr verfügbar.');
+          return;
+        }
+        const room = olIsRoom(invite);
+        if ((room && LUN.code === invite.code) || OL.sess?.mid === invite.mid) return;
+        const available = await OL.db.ref(room ? 'rooms/'+invite.code+'/game' : 'matches/'+invite.mid+'/state').once('value');
+        if (OL.me !== target.account) return;
+        if (!olInviteValid(invite) || available.val() !== (room ? invite.game : 'invited')) {
+          toast('Diese Einladung ist nicht mehr verfügbar.');
+          return;
+        }
+        window.directChat?.close();
+        olClose();
+        if (OL.out) olCancelOut();
+        if (OL.sess) olLeave();
+        if (LUN.ref) toMenu();
+        OL.INV[target.sender] = invite;
+        await olAccept(target.sender);
+      } else if (target.kind === 'direct') {
+        const friend = await OL.db.ref('friends/'+OL.me+'/'+target.id).once('value');
+        if (OL.me !== target.account) return;
+        if (friend.val() === true && olAllowed(target.id)) {
+          OL.F[target.id] = true;
+          olClose();
+          window.directChat.open(target.id);
+        } else toast('Dieser Chat ist nicht mehr verfügbar.');
+      } else if (target.kind === 'group') {
+        olClose();
+        await window.groupChat.open(target.id);
+      } else if (!window.gameChat.openNotification(target)) {
+        toast('Der Spielchat ist nur in der laufenden Partie verfügbar.');
+      }
+    } catch {
+      toast('Die Benachrichtigung konnte nicht geöffnet werden.');
+    } finally {
+      opening = false;
+      if (pending) openPending();
+    }
+  }
+
+  async function open(target) {
+    const key = /^[A-Za-z0-9_-]{1,128}$/;
+    if (!target || !key.test(target.account || '') ||
+      !['invite','direct','group','room','peer'].includes(target.kind) ||
+      (target.kind === 'invite' ? !key.test(target.sender || '') : !key.test(target.id || ''))) return;
+    pending = target;
+    if (OL.me) {
+      await openPending();
+    } else {
+      await olInit();
+      if (!OL.auth?.currentUser && pending === target) olOpen();
+    }
+  }
+
+  const params = new URLSearchParams(location.search);
+  if (params.has('push')) {
+    const target = {kind:params.get('push')};
+    for (const key of ['account','id','sender','ts']) {
+      target[key] = params.get(key);
+      params.delete(key);
+    }
+    params.delete('push');
+    history.replaceState(null,'',location.pathname+(params.size?'?'+params:'')+location.hash);
+    open(target);
+  }
+  navigator.serviceWorker?.addEventListener('message', event => {
+    if (event.data?.type !== 'open-notification') return;
+    event.ports[0]?.postMessage(true);
+    open(event.data.target);
+  });
+
+  async function peer(id) {
+    const uid = OL.me;
+    if (!enabled || !uid || Notification.permission !== 'granted' || !document.hidden) return;
+    try {
+      const reg = await register();
+      if (uid !== OL.me || !enabled) return;
+      await reg.showNotification('Neue Nachricht im Spielchat', {
+        body:'Tippe, um zum Spielchat zu wechseln.',
+        icon:'./icons/icon-192.png',
+        tag:uid+':peer:'+id,
+        data:{kind:'peer', account:uid, id}
+      });
+    } catch {}
+  }
+
+  window.gameNotifications = {
+    render, toggle, logout, peer,
+    signedIn() { prepare(); openPending(); },
+    signedOut() { config = null; enabled = false; status = ''; render(); }
+  };
+})();

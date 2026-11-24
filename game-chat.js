@@ -140,6 +140,7 @@
     const entry = {seat, id, uid:author.uid, name:author.name, text, received:performance.now(), life};
     active.entries.push(entry);
     if(!expanded && seat!==active.seat)trigger.dataset.unread = '';
+    if(active.kind==='peer' && seat!==active.seat)window.gameNotifications?.peer(active.ss.mid);
     const previous = bubbles.get(seat);
     if(previous){clearTimeout(previous.timer);previous.node.remove();}
     const node = item(entry,'gc-bubble');
@@ -316,5 +317,13 @@
     chat.style.setProperty('--gc-keyboard',Math.max(0,innerHeight-visualViewport.height-visualViewport.offsetTop)+'px');
     layout();
   });
-  window.gameChat={room,peer,receivePeer,stop,refreshBlocks};
+  function openNotification(target){
+    if(!active || (target.kind==='room'
+      ? active.kind!=='room'||active.code!==target.id
+      : active.kind!=='peer'||active.ss.mid!==target.id))return false;
+    toggle(true);
+    return true;
+  }
+
+  window.gameChat={room,peer,receivePeer,stop,refreshBlocks,openNotification};
 })();

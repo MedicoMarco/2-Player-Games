@@ -162,5 +162,13 @@
     }));
   }
   function remove(id,slot,uid){return root().update({[locationOf(id)+'/members/'+slot]:null,[index(uid,id)]:null});}
-  window.groupChat={attach,stop:()=>{managing=null;stop();},render,manage,unread,refreshCounts};
+  async function open(id){
+    const uid=OL.me;
+    const slot=(await root().child(index(uid,id)).once('value')).val();
+    if(uid!==OL.me)return;
+    if(slot==null){chat().show(null,'groups');return;}
+    const data=(await ref(id).once('value')).val();
+    if(uid===OL.me)chat().show(view({id,slot,data}),'groups');
+  }
+  window.groupChat={attach,open,stop:()=>{managing=null;stop();},render,manage,unread,refreshCounts};
 })();
