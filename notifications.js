@@ -11,8 +11,11 @@
       headers:{Authorization:'Bearer '+await user.getIdToken(),'Content-Type':'application/json'},
       body:JSON.stringify(body),signal:AbortSignal.timeout(12000)
     });
-    if (!response.ok) throw Error('Push service unavailable');
-    return {data:await response.json()};
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw Object.assign(Error('Push service unavailable'), {
+      code:data.error || 'Connection', http:response.status
+    });
+    return {data};
   };
 
   async function dispatch(event, recipients) {
@@ -62,8 +65,8 @@
       const bytes = Uint8Array.from(atob(key.replace(/-/g,'+').replace(/_/g,'/')), char => char.charCodeAt(0));
       if (bytes.length !== 65) throw Error('invalid key');
       if (uid === OL.me) config = {uid, manager, sub, bytes};
-    } catch {
-      if (uid === OL.me) status = 'Der Benachrichtigungsdienst ist gerade nicht verfügbar.';
+    } catch (error) {
+      if (uid === OL.me) status = setupError(error,'server');
     } finally {
       preparing = false;
       render();
@@ -77,7 +80,7 @@
     const reg = await register();
     const sub = await reg.pushManager.getSubscription();
     if (sub) {
-      const removal = owner() === uid ? service()({action:'remove', subscription:sub.toJSON()}).catch(() => {}) : null;
+      const removal = owner() === uid ? service()({action:'remove', subscription:serialize(sub)}).catch(() => {}) : null;
       await sub.unsubscribe();
       await removal;
     }
@@ -98,10 +101,28 @@
     ]);
   }
 
+  function serialize(sub) {
+    const encode = key => btoa(String.fromCharCode(...new Uint8Array(sub.getKey(key))))
+      .replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    return {endpoint:sub.endpoint,keys:{p256dh:encode('p256dh'),auth:encode('auth')}};
+  }
+
+  function setupError(error, stage) {
+    if (Notification.permission === 'denied') return 'Erlaube Mitteilungen in den iPad-Einstellungen.';
+    if (error.code === 'Authentication') return 'Die Online-Anmeldung wurde nicht bestätigt. Melde dich bei Play2Gether neu an.';
+    if (error.code === 'Firebase setup') return 'Cloudflare konnte sich nicht bei Firebase anmelden. Prüfe das Firebase-Secret.';
+    if (error.code === 'Database access') return 'Der Push-Dienst hat keinen Zugriff auf die Firebase-Datenbank.';
+    if (error.code === 'Push setup') return 'Die Push-Secrets fehlen oder sind ungültig. Prüfe das Cloudflare-Produktionsdeployment.';
+    if (error.code === 'Subscription') return 'Der Push-Dienst konnte das Geräte-Abo nicht lesen.';
+    if (stage === 'device') return 'Das Gerät konnte kein Push-Abo erstellen ('+(error.name||'Fehler')+'). Öffne Play2Gether über das Home-Bildschirm-Symbol.';
+    return 'Die Anmeldung des Geräts beim Push-Dienst ist fehlgeschlagen'+(error.http?' (HTTP '+error.http+')':'')+'.';
+  }
+
   async function toggle() {
     const uid = OL.me;
     if (!supported || !uid || busy || preparing) return;
     busy = true;
+    let stage = 'device';
     status = '';
     render();
     try {
@@ -122,7 +143,8 @@
       }
       const {manager, bytes} = config;
       let {sub} = config;
-      if (sub && new Uint8Array(sub.options.applicationServerKey).join() !== bytes.join()) {
+      const previousKey = sub?.options?.applicationServerKey;
+      if (previousKey && new Uint8Array(previousKey).join() !== bytes.join()) {
         await sub.unsubscribe();
         config.sub = null;
         status = 'Tippe erneut, um Benachrichtigungen einzuschalten.';
@@ -135,14 +157,15 @@
         return;
       }
       config.sub = sub;
-      await service()({action:'add', subscription:sub.toJSON()});
+      const subscription = serialize(sub);
+      stage = 'server';
+      await service()({action:'add', subscription});
       if (OL.auth.currentUser?.uid !== uid) { await sub.unsubscribe(); return; }
       remember(uid);
       enabled = true;
       status = 'Systembenachrichtigungen auf diesem Gerät sind an.';
-    } catch {
-      status = Notification.permission === 'denied' ? 'Erlaube Benachrichtigungen in den Website-Einstellungen.'
-        : 'Benachrichtigungen konnten gerade nicht eingerichtet werden.';
+    } catch (error) {
+      status = setupError(error,stage);
     } finally {
       busy = false;
       render();

@@ -39,7 +39,7 @@ function databaseClient(token) {
       method, headers:{Authorization:'Bearer '+token,'Content-Type':'application/json', ...headers},
       body:value===undefined?undefined:JSON.stringify(value),redirect:'error'
     });
-    if (!response.ok && response.status!==412) throw Error('Database request failed');
+    if (!response.ok && response.status!==412) throw Object.assign(Error('Database request failed'), {code:'Database access'});
     return {ok:response.ok,etag:response.headers.get('etag'),value:await response.json()};
   };
 }
@@ -155,7 +155,10 @@ export async function onRequest({request,env,waitUntil}) {
     const [publicKey,privateKey,subject] = String(env.PLAY2GETHER_PUSH_VAPID||'').split(',');
     if (!publicKey || !privateKey || !subject || !env.PLAY2GETHER_FIREBASE_SERVICE_ACCOUNT) return reply({error:'Push setup'},503);
     if (body.action==='key') return reply({key:publicKey});
-    const db = databaseClient(await databaseToken(env));
+    let token;
+    try { token = await databaseToken(env); }
+    catch { return reply({error:'Firebase setup'},503); }
+    const db = databaseClient(token);
     if (body.action==='send') {
       waitUntil(send(db,{publicKey,privateKey,subject},uid,body).catch(()=>console.error('Push dispatch failed')));
       return reply({},202);
@@ -178,7 +181,7 @@ export async function onRequest({request,env,waitUntil}) {
       return reply({error:'Retry'},409);
     }
     return reply({});
-  } catch {
-    return reply({error:'Push service unavailable'},503);
+  } catch (error) {
+    return reply({error:error.code==='Database access'?'Database access':'Push service unavailable'},503);
   }
 }
