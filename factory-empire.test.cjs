@@ -415,7 +415,7 @@ d=load([[7,6,'belt',0,1],[8,6,'shp',0,1],[7,8,'belt',0,1],[8,8,'auto',0,1]],{
 });
 const bonus=1.05*1.08*1.08*1.05*1.12*1.03*1.06*1.04;
 const standardPrice=Math.round(60*bonus),managedPrice=Math.round(60*bonus*1.2);
-assert.equal(d.salePrice(5),standardPrice);
+assert.equal(d.salePrice(5),Math.round(60*bonus/1.03),'the quality crew bonus applies only to shipping in its assigned hall');
 assert(d.give(d.cell(7,6),0,5));
 assert(d.give(d.cell(7,8),0,5));
 assert.equal(d.G.saleIncome[5],standardPrice+managedPrice);
@@ -1027,6 +1027,87 @@ d.hireE('p');
 assert(d.tme(d.cell(9,6))<timeWithManager);
 ticks(16);
 assert(d.G.wc>0);
+
+const teamStore=(x,y,items=[],extra={})=>[x,y,'sto',0,1,-1,[], -1,items,0,{teamDepot:true,...extra}];
+const legacyTeam={v:2,m:12500,emp:{p:2,q:1,l:1},mg:[{id:'prod',lv:6,sp:1,x:9,y:6}],hl:{gar:1,met:1},o:starter,ts:clock};
+core().applySave(legacyTeam);
+d=core();
+assert.deepEqual(JSON.parse(data.get('2pg_fe_demo.before-hall-teams')),legacyTeam);
+assert.equal(d.G.m,12500,'existing team investments are not charged a second time');
+assert.equal(d.G.crew.gar.p,2);
+assert.equal(d.G.mg[0].lv,6);
+assert.equal(d.G.mg[0].sp,1);
+assert(d.setCrew('p','gar',-1)&&d.setCrew('p','met',1));
+assert(!d.setCrew('p','vrs',1),'locked halls cannot be assigned a crew');
+assert(!d.setCrew('p','met',1),'reassignment cannot duplicate an employee');
+const relocatedTeam=save();
+d=load(relocatedTeam.o,relocatedTeam);
+assert.equal(d.G.crew.gar.p,1);
+assert.equal(d.G.crew.met.p,1);
+assert.equal(d.G.emp.p,2);
+
+d=load([teamStore(8,5,[1],{qq:[137]}),[10,7,'frm',0,1]],{crewVersion:1,emp:{p:1},crew:{gar:{p:1}}});
+ticks(24);
+assert.equal(d.cell(8,5).q.length,0);
+assert.equal(d.cell(10,7).iv[0],1);
+assert.equal(d.cell(10,7).ivq[0],137,'material staff preserve the transported quality');
+const afterPickup=save();
+d=load(afterPickup.o,afterPickup);
+assert(d.cell(8,5).teamDepot);
+assert.equal(d.cell(10,7).iv[0],1);
+assert.equal(d.G.crew.gar.p,1);
+assert(d.setCrew('p','gar',-1));
+const inReserve=save();
+delete inReserve.crew;
+d=load(inReserve.o,inReserve);
+assert.equal(d.G.emp.p,1);
+assert.equal(d.fx().WG,0,'Firebase can omit empty hall assignments without losing the reserve');
+
+const misroutedBelt=(x,y,item)=>[x,y,'belt',0,1,item,0,-1,0,0,{iq:129}];
+d=load([teamStore(8,4),misroutedBelt(8,6,1),[9,6,'saw',0,1]],{crewVersion:1,emp:{q:1},crew:{gar:{q:1}}});
+ticks(24);
+assert.equal(d.cell(8,6).it,-1);
+assert.deepEqual(Array.from(d.cell(8,4).q),[1]);
+assert.deepEqual(Array.from(d.cell(8,4).qq),[129]);
+
+d=load([teamStore(8,5,[14]),[10,7,'prj',0,1]],{ord:1,crewVersion:1,emp:{l:1},crew:{gar:{l:1}}});
+ticks(24);
+assert.equal(d.G.sd,1,'shipping staff deliver with the regular bunker receipt');
+assert.equal(d.cell(8,5).q.length,0);
+d=load([teamStore(8,5,[1]),[10,7,'shp',0,1]],{ord:1,od:[[1,30,1,80]],crewVersion:1,emp:{l:1},crew:{gar:{l:1}}});
+ticks(24);
+assert.equal(d.G.sold,1,'the shipping crew uses the standard sale and order workflow');
+assert.equal(d.G.od[0].d,2);
+assert.equal(d.cell(8,5).q.length,0);
+
+d=load([teamStore(8,5),[10,7,'frm',0,1,-1,[0],2]],{crewVersion:1,mg:[{id:'prod',hall:'gar',lv:1}]});
+ticks(48);
+assert.equal(d.cell(10,7).out,-1);
+assert.deepEqual(Array.from(d.cell(8,5).q),[2],'the production manager clears completed output');
+d=load([teamStore(8,4),misroutedBelt(8,6,0),[9,6,'prj',0,1]],{crewVersion:1,mg:[{id:'qual',hall:'gar',lv:1}]});
+ticks(48);
+assert.equal(d.G.sd,0);
+assert.equal(d.cell(8,6).it,-1);
+assert.deepEqual(Array.from(d.cell(8,4).q),[0],'the quality manager recovers rejected freight');
+d=load([[10,6,'frm',0,1,-1,[0],2],[8,8,'asm',0,1]],{crewVersion:1,mg:[{id:'eng',hall:'gar',lv:1}]});
+ticks(48);
+assert.equal(d.cell(10,6).out,-1);
+assert.equal(d.cell(8,8).iv[0],1,'the engineer transfers a waiting output directly to its next recipe');
+d=load([teamStore(8,5,Array(24).fill(1)),teamStore(10,7)],{crewVersion:1,mg:[{id:'log',hall:'gar',lv:1}]});
+ticks(48);
+assert.deepEqual([d.cell(8,5).q.length,d.cell(10,7).q.length],[23,1],'the logistics manager redistributes existing stock');
+assert.equal(save().mg[0].hall,'gar');
+
+d=load([[8,5,'sto',0,1]]);
+d.setTool('hand');d.sel(d.cell(8,5));play.draw();
+d.tuD().HB.find(hit=>hit.id==='team_depot').fn();
+assert(d.cell(8,5).teamDepot);
+d.togP('pn');play.draw();
+d.tuD().HB.find(hit=>hit.id==='crew_hire_p').fn();
+assert.equal(d.G.crew.gar.p,1);
+d.togP('pn');
+console.log('Hall teams, all four manager tasks, warehouse controls and previous team saves passed.');
+
 d=load([
  [8,6,'sorter',0,1,1,0,-1,0,0,{large:true,sortRule:0,iq:123,queue:[[1,105,2,0,false],[7,100,2,0,false]]}],
  [8,5,'sto',0,1],[8,7,'sto',0,1],[10,6,'sto',0,1]

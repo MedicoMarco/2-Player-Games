@@ -61,18 +61,29 @@ const RN=[
  {id:'off',n:'Auftragsbüro',c:8,p:['hnd'],x:1,y:4,e:'Ein vierter Auftrag gleichzeitig.'},
  {id:'mas',n:'Massenfertigung',c:28,p:['brd'],x:2,y:4,ex:'prm',e:'+20 % Tempo und 5 % niedrigere Verkaufspreise. Schließt Premiumfertigung aus.',rq:['Premiumfertigung nicht gewählt',()=>!RH('prm')]},
  {id:'prm',n:'Premiumfertigung',c:28,p:['brd'],x:3,y:4,ex:'mas',e:'+12 % Verkaufspreise, aber 5 % weniger Tempo. Schließt Massenfertigung aus.',rq:['Massenfertigung nicht gewählt',()=>!RH('mas')]},
- {id:'sch',n:'Schulungen',c:10,p:[],x:0,y:5,e:'Produktions-Mitarbeiter bringen +3 % statt +2 % Tempo.'},
- {id:'ldr',n:'Führungstraining',c:20,p:['sch'],x:1,y:5,e:'Alle Manager wirken 15 % stärker.'},
+ {id:'sch',n:'Schulungen',c:10,p:[],x:0,y:5,e:'Materialdienst arbeitet häufiger und stärkt das Produktionstempo in seiner Halle.'},
+ {id:'ldr',n:'Führungstraining',c:20,p:['sch'],x:1,y:5,e:'Manager erledigen ihre Hallenaufgabe häufiger. Ihre Maschinenboni steigen um 15 %.'},
  {id:'nst',n:'Nachtschicht',c:30,p:['ldr'],x:2,y:5,e:'Offline-Fortschritt: bis zu 12 statt 8 Std., Effizienz 40 % statt 25 %.'}];
-/* ---- Personal: Mitarbeiter (Lohn) und Manager (Meilenstein-Freischaltung, Zuweisung, Spezialisierung) ---- */
-const WAGE=6,MG=[
- {id:'prod',n:'Hanna Berger',r:'Produktionsleiterin',kind:'prod',base:.08,cost:800,tgt:'eine Maschine',lab:'Tempo',cond:['50 Produkte verkauft',()=>G.sold>=50]},
- {id:'qual',n:'Jonas Weber',r:'Qualitätsmanager',kind:'qual',base:.02,cost:2500,tgt:'einen Versand',lab:'Verkaufspreis',cond:['3 Aufträge erfüllt',()=>G.ord>=3]},
- {id:'eng',n:'Dr. Mira Voss',r:'Ingenieurin',kind:'eng',base:.05,cost:6000,tgt:'eine Maschine',lab:'Upgrade-Kosten −',cond:['„Präzisionswerkzeuge“ erforscht',()=>RH('spd1')]},
- {id:'log',n:'Tobias Kern',r:'Logistikmanager',kind:'log',base:.15,cost:4000,tgt:'ein Zwischenlager',lab:'Lagerplätze',cond:['„Hochregal-Lagerung“ erforscht',()=>RH('lag')]}];
-const comp=(d,o)=>d.kind=='qual'?o.t=='shp':d.kind=='log'?o.t=='sto':!!(MD[o.t]&&MD[o.t].o!=null);
+/* ---- Hallenteams und ihre Transporte ---- */
+const WAGE=6,crewRoles=[
+ {id:'p',label:'Materialdienst',description:'Holt fehlende Rezeptzutaten aus Team-Lagern und bringt sie zu wartenden Maschinen.',color:'#dd8740',unlock:()=>true},
+ {id:'q',label:'Linienservice',description:'Bringt Fehlteile von blockierten Bändern zurück ins Team-Lager.',color:'#4a9cd1',unlock:()=>G.sold>=25,require:'25 Produkte verkaufen'},
+ {id:'l',label:'Versanddienst',description:'Liefert aus dem Team-Lager an ARCHE oder an den Versand für einen offenen Auftrag.',color:'#80a95a',unlock:()=>G.ord>=1||RH('lag'),require:'Einen Auftrag erfüllen oder Hochregal-Lagerung erforschen'}
+],MG=[
+ {id:'prod',n:'Hanna Berger',r:'Produktionsleiterin',base:.08,cost:800,tgt:'eine Maschine',lab:'Tempo',color:'#f0b066',task:'Bringt fertige Waren von blockierten Maschinen ins Team-Lager.',cond:['50 Produkte verkauft',()=>G.sold>=50]},
+ {id:'qual',n:'Jonas Weber',r:'Qualitätsmanager',base:.02,cost:2500,tgt:'einen Versand',lab:'Verkaufspreis',color:'#83c5e8',task:'Holt nicht angeforderte Waren von blockierten ARCHE-Zuführungen zurück ins Team-Lager.',cond:['3 Aufträge erfüllt',()=>G.ord>=3]},
+ {id:'eng',n:'Dr. Mira Voss',r:'Ingenieurin',base:.05,cost:6000,tgt:'eine Maschine',lab:'Upgrade-Kosten',color:'#c6a5e8',task:'Bringt fertige Ware von blockierten Maschinen direkt zu einer Maschine, der genau diese Zutat fehlt.',cond:['„Präzisionswerkzeuge“ erforscht',()=>RH('spd1')]},
+ {id:'log',n:'Tobias Kern',r:'Logistikmanager',base:.15,cost:4000,tgt:'ein Zwischenlager',lab:'Lagerplätze',color:'#b8cf7c',task:'Verteilt Ware aus vollen Team-Lagern auf freie Team-Lager derselben Halle.',cond:['„Hochregal-Lagerung“ erforscht',()=>RH('lag')]}];
+const comp=(d,o)=>!!o&&!o.needsRelocation&&(d.id==='qual'?typeShip(o.t):d.id==='log'?isStorage(o.t):prod(o));
+const crewCount=(id,role)=>G.crew[id]?.[role]||0;
+const assignedCrew=role=>Object.values(G.crew).reduce((sum,crew)=>sum+(crew[role]||0),0);
+const managerHall=m=>m.hall?hallOf(m.hall):cell(m.x,m.y)&&areaAt(m.x,m.y);
 const meff=(m,d)=>d.base*m.lv*(m.sp==1?1.5:m.sp==2?.6:1)*(1+.1*pul('mgt1'))*(RH('ldr')?1.15:1),hcost=k=>Math.round(150*Math.pow(1.3,G.emp[k])),lcost=(m,d)=>Math.round(d.cost*.5*Math.pow(1.7,m.lv-1));
-function recalc(){for(const o of L){o.sb=1;o.ub=1;o.pb=1;o.cb=0;o.mg=0}
+function recalc(){for(const o of L){
+ const hall=areaAt(o.x,o.y)?.id;
+ o.sb=1+(RH('sch')?.03:.02)*crewCount(hall,'p');o.ub=1;
+ o.pb=1+.01*crewCount(hall,'q');o.cb=0;o.extraStorage=2*crewCount(hall,'l');o.mg=0;
+ }
  const par=new Map(),f=o=>{while(par.get(o)!==o)o=par.get(o);return o};for(const o of L)par.set(o,o);
  for(const o of L){
   const outputs=o.j?(o.j==1?o.jm.flatMap((mode,d)=>mode==2?[d]:[]):[0,1,2,3]):
@@ -80,14 +91,48 @@ function recalc(){for(const o of L){o.sb=1;o.ub=1;o.pb=1;o.cb=0;o.mg=0}
   for(const d of outputs){const q=neighbor(o,d);if(q)par.set(f(o),f(q))}
   const exit=tunnelExit(o);if(exit)par.set(f(o),f(exit));
  }
- for(const m of G.mg){const d=MG.find(q=>q.id==m.id),t=m.x>=0?cell(m.x,m.y):null;if(!t||!comp(d,t))continue;t.mg=1;const e=meff(m,d);
-  for(const o of m.sp==2?L.filter(o=>f(o)==f(t)&&comp(d,o)):[t]){if(d.kind=='prod')o.sb*=1+e;else if(d.kind=='eng')o.ub*=Math.max(.4,1-e);else if(d.kind=='qual')o.pb*=1+e;else o.cb+=e}}}
-function hireE(k){if(G.emp[k]>=12){deny('Mehr als 12 Mitarbeiter pro Abteilung gehen nicht.');return}const c1=hcost(k);if(G.m<c1){deny('Nicht genug Geld.');return}G.m-=c1;G.emp[k]++;rfx();xp(2);sfx('hire');sv(0)}
-function fireE(k){if(G.emp[k]>0){G.emp[k]--;rfx();sfx('remove');sv(0)}}
-function hireM(d){if(G.mg.some(m=>m.id==d.id))return;if(!d.cond[1]()){deny('Gesperrt: '+d.cond[0]);return}if(G.m<d.cost){deny('Nicht genug Geld.');return}G.m-=d.cost;G.mg.push({id:d.id,lv:1,sp:0,x:-1,y:-1});xp(20);sfx('hire');toast(d.n+' arbeitet jetzt für dich – weise sie einer Maschine zu.');sv(1)}
+ for(const m of G.mg){const d=MG.find(q=>q.id==m.id),t=managerTarget(m,d);if(!t)continue;t.mg=1;const e=meff(m,d),hall=areaAt(t.x,t.y);
+  for(const o of m.sp==2?L.filter(o=>f(o)===f(t)&&comp(d,o)&&areaAt(o.x,o.y)===hall):[t]){if(d.id==='prod')o.sb*=1+e;else if(d.id==='eng')o.ub*=Math.max(.4,1-e);else if(d.id==='qual')o.pb*=1+e;else o.cb+=e}
+ }
+}
+function managerTarget(m,d){
+ const target=cell(m.x,m.y),hall=managerHall(m);
+ if(comp(d,target)&&(!m.hall||areaAt(target.x,target.y)===hall))return target;
+ if(!hall||!hlv(hall.id))return null;
+ return L.find(o=>comp(d,o)&&areaAt(o.x,o.y)===hall);
+}
+function setCrew(k,hall,delta){
+ if(!hlv(hall)||!crewRoles.some(role=>role.id===k))return false;
+ const next=crewCount(hall,k)+delta;
+ if(next<0||delta>0&&assignedCrew(k)>=G.emp[k])return false;
+ G.crew[hall]??={};
+ G.crew[hall][k]=next;
+ rfx();recalc();sv(0);
+ return true;
+}
+function hireE(k,hall='gar'){
+ const role=crewRoles.find(role=>role.id===k);
+ if(!role?.unlock()||!hlv(hall))return false;
+ if(G.emp[k]>=12){deny('Mehr als 12 Mitarbeiter je Rolle gehen nicht.');return false}
+ const cost=hcost(k);
+ if(G.m<cost){deny('Nicht genug Geld.');return false}
+ G.m-=cost;G.emp[k]++;xp(2);setCrew(k,hall,1);sfx('hire');
+ return true;
+}
+function hireM(d){if(G.mg.some(m=>m.id==d.id))return;if(!d.cond[1]()){deny('Gesperrt: '+d.cond[0]);return}if(G.m<d.cost){deny('Nicht genug Geld.');return}G.m-=d.cost;G.mg.push({id:d.id,lv:1,sp:0,x:-1,y:-1});xp(20);sfx('hire');toast(d.n+' arbeitet jetzt für dich. Setze den Manager im Team-Menü in einer Halle ein.');sv(1)}
 function lvlM(m,d){if(m.lv>=10)return;const c1=lcost(m,d);if(G.m<c1){deny('Nicht genug Geld.');return}G.m-=c1;m.lv++;recalc();xp(10);sfx('upgrade');sv(0)}
 function specM(m,sp){if(m.lv<5||m.sp)return;m.sp=sp;recalc();sfx('unlock');sv(0)}
-function assignTap(a,b){const d=MG.find(q=>q.id==asg),m=G.mg.find(q=>q.id==asg),o=cell(a,b);if(!o||!comp(d,o)){deny('Das passt nicht – tippe '+d.tgt+' an.');return}m.x=o.x;m.y=o.y;asg=null;pnO=true;recalc();analyze();sfx('select');sv(0)}
+function assignManager(m,hall,o){
+ if(!m||!hall||!hlv(hall.id))return false;
+ m.hall=hall.id;m.x=o?.x??-1;m.y=o?.y??-1;
+ recalc();sfx('select');sv(0);
+ return true;
+}
+function assignTap(a,b){
+ const d=MG.find(q=>q.id===asg),m=G.mg.find(q=>q.id===asg),o=cell(a,b);
+ if(!d||!comp(d,o)||!assignManager(m,areaAt(o.x,o.y),o)){deny('Wähle '+d.tgt+' in einer eigenen Halle.');return}
+ teamHall=m.hall;asg=null;pnO=true;
+}
 /* ---- Spielerlevel & Erfolge ---- */
 const need=l=>Math.round(60*Math.pow(l,1.5));
 function setLv(){let l=1,x=G.xp,n=need(1);while(x>=n){x-=n;l++;n=need(l)}LV=l;XB=G.xp-x;XN=XB+n}
@@ -157,7 +202,7 @@ function buyP(id){const p=PU.find(q=>q.id==id);if(!p)return false;const l=pul(id
 function doPrestige(){const b=bpCalc();if(b.t<PMIN){deny('Noch zu früh: Mindestens '+PMIN+' Blaupausen nötig.');return}
  G.bp+=b.t;G.bpt+=b.t;G.pr++;resetPlanning();currentSite='main';cam={x:11.5*TS,y:6.5*TS,z:1.3};L=[];g=[];starter();
  projectCargo.clear();projectTrucks.length=0;
- G.m=startMoney();G.tr=0;G.ordRun=0;G.legacyPlots=[];G.hl={gar:1};['met','vrs'].forEach((id,i)=>{if(pul('prd2')>i&&G.sp>=hallOf(id).ph)G.hl[id]=1});startTech();mvO=null;G.emp={...G.emp,p:0,q:0,l:0};G.mg=[];G.od=[];G.pc={};G.recent=FactoryTelemetry.create(G.tk,TICK);sb.fill(0);rw=0;sel=null;selA=null;PO=[];asg=null;tool='hand';
+ G.m=startMoney();G.tr=0;G.ordRun=0;G.legacyPlots=[];G.hl={gar:1};['met','vrs'].forEach((id,i)=>{if(pul('prd2')>i&&G.sp>=hallOf(id).ph)G.hl[id]=1});startTech();mvO=null;G.emp={...G.emp,p:0,q:0,l:0};G.crew={};teamTrips.length=0;G.mg=[];G.od=[];G.pc={};G.recent=FactoryTelemetry.create(G.tk,TICK);sb.fill(0);rw=0;sel=null;selA=null;PO=[];asg=null;tool='hand';
  refreshIndustrialArea();rfx();recalc();analyze();xp(100);pfl=1;sfx('prestige');toast('Neues Unternehmen gegründet! +'+b.t+' Blaupausen');sv(1)}
 /* ===== Audio: Web Audio API, komplett synthetisiert (keine Dateien), Start erst nach Nutzer-Interaktion ===== */
 let wMsg='',wT=-99;
@@ -172,10 +217,10 @@ function auTab(X,Y,W,H){tx('Audio',X+26,Y+68,15,'#fff','left',800);
  btn(X+26,Y+256,304,32,()=>{AS.ma=AS.ma?0:1;audApply();audSave()},AS.ma?'#b91c1c':'#334155');tx(AS.ma?'🔇 Ton ist aus – tippen zum Einschalten':'🔊 Alles stumm schalten',X+178,Y+276,12.5,'#fff','center',800);
  tx('Der Ton startet nach dem ersten Klick (Browser-Vorgabe). Einstellungen werden im Konto gespeichert.',X+26,Y+306,10,'#94a3b8')}
 const rOK=n=>!RH(n.id)&&n.p.every(p=>RH(p))&&(!n.rq||n.rq[1]());
-function rfx(){const E=G.emp;SPm=(1+(RH('spd1')?.1:0)+(RH('spd2')?.15:0)+(RH('spd3')?.2:0)+(RH('mas')?.2:0)-(RH('prm')?.05:0))*(1+(RH('sch')?.03:.02)*E.p)*(1+.01*Math.min(24,LV-1))*(1+.05*pul('prd1'));STC=(RH('lag2')?80:RH('lag')?40:20)+2*E.l+10*pul('log1');BTv=RH('bel2')?BELT/3:RH('bel')?BELT/2:BELT;RM=RH('hnd')?1.25:1;
+function rfx(){SPm=(1+(RH('spd1')?.1:0)+(RH('spd2')?.15:0)+(RH('spd3')?.2:0)+(RH('mas')?.2:0)-(RH('prm')?.05:0))*(1+.01*Math.min(24,LV-1))*(1+.05*pul('prd1'));STC=(RH('lag2')?80:RH('lag')?40:20)+10*pul('log1');BTv=RH('bel2')?BELT/3:RH('bel')?BELT/2:BELT;RM=RH('hnd')?1.25:1;
  PM=(RH('mkt')?1.05:1)*(RH('brd')?1.08:1)*(RH('exp')?1.08:1)*(RH('vtr')?1.05:1)*
-  (RH('prm')?1.12:1)*(RH('mas')?.95:1)*(1+.01*E.q)*(1+.02*G.bpt)*(1+.02*pul('log2'));
- OS=RH('off')?4:3;WG=(E.p+E.q+E.l)*WAGE*(1-.1*pul('mgt2'));KUC=RH('lean')?.88:1;KBC=RH('bau')?.85:1;KOF=RH('nst')?43200:OFF;OFFE=RH('nst')?.4:.25;RCm=RH('wrk')?.85:1}
+  (RH('prm')?1.12:1)*(RH('mas')?.95:1)*(1+.02*G.bpt)*(1+.02*pul('log2'));
+ OS=RH('off')?4:3;WG=crewRoles.reduce((sum,role)=>sum+assignedCrew(role.id),0)*WAGE*(1-.1*pul('mgt2'));KUC=RH('lean')?.88:1;KBC=RH('bau')?.85:1;KOF=RH('nst')?43200:OFF;OFFE=RH('nst')?.4:.25;RCm=RH('wrk')?.85:1}
 function buyR(n){if(!rOK(n)){deny('Voraussetzungen noch nicht erfüllt.');return}const cost=researchCost(n);if(G.rp<cost){deny('Nicht genug Forschungspunkte.');return}G.rp-=cost;G.rs.push(n.id);rfx();xp(30);sfx('unlock');toast('Erforscht: '+n.n);rflash[n.id]=1;sv(1);analyze()}
 const LVQ=n=>({t:'Spielerlevel '+n,ok:()=>LV>=n,p:()=>Math.min(LV,n)+'/'+n});
 const REQ=(t,n,k)=>({t,ok:()=>G[k]>=n,p:()=>Math.min(G[k],n)+'/'+n});
@@ -220,13 +265,14 @@ const beltCount=o=>o.it<0?0:1+o.queue.length;
 const beltCapacity=o=>Math.min(60/beltTime(o.t),60*beltSize(o.t)/TICK);
 const terminal=t=>typeShip(t)||t=='prj'||!!(MD[t]?.supply||MD[t]?.distribution);
 const prod=o=>MD[o.t]?.o!=null;
-const cap=o=>Math.floor(STC*(1+(o.cb||0)));
+const cap=o=>Math.floor((STC+(o.extraStorage||0))*(1+(o.cb||0)));
 const inputCap=(o,i)=>MD[o.t].r[i][1]*2;
 const spd=(o,level=o.lv)=>Math.pow(1.18,Math.min(60,level)-1)*SPm*(o.sb||1)*xsp(o);
 const tme=(o,level=o.lv)=>MD[o.t].w/spd(o,level);
 const defaultSize=t=>MD[t]?.size||[1,1];
 const {dimensions,footprint,port}=FactoryGrid;
 function mapObject(o,value){
+ teamPaths.clear();
  for(const [x,y] of footprint(o))g[y*GW+x]=value;
 }
 function neighbor(o,d){
@@ -265,6 +311,7 @@ const legacyPlots=[
 const logisticsSiteError='Baue Logistik auf dem Werksboden rund um deine Hallen.';
 let industrial;
 function refreshIndustrialArea(){
+ teamPaths.clear();
  const plots=HL.filter(hall=>hlv(hall.id)>0).map(hall=>{
   const rect=hrect(hall);
   return {rect,site:siteAt(rect[0],rect[1])};
@@ -335,8 +382,8 @@ function init(value){
  resetPlanning();
  projectCargo.clear();projectTrucks.length=0;
  rejectedBuild=null;
- currentSite='main';traffic.clear();
- G={plans:[],contracts:[],contractWins:{},supplyOrders:{},epoch:0,stock:{},activeBoosts:{},milestones:{},lineCounts:{},wins:{},history:[],units:0,productTracks:{},recent:FactoryTelemetry.create(0,TICK),goals:{mass:0,quality:0,efficiency:0,logistics:0,lab:0},legacyPlots:[],m:120,te:0,sold:0,made:0,pk:0,cost:0,tk:0,ord:0,od:[],hl:{gar:1},pc:{},sl:new Array(ITEMS.length).fill(0),saleIncome:{},rp:0,rs:[],ds:new Array(ITEMS.length).fill(0),emp:{p:0,q:0,l:0,w:0,d:0,a:0},mg:[],wc:0,xp:0,pl:0,bt:[],ac:[],bp:0,bpt:0,pr:0,pu:{},tr:0,ordRun:0,tu:-1,th:[],sp:0,sq:[],st:0,sd:0,sf:{},late:0,end:0};L=[];g=[];
+ currentSite='main';traffic.clear();teamPaths.clear();teamTrips.length=0;teamHall='gar';teamTab=0;teamSpecialty=null;
+ G={plans:[],crew:{},contracts:[],contractWins:{},supplyOrders:{},epoch:0,stock:{},activeBoosts:{},milestones:{},lineCounts:{},wins:{},history:[],units:0,productTracks:{},recent:FactoryTelemetry.create(0,TICK),goals:{mass:0,quality:0,efficiency:0,logistics:0,lab:0},legacyPlots:[],m:120,te:0,sold:0,made:0,pk:0,cost:0,tk:0,ord:0,od:[],hl:{gar:1},pc:{},sl:new Array(ITEMS.length).fill(0),saleIncome:{},rp:0,rs:[],ds:new Array(ITEMS.length).fill(0),emp:{p:0,q:0,l:0,w:0,d:0,a:0},mg:[],wc:0,xp:0,pl:0,bt:[],ac:[],bp:0,bpt:0,pr:0,pu:{},tr:0,ordRun:0,tu:-1,th:[],sp:0,sq:[],st:0,sd:0,sf:{},late:0,end:0};L=[];g=[];
  const compacted=new Map();
  if(d){for(const k of['m','te','sold','made','pk','cost','tk','ord','rp','wc','xp','pl','bp','bpt','pr','tr','ordRun','sp','st','sd','late','end'])if(typeof d[k]=='number')G[k]=d[k];
   for(let i=0;i<ITEMS.length;i++){
@@ -361,6 +408,7 @@ function init(value){
     o.p=prod(o)&&Number.isFinite(extra.p)?Math.max(0,Math.min(MD[t].w,extra.p)):0;
     o.iq=qvalue(extra.iq);o.oq=qvalue(extra.oq);o.pq=qvalue(extra.pq);
     o.jumped=extra.jumped===true;
+    o.teamDepot=isStorage(t)&&extra.teamDepot===true;
     o.beltCarry=Math.max(0,Math.min(TICK,Number(extra.beltCarry)||0));
     o.carryTick=Number.isInteger(extra.carryTick)?extra.carryTick:-2;
     o.sortRule=Number.isInteger(extra.sortRule)&&(t=='sorter'?!!sortingGroups[extra.sortRule]:!!ITEMS[extra.sortRule])?extra.sortRule:-1;
@@ -381,7 +429,16 @@ function init(value){
   G.hl={gar:1};if(d.hl)for(const h of HL){const l=d.hl[h.id]|0;if(l>0)G.hl[h.id]=Math.min(h.rc.length,l)}
   G.rs=Object.values(d.rs||{}).filter(id=>id==='grd'||RN.some(n=>n.id==id));
   if(d.emp)for(const k of Object.keys(G.emp))G.emp[k]=Math.max(0,Math.min(12,d.emp[k]|0));
-  G.mg=Object.values(d.mg||{}).map(e=>({id:e.id,lv:Math.max(1,Math.min(10,e.lv|0||1)),sp:Math.max(0,Math.min(2,e.sp|0)),x:e.x==null?-1:e.x|0,y:e.y==null?-1:e.y|0})).filter(m=>MG.some(g=>g.id==m.id));
+  for(const {id} of crewRoles){
+   let available=G.emp[id];
+   for(const hall of HL){
+    if(!hlv(hall.id))continue;
+    const saved=d.crewVersion===1?d.crew?.[hall.id]?.[id]:hall.id==='gar'?available:0;
+    const amount=Math.max(0,Math.min(available,saved|0));
+    if(amount){(G.crew[hall.id]??={})[id]=amount;available-=amount}
+   }
+  }
+  G.mg=Object.values(d.mg||{}).filter(e=>e&&MG.some(g=>g.id===e.id)).map(e=>({id:e.id,lv:Math.max(1,Math.min(10,e.lv|0||1)),sp:Math.max(0,Math.min(2,e.sp|0)),x:e.x==null?-1:e.x|0,y:e.y==null?-1:e.y|0,hall:hlv(e.hall)?e.hall:undefined}));
   G.bt=Object.values(d.bt||{}).filter(t=>t=='belt'||MD[t]);G.ac=Object.values(d.ac||{}).filter(id=>AC.some(a=>a.id===id));
   G.pu={...d.pu};for(const p of PU)G.pu[p.id]=Math.max(0,Math.min(p.max,d.pu?.[p.id]|0));
   G.tu=typeof d.tu=='number'?d.tu:-1;if(G.tu>=TU.length)G.tu=-1;G.th=d.th?Object.values(d.th).filter(x=>typeof x=='string'):[];
@@ -482,6 +539,18 @@ function sellProduct(q,item){
  if(!fs)PO.push({x:(q.x+.5)*TS,y:q.y*TS,t:0,v:'+'+value});
  return true;
 }
+function receiveStorage(store,item,quality){
+ if(store.q.length>=cap(store))return false;
+ store.q.push(item);store.qq.push(quality);
+ record(store,'arrivals');store.activity=G.tk;store.incoming=item;
+ return true;
+}
+function receiveRecipe(machine,item,quality){
+ const i=acc2(machine,item);
+ if(i<0)return false;
+ machine.iv[i]++;machine.ivq[i]+=quality;
+ return true;
+}
 function give(o,d,s,quality=100,jump=null){
  const q=jump||neighbor(o,d);
  if(!q||o.needsRelocation||q.needsRelocation||!ITEMS[s]||siteAt(o.x,o.y)!==siteAt(q.x,q.y))return false;
@@ -503,18 +572,13 @@ function give(o,d,s,quality=100,jump=null){
   q.xs[entry]=s;q.xq[entry]=quality;q.xa[entry]=0;return true;
  }
  if(q.t=='prj')return prjIn(s,q);
- if(isStorage(q.t)){
-  if(q.q.length>=cap(q))return false;
-  q.q.push(s);q.qq.push(quality);record(q,'arrivals');q.activity=G.tk;q.incoming=s;return true;
- }
+ if(isStorage(q.t))return receiveStorage(q,s,quality);
  if(MD[q.t]?.inspect){
   if(q.it>=0)return false;
   q.it=s;q.iq=quality;q.ag=0;q.mt=G.tk;return true;
  }
  if(typeShip(q.t))return sellProduct(q,s);
- const i=acc2(q,s);
- if(i<0)return false;
- q.iv[i]++;q.ivq[i]+=quality;return true;
+ return receiveRecipe(q,s,quality);
 }
 function startRecipe(o,d){
  let used=0;
@@ -604,6 +668,7 @@ if(isBelt(o.t)){moveBelt(o);continue}
   o.es=o.es*.99+(status==2?.01:0);
   o.eb=o.eb*.99+(status==3?.01:0);
  }
+ if(G.tk%8===0)workCrews();
 }
 function analyze(){
  const phase=PH[G.sp];
@@ -678,7 +743,8 @@ function backupOriginal(save,suffix){
 function backupBeforeMigration(save){
  if(save.v!==2)return backupOriginal(save,'before-v2');
  const oversized=Object.values(save.o||{}).some(row=>row?.[10]?.large===true&&MD[row[2]]?.previousSize);
- return !oversized||backupOriginal(save,'before-compact-buildings');
+ const oldTeam=save.crewVersion!==1&&(crewRoles.some(role=>save.emp?.[role.id]>0)||Object.values(save.mg||{}).length>0);
+ return (!oversized||backupOriginal(save,'before-compact-buildings'))&&(!oldTeam||backupOriginal(save,'before-hall-teams'));
 }
 function applySave(value){
  stQ=[];ff=null;saveAfterTick=false;closeP2();
@@ -738,7 +804,7 @@ function snapshot(){
   carry:Math.max(0,acc),m:G.m,te:G.te,sold:G.sold,made:G.made,units:G.units,productTracks:G.productTracks,pk:G.pk,cost:G.cost,
   tk:G.tk,ord:G.ord,tr:G.tr,ordRun:G.ordRun,history:G.history,rt:Math.round(rate()*10)/10,
   hl:G.hl,legacyPlots:G.legacyPlots,site:currentSite,sp:G.sp,sq:G.sq.map(v=>v|0),st:G.st,sd:G.sd,sf:G.sf,late:G.late,end:G.end,
-  emp:G.emp,mg:G.mg,wc:G.wc,xp:G.xp,pl:G.pl,bt:G.bt,ac:G.ac,bp:G.bp,bpt:G.bpt,pr:G.pr,pu:G.pu,
+  emp:G.emp,crew:G.crew,crewVersion:1,mg:G.mg,wc:G.wc,xp:G.xp,pl:G.pl,bt:G.bt,ac:G.ac,bp:G.bp,bpt:G.bpt,pr:G.pr,pu:G.pu,
   tu:G.tu,th:G.th,rp:G.rp,rs:G.rs,ds:G.ds,sl:G.sl,saleIncome:G.saleIncome,pc:G.pc,
   ...(G.legacySaturation?{sa:G.legacySaturation}:{}),
   plans:G.plans,epoch:G.epoch,stock:G.stock,activeBoosts:G.activeBoosts,milestones:G.milestones,
@@ -750,6 +816,7 @@ function snapshot(){
    {
     up:o.up,spec:o.spec,paused:o.paused,priority:o.priority,control:o.control,credits:o.credits,threshold:o.threshold,
     wk:!!o.wk,p:o.p,supplyItem:o.supplyItem,supplyStock:o.supplyStock,iq:o.iq,oq:o.oq,pq:o.pq,ivq:o.iv.map((n,i)=>n?o.ivq[i]/n:100),
+    ...(o.teamDepot?{teamDepot:true}:{}),
     qq:o.qq,xq:o.xq,ag:o.ag,ein:o.ein,xa:o.xa||[],large:o.base.some(n=>n>1),
     queue:o.queue,beltCarry:o.beltCarry,carryTick:o.carryTick,jumped:o.jumped,sortRule:o.sortRule,smartMode:o.smartMode,stats:o.stats,recent:o.recent
    }
@@ -1181,6 +1248,7 @@ function dm(o,wk){
  c.fillStyle=o.t=='shp'||o.t=='prj'?'#4ade80':['','#4ade80','#facc15','#ef4444'][o.st]||'#888';if(w){c.shadowColor=c.fillStyle;c.shadowBlur=8}c.beginPath();c.arc(h-8,-h+8,3.2,0,PI*2);c.fill();c.shadowBlur=0;
  if(!terminal(o.t)){saveCanvas();c.rotate(o.r*PI/2);c.fillStyle='#ffd23f';c.beginPath();c.moveTo(h-1,0);c.lineTo(h-9,-6);c.lineTo(h-9,6);c.fill();restoreCanvas()}
  if(o.mg){c.fillStyle='#fde68a';c.strokeStyle='#7c5a00';c.lineWidth=1;c.beginPath();c.arc(-h+9,-h+9,5.5,0,PI*2);c.fill();c.stroke();tx('M',-h+9,-h+12.5,8,'#5b3d00','center',800)}
+  if(o.teamDepot&&inG(o.x,o.y)){rr(h-18,-h+4,13,12,3,'#246554');tx('T',h-11.5,-h+13,8,'#d7f9e7','center',800)}
  if(o.lv>1&&o.t!='shp'&&o.t!='prj')tx('L'+o.lv,-h+5,h-6,9,'#fff','left',800)}
 function db(o){const e=feed(o),b=(o.r+2)%4;saveCanvas();c.translate((o.x+.5)*TS,(o.y+.5)*TS);c.rotate(o.r*PI/2);
  if(e!=b){const s=e==(o.r+1)%4?1:-1,R=TS/2,W=19,a0=s>0?PI:PI/2,a1=s>0?1.5*PI:PI,ar=(x,y,r,p,q,cc)=>c.arc(x,y,r,p,q,cc);
@@ -1233,61 +1301,159 @@ function ghost(t,r,x,y,ok,base=defaultSize(t)){
  c.fillStyle=ok?'#22c55e55':'#ef444466';c.fillRect(x*TS,y*TS,w*TS,h*TS);
 }
 const traffic=new Map();
+const teamTrips=[],teamPaths=new Map();
 const floorRoute=(start,finish,hall)=>FactoryGrid.floorRoute(start,finish,GW,(x,y)=>inR(hrect(hall),x,y)&&!cell(x,y));
-function freeSide(o,hall){
- return [3,1,2,0].map(d=>port(o,d)).find(([x,y])=>inR(hrect(hall),x,y)&&!cell(x,y));
+function freeSides(o,hall){
+ return [3,1,2,0].map(d=>port(o,d)).filter(([x,y])=>inR(hrect(hall),x,y)&&!cell(x,y));
 }
-function factoryTraffic(visible,canPlan){
- const {p,q,l}=G.emp,workers=Math.min(5,p+q+l);
- const site=REGIONS.find(r=>r.id==currentSite);
- const objects=visible.filter(o=>siteAt(o.x,o.y)===site);
- for(let type=0;type<2;type++){
-  const slots=type==0?workers:1;
-  for(let i=0;i<slots;i++){
-   const key=site.id+'-'+type+'-'+i;
-   let trip=traffic.get(key);
-   if(!trip||tm>=trip.until){
-    if(!canPlan)continue;
-    const from=type==1?objects.filter(o=>(isStorage(o.t)||typeShip(o.t))&&G.tk-(o.activity||-1000)<240):objects.filter(o=>prod(o)&&o.st==1);
-    const origin=from.length?from[(i+Math.floor(tm/12))%from.length]:null;
-    const hall=origin&&areaAt(origin.x,origin.y);
-    const start=hall&&hlv(hall.id)>0&&freeSide(origin,hall);
-    const destinations=start?objects.filter(o=>o!==origin&&areaAt(o.x,o.y)===hall&&(prod(o)||isStorage(o.t)||typeShip(o.t))):[];
-    let path=[];
-    const attempts=Math.min(6,destinations.length),first=(i+Math.floor(tm/3))%Math.max(1,destinations.length);
-    for(let offset=0;offset<attempts;offset++){
-     const target=freeSide(destinations[(first+offset)%destinations.length],hall);
-     if(!target)continue;
-     path=floorRoute(start,target,hall);
-     if(path.length>2)break;
-    }
-    const speed=type==1?.29:.46,travel=path.length*speed;
-    trip={path,start:tm,until:tm+Math.max(3,travel*2+2),speed};
-    traffic.set(key,trip);
-   }
-   const path=trip.path,travel=(path.length-1)*trip.speed;
-   if(path.length<3||tm-trip.start>=2*travel)continue;
-   const elapsed=tm-trip.start,reverse=elapsed>travel,step=(reverse?2*travel-elapsed:elapsed)/trip.speed;
-   const index=Math.min(path.length-2,Math.floor(step)),t=Math.max(0,step-index);
-   const [ax,ay]=path[index],[bx,by]=path[index+1];
-   if(cell(ax,ay)||cell(bx,by)){trip.until=tm;continue}
-   const x=(ax+.5+(bx-ax)*t)*TS,y=(ay+.5+(by-ay)*t)*TS;
-   saveCanvas();c.translate(x,y);
-   if(type==1){
-    const facing=DX.findIndex((dx,d)=>dx==bx-ax&&DY[d]==by-ay);
-    c.rotate((facing+(reverse?2:0))*PI/2);
-    rr(-17,-8,32,20,5,'#0004');rr(-15,-9,24,18,4,'#e6aa30');rr(-10,-6,9,12,2,'#303a43');
-    c.fillStyle='#414954';c.fillRect(6,-6,12,3);c.fillRect(6,3,12,3);
-    if(!reverse){rr(10,-6,12,12,2,'#9b6838');c.fillStyle='#e2bc7c';c.fillRect(14,-6,3,12)}
-   }else{
-    const stride=Math.sin(tm*11+i)*3;
-    c.fillStyle='#0004';c.beginPath();c.ellipse(0,8,7,3,0,PI*2);c.fill();
-    c.fillStyle='#303943';c.fillRect(-3+stride,3,2.4,6);c.fillRect(1-stride,3,2.4,6);
-    rr(-5,-5,10,9,3,['#dd8740','#4a9cd1','#80a95a'][i%3]);rr(-4,-12,8,7,3,'#e9c092');rr(-4,-13,8,4,2,'#e9bc49');
-   }
-   restoreCanvas();
+function teamRoute(from,to,hall){
+ const key=[from.x,from.y,from.r,to.x,to.y,to.r].join(',');
+ if(!teamPaths.has(key)){
+  if(teamPaths.size>=384)teamPaths.clear();
+  const starts=freeSides(from,hall),ends=freeSides(to,hall);
+  let path=[];
+  for(const start of starts){
+   if(ends.some(end=>(path=floorRoute(start,end,hall)).length>0))break;
+  }
+  teamPaths.set(key,path);
+ }
+ return teamPaths.get(key);
+}
+function completeHallJob(hall,from,to,item,quality,color,remove){
+ const path=teamRoute(from,to,hall);
+ if(!path.length)return false;
+ const delivered=isStorage(to.t)?receiveStorage(to,item,quality):to.t==='prj'?prjIn(item,to):typeShip(to.t)?sellProduct(to,item):receiveRecipe(to,item,quality);
+ if(!delivered)return false;
+ remove();
+ if(!fs){
+  if(teamTrips.length===48)teamTrips.shift();
+  teamTrips.push({path,started:tm,item,color});
+ }
+ return true;
+}
+function hallJobs(hall,objects){
+ const depots=objects.filter(o=>isStorage(o.t)&&o.teamDepot),machines=objects.filter(prod);
+ const misrouted=o=>isBelt(o.t)&&o.it>=0&&o.bad;
+ const goesToProject=o=>neighbor(o,beltDirections(o)[0])?.t==='prj';
+ function fromDepot(depot,i,to,color){
+  return completeHallJob(hall,depot,to,depot.q[i],depot.qq[i],color,()=>{
+   depot.q.splice(i,1);depot.qq.splice(i,1);record(depot,'moves');
+  });
+ }
+ function needed(machine,item){
+  return MD[machine.t].r?.some(([id,count],i)=>id===item&&machine.iv[i]<count);
+ }
+ function store(from,item,value,color,remove){
+  return depots.some(depot=>depot.q.length<cap(depot)&&completeHallJob(hall,from,depot,item,value,color,remove));
+ }
+ return {
+  p:color=>machines.some(machine=>depots.some(depot=>{
+   const index=depot.q.findIndex(item=>needed(machine,item));
+   return index>=0&&fromDepot(depot,index,machine,color);
+  })),
+  q:color=>objects.some(o=>misrouted(o)&&!goesToProject(o)&&store(o,o.it,o.iq,color,()=>{
+   record(o,'moves');clearBelt(o);
+  })),
+  l:color=>objects.filter(o=>o.t==='prj'||typeShip(o.t)).sort((a,b)=>Number(b.t==='prj')-Number(a.t==='prj')).some(sink=>depots.some(depot=>{
+   const index=depot.q.findIndex(item=>sink.t==='prj'?prjNeed(item):!prjNeed(item)&&orderFor(item));
+   return index>=0&&fromDepot(depot,index,sink,color);
+  })),
+  prod:color=>machines.some(o=>o.out>=0&&o.st===3&&store(o,o.out,o.oq,color,()=>{o.out=-1})),
+  qual:color=>objects.some(o=>misrouted(o)&&goesToProject(o)&&store(o,o.it,o.iq,color,()=>{record(o,'moves');clearBelt(o)})),
+  eng:color=>machines.some(source=>source.out>=0&&source.st===3&&machines.some(target=>target!==source&&needed(target,source.out)&&completeHallJob(hall,source,target,source.out,source.oq,color,()=>{source.out=-1}))),
+  log:color=>depots.some(source=>source.q.length>=cap(source)&&depots.some(target=>{
+   return source!==target&&target.q.length+1<cap(target)&&fromDepot(source,0,target,color);
+  }))
+ };
+}
+function workCrews(){
+ const due=new Map(),second=G.tk/8;
+ function schedule(hall,id,color,count){
+  if(!due.has(hall))due.set(hall,[]);
+  due.get(hall).push({id,color,count});
+ }
+ for(const manager of G.mg){
+  const hall=managerHall(manager),kind=MG.find(d=>d.id===manager.id);
+  const interval=Math.max(2,7-Math.ceil(manager.lv/2)-(RH('ldr')?1:0));
+  if(hall&&hlv(hall.id)&&second%interval===0)schedule(hall,kind.id,kind.color,1);
+ }
+ for(const hall of HL)for(const role of crewRoles){
+  const assigned=crewCount(hall.id,role.id),interval=role.id==='p'&&RH('sch')?2:3;
+  const count=Math.floor(second*assigned/interval)-Math.floor((second-1)*assigned/interval);
+  if(count>0)schedule(hall,role.id,role.color,count);
+ }
+ if(!due.size)return;
+ const rooms=new Map();
+ for(const o of L){
+  if(o.needsRelocation)continue;
+  const hall=areaAt(o.x,o.y);
+  if(!due.has(hall))continue;
+  if(!rooms.has(hall))rooms.set(hall,[]);
+  rooms.get(hall).push(o);
+ }
+ for(const [hall,objects] of rooms){
+  const jobs=hallJobs(hall,objects);
+  for(const {id,count,color} of due.get(hall))for(let i=0;i<count;i++){
+   if(!jobs[id](color))break;
   }
  }
+}
+function drawTeamTrips(intersects){
+ for(let i=teamTrips.length-1;i>=0;i--){
+  const {path,started,item,color}=teamTrips[i];
+  const step=Math.max(0,(tm-started)*3.2),last=path.length-1;
+  if(step>=last+1.6){teamTrips.splice(i,1);continue}
+  const n=Math.min(Math.floor(step),last),t=Math.min(1,step-n);
+  const [a,b]=path[n],[x,y]=path[Math.min(n+1,last)];
+  if(cell(a,b)||cell(x,y)){teamTrips.splice(i,1);continue}
+  const px=(a+.5+(x-a)*t)*TS,py=(b+.5+(y-b)*t)*TS;
+  if(!intersects(px-16,py-19,32,38))continue;
+  withCanvasState(()=>{
+   c.translate(px,py);
+   const stride=step<last?Math.sin(step*4)*3:0;
+   rr(-7,6,14,5,2,'#0004');rr(-3+stride,3,3,7,1,'#303943');rr(1-stride,3,3,7,1,'#303943');
+   rr(-5,-5,10,10,3,color);rr(-4,-12,8,7,3,'#e9c092');rr(-4,-14,8,4,2,'#e9bc49');
+   rr(3,0,9,7,1.5,'#c89b5e');rr(6,0,2,7,1,'#f1d899');
+   if(cameraZoom()>=.62)ico(item,8,-11,.5);
+  });
+ }
+}
+function factoryTraffic(visible,canPlan){
+ const site=REGIONS.find(r=>r.id===currentSite);
+ let trip=traffic.get(site.id);
+ if(!trip||tm>=trip.until){
+  if(!canPlan)return;
+  const objects=visible.filter(o=>siteAt(o.x,o.y)===site);
+  const recent=objects.filter(o=>(isStorage(o.t)||typeShip(o.t))&&G.tk-(o.activity||-1000)<240);
+  const origin=recent[Math.floor(tm/12)%recent.length],hall=origin&&areaAt(origin.x,origin.y);
+  const start=hall&&hlv(hall.id)>0&&freeSides(origin,hall)[0];
+  const destinations=start?objects.filter(o=>o!==origin&&areaAt(o.x,o.y)===hall&&(prod(o)||isStorage(o.t)||typeShip(o.t))):[];
+  let path=[];
+  const attempts=Math.min(6,destinations.length),first=Math.floor(tm/3)%Math.max(1,destinations.length);
+  for(let i=0;i<attempts;i++){
+   const target=freeSides(destinations[(first+i)%destinations.length],hall)[0];
+   if(!target)continue;
+   path=floorRoute(start,target,hall);
+   if(path.length>2)break;
+  }
+  trip={path,start:tm,until:tm+Math.max(3,path.length*.58+2)};
+  traffic.set(site.id,trip);
+ }
+ const path=trip.path,travel=(path.length-1)*.29,elapsed=tm-trip.start;
+ if(path.length<3||elapsed>=2*travel)return;
+ const reverse=elapsed>travel,step=(reverse?2*travel-elapsed:elapsed)/.29;
+ const index=Math.min(path.length-2,Math.floor(step)),t=Math.max(0,step-index);
+ const [ax,ay]=path[index],[bx,by]=path[index+1];
+ if(cell(ax,ay)||cell(bx,by)){trip.until=tm;return}
+ const x=(ax+.5+(bx-ax)*t)*TS,y=(ay+.5+(by-ay)*t)*TS;
+ withCanvasState(()=>{
+  c.translate(x,y);
+  const facing=DX.findIndex((dx,d)=>dx===bx-ax&&DY[d]===by-ay);
+  c.rotate((facing+(reverse?2:0))*PI/2);
+  rr(-17,-8,32,20,5,'#0004');rr(-15,-9,24,18,4,'#e6aa30');rr(-10,-6,9,12,2,'#303a43');
+  c.fillStyle='#414954';c.fillRect(6,-6,12,3);c.fillRect(6,3,12,3);
+  if(!reverse){rr(10,-6,12,12,2,'#9b6838');c.fillStyle='#e2bc7c';c.fillRect(14,-6,3,12)}
+ });
 }
 function applyCamera(){
  const [x,y]=worldToView(0,0),zoom=cameraZoom();
@@ -1326,7 +1492,7 @@ function world(){
    hover:tool==='hand'&&!buildMode&&hv&&inR(SITE,...hv),detail});
  });
  drawLayer('Wolkenschatten',()=>worldArt.clouds(time,intersects));
- drawLayer('Werksverkehr',()=>factoryTraffic(visible,!moving));
+ drawLayer('Werksverkehr',()=>{factoryTraffic(visible,!moving);drawTeamTrips(intersects)});
  for(const o of visible){
   const [w,h]=dimensions(o);
   if(isLogistics(o.t)&&!logisticsHall(o.x,o.y,o.x+w-1,o.y+h-1)){
@@ -1757,28 +1923,82 @@ function chainPanel(X,Y,W,H){
  btn(X+W-143,Y+287,126,25,()=>{statsPage++},'#334155');
  tx('Seite '+(page+1)+' / '+pages+' ›',X+W-80,Y+304,10.5,'#fff','center',700);
 }
-function pnPanel(){const [X,Y,W,H]=MENUS.pn.box,E=G.emp;
- btn(X,Y,W,H,()=>{},'#0f141bf8');c.strokeStyle='#ffffff22';c.lineWidth=1;c.beginPath();c.roundRect(X,Y,W,H,12);c.stroke();
- tx('👥 Personal',X+16,Y+26,16,'#fff','left',800);tx('Löhne: '+fm(WG)+' €/Min',X+W-60,Y+26,12.5,WG?'#fca5a5':'#94a3b8','right',700);
- panelClose(X,Y,W,()=>{pnO=false});
- tx('Mitarbeiter',X+16,Y+52,12,'#94a3b8','left',800);tx('Manager',X+338,Y+52,12,'#94a3b8','left',800);
- const departments=[
-  ['p','Produktion','+'+(RH('sch')?3:2)+' % Tempo'],
-  ['q','Qualitätskontrolle','+1 % Verkaufspreis'],
-  ['l','Lager','+2 Lagerplätze']
- ];
- departments.forEach(([k,n,e],i)=>{const y=Y+60+i*84,cs=hcost(k);
-  rr(X+12,y,304,76,10,'#ffffff0a');tx(n,X+24,y+20,13,'#fff','left',800);tx(E[k]+' / 12',X+304,y+20,12,'#fde68a','right',700);tx(e+' je Person · Lohn '+WAGE+' €/Min',X+24,y+38,10.5,'#94a3b8');
-  btn(X+24,y+48,154,22,()=>hireE(k),G.m>=cs&&E[k]<12?'#2f9e6b':'#475569');tx('Einstellen · '+fm(cs)+' €',X+101,y+63,11,'#fff','center',700);
-  btn(X+186,y+48,118,22,()=>fireE(k),E[k]>0?'#7f1d1d':'#334155');tx('Entlassen',X+245,y+63,11,'#fff','center',700)});
- MG.forEach((d,i)=>{const y=Y+60+i*66,m=G.mg.find(q=>q.id==d.id);rr(X+328,y,384,60,10,'#ffffff0a');tx(d.n,X+340,y+17,12.5,'#fff','left',800);tx(d.r,X+340,y+31,10.5,'#94a3b8');
-  if(!m){if(!d.cond[1]())tx('🔒 '+d.cond[0],X+340,y+51,10.5,'#fca5a5','left',700);else{btn(X+340,y+38,160,20,()=>hireM(d),G.m>=d.cost?'#2f9e6b':'#475569');tx('Einstellen · '+fm(d.cost)+' €',X+420,y+52,10.5,'#fff','center',700)}}
-  else{const t=m.x>=0?cell(m.x,m.y):null,ok=t&&comp(d,t);tx('Lv '+m.lv+'/10',X+702,y+17,12,'#fde68a','right',800);
-   tx(m.lv>=5&&!m.sp?'Ab Lv 5: Spezialist (×1,5 am Ziel) oder Generalist (×0,6 an der ganzen Linie)':d.lab+' '+(d.kind=='eng'?'−':'+')+Math.round(meff(m,d)*100)+' % · '+(ok?'Ziel: '+MD[t.t].n:'nicht zugewiesen'),X+702,y+31,10,ok||m.lv>=5&&!m.sp?'#cbd5e1':'#fca5a5','right',600);
-   btn(X+340,y+38,112,20,()=>lvlM(m,d),m.lv<10&&G.m>=lcost(m,d)?'#2f9e6b':'#475569');tx(m.lv<10?'Level ↑ '+fm(lcost(m,d))+' €':'Max.',X+396,y+52,10.5,'#fff','center',700);
-   btn(X+458,y+38,96,20,()=>{asg=d.id;pnO=false;sfx('click')},'#334155');tx('⌖ Zuweisen',X+506,y+52,10.5,'#fff','center',700);
-   if(m.lv>=5&&!m.sp){btn(X+560,y+38,72,20,()=>specM(m,1),'#7c3aed');tx('Spezialist',X+596,y+52,10.5,'#fff','center',700);btn(X+638,y+38,72,20,()=>specM(m,2),'#7c3aed');tx('Generalist',X+674,y+52,10.5,'#fff','center',700)}
-   else if(m.sp)tx(m.sp==1?'Spezialist':'Generalist',X+702,y+52,10.5,'#c4b5fd','right',800)}});
+let teamHall='gar',teamTab=0,teamSpecialty=null;
+function teamBox(){
+ return [40,64,Math.min(720,FW-18),teamTab===0?521:690];
+}
+function pnPanel([X,Y,W,H]){
+ const halls=HL.filter(hall=>hlv(hall.id)>0);
+ const index=Math.max(0,halls.findIndex(hall=>hall.id===teamHall)),hall=halls[index];
+ const workers=crewRoles.reduce((sum,role)=>sum+crewCount(hall.id,role.id),0);
+ const depots=L.filter(o=>o.teamDepot&&!o.needsRelocation&&areaAt(o.x,o.y)===hall).length;
+ pnlBox(X,Y,W,H,'Hallenteam',()=>{pnO=false});
+ const action=(id,label,x,y,w,fn,enabled=true,color='#334e66')=>{
+  btn(x,y,w,28,enabled?fn:()=>{},enabled?color:'#273340',0,enabled?id:null);
+  fitText(label,x+w/2,y+18,w-10,11.5,enabled?'#fff':'#9baabb','center',700);
+ };
+ const choose=direction=>{teamHall=halls[(index+direction+halls.length)%halls.length].id;sfx('select')};
+ action('team_hall_prev','‹',X+13,Y+41,35,()=>choose(-1),halls.length>1);
+ action('team_hall_next','›',X+W-48,Y+41,35,()=>choose(1),halls.length>1);
+ fitText(hall.n+' · '+(index+1)+' / '+halls.length,X+W/2,Y+60,W-110,15,'#e2edf6','center',800);
+ const half=(W-35)/2;
+ action('team_crew','Mitarbeiter',X+13,Y+81,half,()=>{teamTab=0;teamSpecialty=null},true,teamTab===0?'#336ca5':'#253344');
+ action('team_managers','Manager',X+22+half,Y+81,half,()=>{teamTab=1},true,teamTab===1?'#336ca5':'#253344');
+ fitText(depots+' Team-Lager · '+workers+' Mitarbeitende · '+fm(WG)+' €/Min gesamt',X+14,Y+127,W-28,11,'#b3c9d6','left',700);
+ fitText('Team-Lager im Menü eines Zwischenlagers in der Halle aktivieren.',X+14,Y+143,W-28,10.5,'#c7d7e4');
+ const cardX=X+13,cardW=W-26,part=(cardW-32)/3;
+ function row(label,y,color){
+  rr(cardX,y,cardW,teamTab===0?108:124,8,'#1c2935');
+  rr(cardX+9,y+8,4,13,2,color);
+  fitText(label,cardX+20,y+19,cardW-78,13,'#fff','left',800);
+ }
+ function description(description,y){
+  tuWrap(description,cardW-20,'600 10.5px system-ui').slice(0,2).forEach((line,i)=>tx(line,cardX+10,y+i*13,10.5,'#cbd5e1','left',600));
+ }
+ if(teamTab===0){
+  for(const [i,role] of crewRoles.entries()){
+   const k=role.id,y=Y+155+i*115,assigned=crewCount(hall.id,k),reserve=G.emp[k]-assignedCrew(k),cost=hcost(k);
+   row(role.label,y,role.color);
+   description(role.description,y+37);
+   const detail=!role.unlock()&&G.emp[k]===0?role.require:assigned+' in dieser Halle · '+reserve+' verfügbar · '+G.emp[k]+' / 12 angestellt';
+   fitText(detail,cardX+10,y+65,cardW-20,10.5,'#f1cb85');
+   const start=cardX+10,buttonY=y+73;
+   action('crew_hire_'+k,'Einstellen '+fm(cost)+' €',start,buttonY,part,()=>hireE(k,hall.id),role.unlock()&&G.emp[k]<12&&G.m>=cost,'#2c694f');
+   action('crew_assign_'+k,'Einsetzen',start+part+6,buttonY,part,()=>setCrew(k,hall.id,1),reserve>0);
+   action('crew_remove_'+k,'Abziehen',start+2*(part+6),buttonY,part,()=>setCrew(k,hall.id,-1),assigned>0);
+  }
+  return;
+ }
+ if(teamSpecialty){
+  const manager=G.mg.find(m=>m.id===teamSpecialty);
+  const y=Y+166;
+  tx('Spezialisierung',X+16,y+12,14,'#fff','left',800);
+  description('Spezialist: stärkerer Bonus am Ziel. Generalist: kleinerer Bonus entlang der verbundenen Linie in der Halle.',y+36);
+  action('manager_specialist','Spezialist',X+14,y+78,half,()=>{specM(manager,1);teamSpecialty=null});
+  action('manager_generalist','Generalist',X+23+half,y+78,half,()=>{specM(manager,2);teamSpecialty=null});
+  action('manager_cancel','Zurück',X+14,y+112,W-28,()=>{teamSpecialty=null});
+  return;
+ }
+ for(const [i,d] of MG.entries()){
+  const m=G.mg.find(manager=>manager.id===d.id),room=m&&managerHall(m),y=Y+155+i*131;
+  row(d.r,y,d.color);
+  description(d.task,y+51);
+  fitText(d.n+(m?' · Level '+m.lv+' / 10':''),cardX+10,y+34,cardW-20,10.5,'#b3c9d6','left',700);
+  const start=cardX+10,buttonY=y+87;
+  if(!m){
+   fitText(d.cond[1]()?'Verfügbar':d.cond[0],start,y+78,cardW-20,10.5,d.cond[1]()?'#97e4bb':'#f1cb85');
+   action('manager_hire_'+d.id,'Einstellen · '+fm(d.cost)+' €',start,buttonY,cardW-20,()=>hireM(d),d.cond[1]()&&G.m>=d.cost,'#2c694f');
+   continue;
+  }
+  const target=managerTarget(m,d),useHere=room===hall;
+  fitText((room?.n||'Nicht eingesetzt')+(target?' · '+d.lab+' '+(d.id==='eng'?'−':'+')+Math.min(d.id==='eng'?60:Infinity,Math.round(meff(m,d)*100))+' %':'')+(m.sp?' · '+(m.sp===1?'Spezialist':'Generalist'):''),start,y+78,cardW-20,10.5,room?'#97e4bb':'#f1cb85');
+  action('manager_assign_'+d.id,useHere?'In dieser Halle':'Hier einsetzen',start,buttonY,part,()=>assignManager(m,hall),!useHere);
+  action('manager_level_'+d.id,m.lv===10?'Max. Level':'Level ↑ '+fm(lcost(m,d))+' €',start+part+6,buttonY,part,()=>lvlM(m,d),m.lv<10&&G.m>=lcost(m,d),'#2c694f');
+  if(m.lv>=5&&!m.sp){
+   action('manager_spec_'+d.id,'Spezialisieren',start+2*(part+6),buttonY,part,()=>{teamSpecialty=m.id;panelScroll.y=0},true,'#58477e');
+  }else action('manager_target_'+d.id,'Ziel wählen',start+2*(part+6),buttonY,part,()=>{asg=d.id;pnO=false;sfx('click')});
+ }
+
 }
 function rsPanel(){const [X,Y,W,H]=MENUS.rs.box,NW=138,NH=32,pos=n=>[X+104+n.x*150,Y+44+n.y*38];
  btn(X,Y,W,H,()=>{},'#0f141bf8');c.strokeStyle='#ffffff22';c.lineWidth=1;c.beginPath();c.roundRect(X,Y,W,H,12);c.stroke();
@@ -1805,7 +2025,7 @@ function rotObj(o,r=(o.r+1)%4){
  o.r=r;o.needsRelocation=false;mapObject(o,o);sfx('rotate');analyze();sv(0);return true;
 }
 function togP(k){const w=MENUS[k].show(),fromAchievements=achievementsOpen;closeP2();if(!w){if(k=='mk')mkO=true;else if(k=='rs')rsO=true;else if(k=='pn')pnO=true;else if(k=='hl')hlO=true;else if(k=='bk')bkO=true;else{acO=true;if(fromAchievements)fTab=0}}sfx('click')}
-const TIPS={hand:['Hand','Antippen: Upgrade, Drehen und Einstellungen eines Gebäudes. Tippe auf ARCHE, um den Baufortschritt anzusehen.'],belt:['Förderband','Transportiert 4 Felder pro Sekunde. Ziehen verlegt viele Stücke in einem Zug; ein Band antippen dreht es.'],rot:['Richtung','Dreht, was du als Nächstes baust (oder gerade trägst).'],mov:['Bewegen','Gebäude antippen und Zielfeld antippen – oder direkt ziehen. Inhalt, Level und Manager bleiben erhalten.'],del:['Löschen','Antippen oder über Gebäude ziehen: 50 % Erstattung. Mit „Alles verkaufen“ räumst du die ganze Fabrik.']};
+const TIPS={hand:['Hand','Antippen: Upgrade, Drehen und Einstellungen eines Gebäudes. Tippe auf ARCHE, um den Baufortschritt anzusehen.'],belt:['Förderband','Transportiert 4 Felder pro Sekunde. Ziehen verlegt viele Stücke in einem Zug; ein Band antippen dreht es.'],rot:['Richtung','Dreht, was du als Nächstes baust (oder gerade trägst).'],mov:['Bewegen','Gebäude antippen und Zielfeld antippen – oder direkt ziehen. Inhalt und Level bleiben erhalten. Teams arbeiten in der zugewiesenen Halle.'],del:['Löschen','Antippen oder über Gebäude ziehen: 50 % Erstattung. Mit „Alles verkaufen“ räumst du die ganze Fabrik.']};
 function fitText(text,x,y,width,size,color,align='left',weight=700){
  c.font=weight+' '+size+'px system-ui,sans-serif';
  c.fillStyle=color;c.textAlign=align;
@@ -1836,7 +2056,7 @@ function infoCard(id,box){
 const MENUS={
  mk:{box:[70,62,660,330],show:()=>mkO,draw:mkPanel},
  rs:{box:[40,64,720,330],show:()=>rsO,draw:rsPanel},
- pn:{box:[40,64,720,330],show:()=>pnO,draw:pnPanel},
+ pn:{box:teamBox,show:()=>pnO,draw:pnPanel},
  hl:{box:[40,64,720,330],show:()=>hlO,draw:hlPanel},
  bk:{box:[40,64,720,330],show:()=>bkO,draw:bkPanel},
  ac:{box:companyBox,show:()=>acO,draw:acPanel},
@@ -2062,7 +2282,7 @@ function ui(){
  if(opened){
   const [id,menu]=opened;
   const box=typeof menu.box==='function'?menu.box():menu.box;
-  const page=id==='achievements'?id+achievementGroup:id==='ac'?id+fTab:id;
+  const page=id==='achievements'?id+achievementGroup:id==='ac'?id+fTab:id==='pn'?id+teamTab:id;
   btn(0,view.headerBottom,FW,FH-view.headerBottom,()=>{},'#14181eea');
   drawPanel(page,box,()=>menu.draw(box),closeP2);
   return;
@@ -2086,7 +2306,7 @@ function objectPanelBox(o){
  if(isB)h=o.t==='sorter'?190:o.t==='smart'||o.t==='sort'?175:o.t==='tunnel'?149:163;
  else if(prod(o))h=258+(d.r?.length>1?20:0);
  else if(typeShip(o.t))h=120;
- else if(isStorage(o.t))h=174;
+ else if(isStorage(o.t))h=areaAt(o.x,o.y)?211:174;
  else if(d.inspect)h=120;
  else if(d.supply||d.distribution)h=116;
  else if(d.j)h=o.j===1?208:150;
@@ -2164,6 +2384,11 @@ function panel(o){
    const automation=RH('lag2');
    btn(X+14,y,W-28,25,()=>{if(!automation){deny('Erforsche Automatisches Lager.');return}o.lv=o.lv==1?2:1;sv(0)},'#334155');
    tx(o.lv==2?'Ausgabe: freie Lieferung':automation?'Ausgabe: FIFO':'Automatik: Forschung erforderlich',X+W/2,y+17,10.5,'#fff','center',700);y+=29;
+   const hall=areaAt(o.x,o.y);
+   if(hall&&hlv(hall.id)&&!o.needsRelocation){
+    btn(X+14,y,W-28,29,()=>{o.teamDepot=!o.teamDepot;sfx('select');sv(0)},o.teamDepot?'#2c694f':'#334155',0,'team_depot');
+    tx('Team-Lager '+(o.teamDepot?'aktiv':'aktivieren'),X+W/2,y+19,11,'#fff','center',700);y+=34;
+   }
   }
   const two=!isB&&!terminal(o.t);if(two){btn(X+14,y,80,28,()=>{rotObj(o)},'#334155');tx('↻ Drehen',X+54,y+19,12,'#fff','center',700)}
   delB(two?100:14,two?W-114:W-28,'Abbauen (50 %)')}}
@@ -2567,7 +2792,7 @@ function lossPoint(objects){
  }
  return best;
 }
-function closeP2(){mkO=rsO=pnO=hlO=bkO=acO=planningOpen=lineOpen=growthOpen=saveOpen=statsOpen=achievementsOpen=false}
+function closeP2(){teamSpecialty=null;mkO=rsO=pnO=hlO=bkO=acO=planningOpen=lineOpen=growthOpen=saveOpen=statsOpen=achievementsOpen=false}
 
 /* ===== Tutorial & Hilfe: interaktive Einführung direkt in der Fabrik, Kurztour (Hilfe), einmalige Kontext-Tipps ===== */
 let tuTour=0,tuTI=0,tuHn=null,tuHT=-99,tuG=null,tuA=0,tuKey='',tuC=0;
@@ -2631,7 +2856,7 @@ const TOUR=[
  {ti:'Aufträge',tx:'Feste Stückzahlen gegen Prämie und Forschungspunkte. Unter „Verkauf → Aufträge“ kannst du offene Aufträge tauschen.',hl:()=>[['u','mk']]},
  {ti:'Verkauf',tx:'Der Versand verkauft automatisch. Unter „Verkauf“ siehst du Stückpreise mit aktiven Boni, verkaufte Mengen und erfasste Erlöse.',hl:()=>[['u','mk']]},
  {ti:'Forschung',tx:'Forschungspunkte bekommst du für Aufträge, neue Produkte und Verkaufsmeilensteine. Der Baum zeigt alle Voraussetzungen.',hl:()=>[['u','rs']]},
- {ti:'Personal',tx:'Mitarbeiter und Manager machen Maschinen schneller oder günstiger. Manager weist du einer Maschine zu und spezialisierst sie ab Level 5.',hl:()=>[['u','pn']]},
+ {ti:'Personal',tx:'Im Team-Menü weist du Personal einer Halle zu. Aktiviere ein Team-Lager, damit dein Team Waren transportieren kann.',hl:()=>[['u','pn']]},
  {ti:'Hallen',tx:'Hier kaufst und erweiterst du Hallen. Maschinen brauchen ihre Produktionshalle. Neue Hallen erweitern den Betonboden, auf dem du Logistik bauen kannst.',hl:()=>[['u','hl']]},
  {ti:'Bunker-Projekt',tx:'Sieben Bauabschnitte, jeder mit schweren Quests. Liefere die Waren per Band an die Bunker-Rampe. Die Frist ist sehr großzügig – ohne Strafen.',hl:()=>[['u','bk']]},
  {ti:'Firma',tx:'Erfolge, Prestige (immer freiwillig), Audio-Einstellungen und diese Hilfe. Die Kurztour startest du hier jederzeit neu.',hl:()=>[['u','ac']],nx:'Fertig'}];
@@ -2642,7 +2867,7 @@ const HNT=[
  {id:'bn',ti:'Engpass erkannt ⚠️',tx:'Die rot umrandete Maschine bremst deine Linie. Die Meldung oben nennt den Grund – oft hilft ein Upgrade genau dort, manchmal ein zweites Band oder mehr Material.',hl:()=>bn?[['t',bn.x,bn.y,1,1]]:[],cd:()=>!!bn&&/^Engpass/.test(msg)},
  {id:'hal',ti:'Neue Halle möglich 🏗️',tx:'Du kannst dir eine neue Halle leisten! Im Menü 🏭 Hallen siehst du Preise, Voraussetzungen und Erweiterungen. Jede Halle ist eine eigene Produktionslinie.',hl:()=>[['u','hl']],cd:()=>HL.some(h=>hlv(h.id)<1&&hReq(h)&&G.m>=h.c[0])},
  {id:'rmp',ti:'Bunker-Rampe bauen 📖',tx:'Baue die Bunker-Rampe aus dem Reiter Logistik am Ende einer Produktionslinie. Sie nimmt nur an, was das Bunker-Projekt gerade braucht.',hl:()=>[['u','pg_l']],cd:()=>G.sold>=30&&!hasProjectRamp()},
- {id:'mg',ti:'Personal einstellen 👥',tx:'Mitarbeiter und Manager sind jetzt bezahlbar. Ein Manager macht eine Maschine schneller – nach dem Einstellen tippst du „Zuweisen“ und dann die Maschine an.',hl:()=>[['u','pn']],cd:()=>!G.mg.length&&G.sold>=50&&G.m>=800},
+ {id:'mg',ti:'Personal einstellen 👥',tx:'Setze im Team-Menü Mitarbeiter oder Manager in einer Halle ein. Ihre Rollen bestimmen, wie sie das Team-Lager und die Produktionslinie unterstützen.',hl:()=>[['u','pn']],cd:()=>!G.mg.length&&G.sold>=50&&G.m>=800},
  {id:'pr',ti:'Prestige: Neugründung ♻',tx:'Du kannst dein Unternehmen freiwillig neu gründen und bekommst dauerhafte Blaupausen-Boni. Nichts passiert automatisch – alle Details stehen unter 🏢 Firma → Prestige.',hl:()=>[['u','ac']],cd:()=>bpCalc().t>=PMIN}];
 HNT.forEach(h=>{h.h=1});
 const alteredStart={
@@ -2719,7 +2944,7 @@ function heTab(X,Y,W,H){tx('Hilfe & Steuerung',X+26,Y+68,15,'#fff','left',800);
  btn(X+202,Y+H-42,190,30,()=>{G.th=[];tuHn=null;tuHT=-99;sfx('click');toast('Tipps werden wieder angezeigt, sobald sie passen.');sv(0)},'#334155');tx('💡 Tipps erneut zeigen',X+297,Y+H-22,12,'#fff','center',700);
  tx(G.tu>=0&&G.tu<TU.length?'Einsteiger-Tutorial: Schritt '+(G.tu+1)+' von '+TU.length:'Einsteiger-Tutorial: abgeschlossen',X+W-26,Y+H-22,10.5,'#94a3b8','right',600)}
 /* ---- Demo-Fabrik für das Vorschaubild (thumbs() ruft mk()/update()/draw() beim Seitenstart auf; kein Speicher, keine Cloud) ---- */
-function demo(){init(null);stQ=[];G.tu=-1;G.th=[];G.hl={gar:1,met:1};L=[];g=[];pg='m';G.rs=['met','wrk','spd1','lag'];G.rp=11;G.xp=1400;G.ac=['first','s100','o1','line','tool','r1','mg1','hall1','lv5'];G.sold=312;setLv();G.emp={...G.emp,p:3,q:2,l:1};G.mg=[{id:'prod',lv:6,sp:1,x:9,y:4},{id:'qual',lv:3,sp:0,x:12,y:6}];rfx();
+function demo(){init(null);stQ=[];G.tu=-1;G.th=[];G.hl={gar:1,met:1};L=[];g=[];pg='m';G.rs=['met','wrk','spd1','lag'];G.rp=11;G.xp=1400;G.ac=['first','s100','o1','line','tool','r1','mg1','hall1','lv5'];G.sold=312;setLv();G.emp={...G.emp,p:3,q:2,l:1};G.crew={gar:{p:3,q:2,l:1}};G.mg=[{id:'prod',lv:6,sp:1,x:9,y:4},{id:'qual',lv:3,sp:0,x:12,y:6}];rfx();
  [[7,4,'src',0,3],[8,4,'belt',0],[9,4,'saw',0,4],[10,4,'belt',0],[11,4,'frm',0,3],[12,4,'belt',0],[13,4,'asm',0,3],[14,4,'belt',0],[15,4,'belt',0],[16,4,'belt',1],[16,5,'belt',1],[16,6,'belt',2],[15,6,'pnt',2,3],[14,6,'sto',2],[13,6,'pck',2,2],[12,6,'shp',2],
   [7,8,'src',0,2],[8,8,'belt',0],[9,8,'saw',0,2],[10,8,'belt',0],[11,8,'wrk',3,2],[11,7,'belt',3],[11,6,'shp',3],
   [12,8,'belt',2],[13,8,'belt',2],[14,8,'belt',2],[15,8,'mil',2,2],[16,8,'sme',2,2],[17,8,'ers',2,2]].forEach(([x,y,t,r,l])=>put(x,y,t,r,l,[1,1]));
@@ -2894,4 +3119,4 @@ update(dt){
  for(const o of L){if(o.bt<1)o.bt=Math.min(1,o.bt+dt*3);if(o.fl>0)o.fl=Math.max(0,o.fl-dt*1.6);o.dv+=(o.ew-o.dv)*.1}
  for(const k in afl)afl[k]=Math.max(0,afl[k]-dt*1.2);for(const k in rflash)rflash[k]=Math.max(0,rflash[k]-dt*1.5);pfl=Math.max(0,pfl-dt*1.2);PO=PO.filter(p=>(p.t+=dt)<1.2);tl+=dt;if(tl>1){tl=0;analyze();warnChk()}at+=dt;if(at>20){at=0;sv(0)}tuUpd(dt);stShow();audMach(dt);audCloudSync();},
 draw:drawFrame,pointerPosition,
-dbg:()=>({AUD:audio.getContext,ASg:()=>AS,audStart:audioStart,audTick:musTick,musFill,audMach,sfxAt:sfx,mshot,SFX,MS,MOODS,audSetK:(k,v)=>{AS[k]=v;audApply();audSave()},aud,audCloudSync,audFlush:audio.clearPending,bpCalc,doPrestige,buyP,PU,pul,pcfSet:v=>{pcf=v},fTabSet:v=>{fTab=v},del,xp,setLv,lv:()=>LV,AC,chkAc,acOpen:v=>{acO=v},pnOpen:v=>{pnO=v},RN,rOK,buyR,rfx,RH,rsOpen:v=>{rsO=v},rsel:id=>{rsel=id},fx:()=>({STC,BTv,SPm,RM,PM,OS,WG,OFFE,KOF,RCm}),MG,hireE,fireE,hireM,lvlM,specM,recalc,cap,assignTo:(id,x,y)=>{const m=G.mg.find(q=>q.id==id);m.x=x;m.y=y;recalc()},salePrice,rawCost,mkOpen:v=>{mkO=v},ITEMS,MD,acc2,view:(x,y,z)=>{cam={x:x*TS,y:y*TS,z}},fm,cst,nf,uc,tme,doPrestige,bpCalc,rrLeft,fillOrders,get ff(){return ff},get lr(){return lr},HL,PH,STX,hlv,hReq,hNext,buyHall,bchk,delAt,sellAll,moveObj,prjIn,phaseDone,get stQ(){return stQ},bProg,dLeft,hallOf,hrect,areaAt,inG,jtick,put,setTool:t=>{tool=t},mvSet:o=>{mvO=o},hselGet:()=>hsel,togP,rotObj,storyIntro,feed,itemPos,rate,G,L,g,tick,analyze,place,plan,buy,sb,give,sv,init,inputCap,currentStats,upgradeBelt,lineMetrics,allProductionLines,lostConnections,recipeTree,beltCapacity,cell,footprint,placement,makePlan,previewPlan,commitBuild,planRoute,checkBuild,connectedLine,REGIONS,SITE,projectTrucks,get industrial(){return industrial},switchSite,companyValue,cloud,flushCloud,chooseSave,applySave,get msg(){return msg},get bn(){return bn},sel:o=>{sel=o},tuD:()=>({HB,view,panelSurface,panelScroll,dockTracks,dockOffsets,cur:tuCur(),TU,TOUR,HNT,tuHn,tuTour,tuTI,tuG,rot,tool,pg,sel,cam,fTab,acO,hlO,bkO,mkO,mvO,delAsk})})}};
+dbg:()=>({AUD:audio.getContext,ASg:()=>AS,audStart:audioStart,audTick:musTick,musFill,audMach,sfxAt:sfx,mshot,SFX,MS,MOODS,audSetK:(k,v)=>{AS[k]=v;audApply();audSave()},aud,audCloudSync,audFlush:audio.clearPending,bpCalc,doPrestige,buyP,PU,pul,pcfSet:v=>{pcf=v},fTabSet:v=>{fTab=v},del,xp,setLv,lv:()=>LV,AC,chkAc,acOpen:v=>{acO=v},pnOpen:v=>{pnO=v},RN,rOK,buyR,rfx,RH,rsOpen:v=>{rsO=v},rsel:id=>{rsel=id},fx:()=>({STC,BTv,SPm,RM,PM,OS,WG,OFFE,KOF,RCm}),MG,hireE,setCrew,hireM,lvlM,specM,recalc,cap,assignTo:(id,x,y)=>assignManager(G.mg.find(q=>q.id===id),areaAt(x,y),cell(x,y)),salePrice,rawCost,mkOpen:v=>{mkO=v},ITEMS,MD,acc2,view:(x,y,z)=>{cam={x:x*TS,y:y*TS,z}},fm,cst,nf,uc,tme,doPrestige,bpCalc,rrLeft,fillOrders,get ff(){return ff},get lr(){return lr},HL,PH,STX,hlv,hReq,hNext,buyHall,bchk,delAt,sellAll,moveObj,prjIn,phaseDone,get stQ(){return stQ},bProg,dLeft,hallOf,hrect,areaAt,inG,jtick,put,setTool:t=>{tool=t},mvSet:o=>{mvO=o},hselGet:()=>hsel,togP,rotObj,storyIntro,feed,itemPos,rate,G,L,g,tick,analyze,place,plan,buy,sb,give,sv,init,inputCap,currentStats,upgradeBelt,lineMetrics,allProductionLines,lostConnections,recipeTree,beltCapacity,cell,footprint,placement,makePlan,previewPlan,commitBuild,planRoute,checkBuild,connectedLine,REGIONS,SITE,projectTrucks,get industrial(){return industrial},switchSite,companyValue,cloud,flushCloud,chooseSave,applySave,get msg(){return msg},get bn(){return bn},sel:o=>{sel=o},tuD:()=>({HB,view,panelSurface,panelScroll,dockTracks,dockOffsets,cur:tuCur(),TU,TOUR,HNT,tuHn,tuTour,tuTI,tuG,rot,tool,pg,sel,cam,fTab,acO,hlO,bkO,mkO,mvO,delAsk})})}};
