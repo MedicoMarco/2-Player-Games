@@ -1,7 +1,7 @@
 /* Parcel queues, splitters, crossings, sorters and tunnel transfers. */
 function createFactoryTransport({
  TICK,MD,PR,isBelt,beltSize,beltTime,currentTick,junctionTime,neighbor,tunnelExit,
- give,record,prod,uses,prjNeed,orderFor
+ give,record,prod,uses,prjNeed,isProjectRamp=t=>t==='prj',orderFor
 }){
 function loadParcel(o,[item,quality,entry,tick,jumped]){
  o.it=item;o.iq=quality;
@@ -15,7 +15,8 @@ function clearBelt(o){
 const sortingGroups=[['h','Holz'],['m','Metall'],['v','Versorgung'],['e','Elektronik'],['n','Energie'],['f','Fahrzeuge'],['t','Hightech'],['b','Bunkermodule'],['u','Haushaltswaren']];
 function beltDirections(o){
  if(MD[o.t]?.sortStation){
-  return [o.sortRule>=0&&MD[PR[o.it]]?.g==sortingGroups[o.sortRule]?.[0]?(o.r+1)%4:o.r];
+  const producer=MD[PR[o.it]];
+  return [o.sortRule>=0&&(producer?.goodsGroup??producer?.g)===sortingGroups[o.sortRule]?.[0]?(o.r+1)%4:o.r];
  }
  if(o.t=='sort')return [o.it==o.sortRule?(o.r+1)%4:o.r];
  if(o.t!='smart')return [o.r];
@@ -42,7 +43,7 @@ function moveBelt(o){
   }
   o.wt=1;record(o,'blocked');
   const target=jump||neighbor(o,dirs[0]);
-  o.bad=!!target&&(target.t=='prj'?!prjNeed(o.it):prod(target)&&!uses(target,o.it));
+  o.bad=!!target&&(isProjectRamp(target.t)?!prjNeed(o.it,target.t):prod(target)&&!uses(target,o.it));
   return;
  }
 }

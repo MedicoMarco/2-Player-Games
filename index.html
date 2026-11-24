@@ -355,6 +355,7 @@ E-Mail: <a href="mailto:projektinfo.kontakt@gmail.com">projektinfo.kontakt@gmail
 <li><strong>Spielräume:</strong> Raumcode, Host- und Spielernamen, technische Nutzerkennungen der Teilnehmer, Einstellungen, Sitzplätze und Spielzustände.</li>
 <li><strong>Online-Partien:</strong> Spielkennung, beteiligte Nutzer, Verbindungsinformationen und technische Daten, die zum Aufbau einer Verbindung benötigt werden.</li>
 <li><strong>Mau-Mau:</strong> Für den Spielablauf erforderliche Kartendaten und Spielzustände.</li>
+<li><strong>Factory Empire:</strong> Beim Spielen mit Konto speichert Firebase deinen Factory-Empire-Spielstand, einschließlich Fabrikaufbau, Kampagnen- und Tutorialfortschritt, Stand der Storysequenzen und Verkaufsstatistiken. Dazu gehören die verkaufte Stückzahl und die erfassten Erlöse je Produkt. Der Spielstand ist nur für dein eigenes Konto lesbar.</li>
 </ul>
 <p>Die Daten werden verarbeitet, damit Konten, Freundesfunktionen, Chats, Online-Anzeigen, Einladungen und gemeinsame Spiele funktionieren. Die Anpassungswerte für Computergegner dienen nur der Spielschwierigkeit. Sie treffen keine Entscheidungen, die rechtliche Wirkung für dich haben oder dich ähnlich erheblich beeinträchtigen.</p>
 <p>Rechtsgrundlage für die von dir angeforderten Konto-, Chat- und Spielfunktionen ist Art. 6 Abs. 1 lit. b DSGVO. Die Verarbeitung von Blockierungen, technischen Sperrfristen und Meldungen stütze ich auf Art. 6 Abs. 1 lit. f DSGVO. Die berechtigten Interessen bestehen im Schutz der Nutzer, in der Bearbeitung konkreter Beschwerden, der Abwehr von Missbrauch sowie gegebenenfalls in der Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen.</p>
@@ -389,6 +390,7 @@ E-Mail: <a href="mailto:projektinfo.kontakt@gmail.com">projektinfo.kontakt@gmail
 <p>Play2Gether verwendet den lokalen Browserspeicher (<code>localStorage</code>), damit Einstellungen und Spielinformationen bei einem späteren Besuch wieder verfügbar sind. In der aktuellen Website-Version werden insbesondere folgende Einträge verwendet:</p>
 <ul>
 <li><code>2pg</code>: Spieleinstellungen, Fortschritt, Erfolge, Statistiken, Favoriten und zuletzt gespielte Spiele.</li>
+<li><code>2pg_fe_guest</code> für Gäste und <code>2pg_fe_</code> mit angehängter Nutzerkennung für Konten: der Factory-Empire-Spielstand einschließlich Verkaufsstatistiken. Der Browser kann zusätzlich lokale Sicherungen des Spielstands führen.</li>
 <li><code>2pg_ol</code>: ein technischer Hinweis, dass der Online-Modus zuvor verwendet wurde, damit die Online-Funktion bei einem späteren Besuch wiederhergestellt werden kann.</li>
 <li><code>sd_ids</code>: eine Zwischenspeicherung von Bildkennungen für Picsum Photos. Diese Liste wird mit einem Zeitstempel gespeichert und höchstens sieben Tage wiederverwendet.</li>
 </ul>
@@ -548,15 +550,20 @@ Deutschland</p>
 <div id="legal" hidden><div class="lg-box" role="dialog" aria-modal="true" aria-labelledby="lg-t"><div class="lg-head"><h2 id="lg-t"></h2><button type="button" id="lg-x" aria-label="Schließen">✕</button></div><div class="lg-body" id="lg-b"></div></div></div>
 <div id="toast"></div><div id="sp" aria-hidden="true"><div class="spc" role="dialog" aria-modal="true" aria-labelledby="spt"><div class="olh"><h2 id="spt">Einstellungen</h2><button id="spx" aria-label="Schließen">✕</button></div><div class="seg" id="spn" role="tablist"></div><div id="spv"></div></div></div><div id="olp"></div><div id="oli"></div><div class="w" id="game"><div class="bar"><button class="btn r" id="back" aria-label="Zurück zum Menü" title="Menü"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h4.5v-6h4v6h4.5V10"/></svg></button><b id="gt"></b><span id="cs"></span><button class="btn" id="rs" aria-label="Neu starten" title="Neu starten">↻</button></div>
 <div class="stage"><button type="button" id="factory-back" aria-label="Zurück zum Menü" title="Menü"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h4.5v-6h4v6h4.5V10"/></svg></button><canvas id="cv" width="800" height="480"></canvas><video id="gv" autoplay muted playsinline></video><canvas id="gc" width="800" height="480"></canvas><div class="ov" id="ov"></div></div><p id="hint" style="text-align:center;color:var(--mu);font-size:14px"></p></div>
-<script src="./factory-empire/catalog.js?v=12"></script>
+<script src="./factory-empire/campaign.js?v=1"></script>
+<script src="./factory-empire/story.js?v=1"></script>
+<script src="./factory-empire/story-art.js?v=1"></script>
+<script src="./factory-empire/catalog.js?v=15"></script>
 <script src="./factory-empire/audio.js"></script>
-<script src="./factory-empire/grid.js"></script>
+<script src="./factory-empire/grid.js?v=2"></script>
 <script src="./factory-empire/runtime.js"></script>
 <script src="./factory-empire/telemetry.js"></script>
-<script src="./factory-empire/drawing.js?v=6"></script>
-<script src="./factory-empire/transport.js?v=6"></script>
-<script src="./factory-empire/layout.js?v=13"></script>
-<script src="./factory-empire/game.js?v=13"></script>
+<script src="./factory-empire/drawing.js?v=7"></script>
+<script src="./factory-empire/transport.js?v=8"></script>
+<script src="./factory-empire/layout.js?v=17"></script>
+<script src="./factory-empire/terrain.js?v=5"></script>
+<script src="./factory-empire/world.js?v=4"></script>
+<script src="./factory-empire/game.js?v=23"></script>
 <script>
 const $=s=>document.querySelector(s),W=800,H=480,cl=(v,a,b)=>Math.max(a,Math.min(b,v)),rnd=(a,b)=>a+Math.random()*(b-a),now=()=>performance.now();
 let S={vm:'auto',cpu:0,d:1,t:5,snd:1,anim:1,theme:'auto',ori:'a',side:0,st:{},fav:[],rec:[],cat:'all',ach:{},pl:0,sk:[0,0]},B='#3b82f6',R='#ef4444';
@@ -3638,7 +3645,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
 }
 
 if(typeof fabrik==='function'&&typeof createFactoryCatalog==='function'&&typeof createFactoryAudio==='function'&&typeof createFactoryDrawing==='function'&&typeof createFactoryCanvasScope==='function'&&typeof FactoryGrid!=='undefined'&&typeof FactoryRuntime!=='undefined'&&typeof FactoryTelemetry!=='undefined'&&typeof createFactoryTransport==='function'&&typeof FactoryLayout!=='undefined')GAMES.push({id:'fabrik',n:'Factory Empire',ic:'🏭',d:'Baue aus einer Garage einen Industriekonzern – und einen Bunker für die Menschheit: Hallen, Produktionsketten, Splitter, Engpässe und eine Story.',cat:'Idle',solo:true,h:'Ziehen = Kamera · Mausrad / Pinch = Zoom · unten Maschinen wählen und tippen · Bewegen & Löschen unten links · 🏭 Hallen und 📖 Bunker oben',sub:'Solo · Idle-Tycoon · Cloud-Speicher',mk:fabrik});
-RULES.fabrik='Ziel: Baue einen Bunker für die gesamte Menschheit – in sieben Phasen mit schweren Quests, einer sehr großzügigen Frist und ohne Strafen. Neue Produktlinien schaltest du durch den Kauf von Hallen frei. Baue eine Produktionslinie: Das Holzlager liefert Rohholz, Förderbänder bringen es zu Säge, Formmaschine, Montage, Lackierstation und Verpackung, der Versand verkauft. Je weiter ein Stück verarbeitet ist, desto mehr bringt es – aber jede Maschine arbeitet nur so schnell wie ihre Vorgängerin liefert. Die Engpassanzeige oben zeigt, wo du upgraden solltest. Dein Spielstand liegt in deinem Konto und läuft bis zu 8 Stunden offline weiter.';
+RULES.fabrik='Ziel: Baue einen Bunker für die gesamte Menschheit – in sieben Phasen mit schweren Quests, einer sehr großzügigen Frist und ohne Strafen. Neue Produktlinien schaltest du durch den Kauf von Hallen frei. Baue eine Produktionslinie: Das Holzlager liefert Rohholz, Förderbänder bringen es zu Säge, Formmaschine, Montage, Lackierstation und Verpackung. Der Versand verkauft automatisch zu festen Stückpreisen. Unter „Verkauf“ findest du Preise, Stückzahlen, Erlöse und Aufträge. Die Engpassanzeige oben zeigt, wo du upgraden solltest. Dein Spielstand läuft bis zu 8 Stunden offline weiter.';
 GAMES.push({id:'ludo',n:'Mensch ärgere dich nicht',ic:'\ud83c\udfb2',d:'Würfeln, ziehen, rauswerfen: 2–4 Spieler, auch online.',cat:'Geschick',h:'Würfeln und mit allen vier Figuren ins Ziel kommen',sub:'2–4 Spieler · Computer · Online',mk:luMk});
 RULES.ludo='Jeder hat vier Figuren (in den Spieleinstellungen auch nur zwei für kürzere Runden). Mit einer 6 kommt eine Figur aufs Startfeld; nach jeder 6 würfelst du nochmal. Ohne Figur auf dem Feld hast du drei Versuche. Wer auf ein besetztes Feld zieht, schmeißt die Figur raus – das ist freiwillig, du darfst den anderen auch verschonen (Computer schlagen meistens). Bei einer 6 darfst du wählen: rauskommen oder mit einer Figur ziehen. Rauskommen geht nicht, solange eine eigene Figur auf dem Startfeld steht. Im Zielhaus wird nicht gesprungen, du brauchst die genaue Augenzahl. Wer zuerst alle vier Figuren im Ziel hat, gewinnt.';
 ICON.maumau=GI(`<rect x="6" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(-12 16 24)"/><rect x="20" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(10 30 24)"/><path d="M31 17c-3-4-8 0-5 5l5 5 5-5c3-5-2-9-5-5z" fill="${Rd}" stroke="none" transform="rotate(10 30 24)"/>`);
