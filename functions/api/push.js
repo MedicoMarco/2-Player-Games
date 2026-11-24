@@ -10,6 +10,8 @@ const encoder = new TextEncoder();
 const b64 = value => btoa(String.fromCharCode(...value)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 const json64 = value => b64(encoder.encode(JSON.stringify(value)));
 const tokenURL = 'https://oauth2.googleapis.com/token';
+const visibleMs = 45000;
+const validTab = /^[a-f0-9-]{36}$/;
 let access;
 
 async function databaseToken(env) {
@@ -148,12 +150,15 @@ async function send(db, vapid, from, body) {
   ]);
   if (!subscriptions.value || !profile.value || lock.value!==null || blocked.value!==null || reverse.value!==null ||
       pref?.value?.muted || pref?.value?.seen>=note.ts) return;
+  const now = Date.now();
+  const devices = Object.entries(subscriptions.value).sort(([,a],[,b])=>b.updated-a.updated).slice(0,8)
+    .filter(([,device])=>!Object.values(device.visibleTabs||{}).some(tab=>tab.visible && tab.expires>now));
+  if (!devices.length) return;
   const topic = (await digest(kind+':'+from+':'+(kind==='invite'?'':note.data.id))).slice(0,32);
   const marker = 'pushDispatch/'+to+'/'+topic;
   const previous = await db(marker,'GET',undefined,{'X-Firebase-ETag':'true'});
   if (previous.value?.ts>=note.ts || (kind==='invite' && Date.now()-previous.value?.sent<15000)) return;
   if (!(await db(marker,'PUT',{ts:note.ts,sent:Date.now()},{'If-Match':previous.etag??'null_etag'})).ok) return;
-  const devices = Object.entries(subscriptions.value).sort(([,a],[,b])=>b.updated-a.updated).slice(0,8);
   for (let i=0;i<devices.length;i+=4) {
     await Promise.allSettled(devices.slice(i,i+4).map(async ([key,device])=>{
       const code = await deliver(device,vapid,{...note.data,account:to},note.ttl,topic);
@@ -195,6 +200,25 @@ async function deliver(device,vapid,data,ttl,topic) {
   return response.status;
 }
 
+async function saveVisibility(db, uid, {endpoint,tab,visible,version}) {
+  if (typeof endpoint!=='string' || endpoint.length>2048 || typeof tab!=='string' || !validTab.test(tab) ||
+      typeof visible!=='boolean' || !Number.isSafeInteger(version) || version<1) return 400;
+  const path = 'pushSubscriptions/'+uid+'/'+await digest(endpoint);
+  for(let attempt=0;attempt<3;attempt++){
+    const current = await db(path,'GET',undefined,{'X-Firebase-ETag':'true'});
+    if (current.value?.endpoint!==endpoint) return 404;
+    const now = Date.now(), tabs = current.value.visibleTabs || {};
+    if (tabs[tab]?.version>=version) return 200;
+    const active = Object.entries(tabs).filter(([key,state])=>key!==tab && state.expires>now)
+      .sort(([,a],[,b])=>b.expires-a.expires).slice(0,23);
+    const device = {...current.value,visibleTabs:{...Object.fromEntries(active),[tab]:{
+      visible,version,expires:now+visibleMs
+    }}};
+    if ((await db(path,'PUT',device,{'If-Match':current.etag??'null_etag'})).ok) return 200;
+  }
+  return 409;
+}
+
 export async function onRequest({request,env,waitUntil}) {
   const fromOrigin = request.headers.get('Origin');
   const allowed = !fromOrigin || fromOrigin===origin || fromOrigin===pages || fromOrigin===new URL(request.url).origin;
@@ -224,6 +248,10 @@ export async function onRequest({request,env,waitUntil}) {
       waitUntil(send(db,{publicKey,privateKey,subject},uid,body).catch(()=>console.error('Push dispatch failed')));
       return reply({},202);
     }
+    if (body.action==='visibility') {
+      const status = await saveVisibility(db,uid,body);
+      return reply({},status);
+    }
     const sub = subscriptionFrom(body.subscription);
     if (!sub || !['add','remove'].includes(body.action)) return reply({error:'Subscription'},400);
     stage = 'Subscription storage';
@@ -236,7 +264,7 @@ export async function onRequest({request,env,waitUntil}) {
       if (!user.value || lock.value!==null) return reply({error:'Account'},403);
       for(let attempt=0;attempt<3;attempt++){
         const current = await db(path,'GET',undefined,{'X-Firebase-ETag':'true'});
-        const values = {...current.value,[key]:{...sub,updated:Date.now()}};
+        const values = {...current.value,[key]:{...current.value?.[key],...sub,updated:Date.now()}};
         const newest = Object.entries(values).sort(([,a],[,b])=>b.updated-a.updated).slice(0,8);
         if ((await db(path,'PUT',Object.fromEntries(newest),{'If-Match':current.etag ?? 'null_etag'})).ok) return reply({});
       }

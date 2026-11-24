@@ -3,13 +3,27 @@
   const storageKey = '2pg-push-account';
   let registration, config, enabled = false, busy = false, preparing = false, status = '', pending = null, opening = false;
   const endpoint = 'https://2-player-games.pages.dev/api/push';
+  let subscribed, tab, visibilityVersion = 0, visibilityTimer;
+  const refreshVisibilityMs = 25000;
+
+  function reportVisibility(visible = !document.hidden) {
+    clearTimeout(visibilityTimer);
+    if (!enabled || !subscribed || owner() !== OL.me || OL.deleting) return;
+    tab ||= crypto.randomUUID();
+    service()({action:'visibility',endpoint:subscribed.endpoint,tab,visible,version:++visibilityVersion}).catch(()=>{});
+    if (visible) visibilityTimer = setTimeout(reportVisibility, refreshVisibilityMs);
+  }
+
+  document.addEventListener('visibilitychange', () => reportVisibility());
+  addEventListener('pagehide', () => reportVisibility(false));
+  addEventListener('pageshow', () => reportVisibility());
   const service = () => async body => {
     const user = OL.auth?.currentUser;
     if (!user) throw Error('Sign-in required');
     const response = await fetch(endpoint,{
       method:'POST',
       headers:{Authorization:'Bearer '+await user.getIdToken(),'Content-Type':'application/json'},
-      body:JSON.stringify(body),signal:AbortSignal.timeout(12000)
+      body:JSON.stringify(body),signal:AbortSignal.timeout(12000),keepalive:body.action==='visibility'
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw Object.assign(Error('Push service unavailable'), {
@@ -60,7 +74,12 @@
       const sub = await manager.getSubscription();
       if (uid !== OL.me) return;
       enabled = !!sub && Notification.permission === 'granted' && owner() === uid;
-      if (enabled || Notification.permission === 'denied') return;
+      if (enabled) {
+        subscribed = sub;
+        reportVisibility();
+        return;
+      }
+      if (Notification.permission === 'denied') return;
       const {data:{key}} = await service()({action:'key'});
       const bytes = Uint8Array.from(atob(key.replace(/-/g,'+').replace(/_/g,'/')), char => char.charCodeAt(0));
       if (bytes.length !== 65) throw Error('invalid key');
@@ -86,8 +105,9 @@
     }
     if (OL.me !== uid) return;
     remember(null);
-    config = null;
+    config = subscribed = null;
     enabled = false;
+    clearTimeout(visibilityTimer);
     render();
     for (const notification of await reg.getNotifications()) {
       if (notification.data?.account === uid) notification.close();
@@ -166,7 +186,9 @@
       await service()({action:'add', subscription});
       if (OL.auth.currentUser?.uid !== uid) { await sub.unsubscribe(); return; }
       remember(uid);
+      subscribed = sub;
       enabled = true;
+      reportVisibility();
       status = 'Systembenachrichtigungen auf diesem Gerät sind an.';
     } catch (error) {
       status = setupError(error,stage);
@@ -282,6 +304,6 @@
   window.gameNotifications = {
     render, toggle, logout, peer, dispatch,
     signedIn() { prepare(); openPending(); },
-    signedOut() { config = null; enabled = false; status = ''; render(); }
+    signedOut() { config = subscribed = null; enabled = false; clearTimeout(visibilityTimer); status = ''; render(); }
   };
 })();
