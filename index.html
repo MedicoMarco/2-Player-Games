@@ -293,7 +293,7 @@ body.onl #rs,body.onl-guest #rs{display:none}
 #legal .lg-body h1{font-size:22px}#legal .lg-body h2{font-size:18px}#legal .lg-body h3{font-size:16px}
 #legal .lg-body a{color:var(--b)}#legal .lg-body p,#legal .lg-body ul,#legal .lg-body ol{margin:.5em 0}
 </style>
-<link rel="stylesheet" href="./direct-chat.css">
+<link rel="stylesheet" href="./direct-chat.css?v=2">
 <link rel="stylesheet" href="./game-chat.css">
 <link rel="stylesheet" href="./chat-moderation.css">
 </head><body>
@@ -342,7 +342,7 @@ E-Mail: <a href="mailto:projektinfo.kontakt@gmail.com">projektinfo.kontakt@gmail
 <p>Rechtsgrundlage für die Konto- und Online-Funktionen ist Art. 6 Abs. 1 lit. b DSGVO, soweit die Verarbeitung erforderlich ist, um die von dir angeforderten Funktionen bereitzustellen. Für Sicherheit, Missbrauchsabwehr und den Schutz der Konten stütze ich mich ergänzend auf Art. 6 Abs. 1 lit. f DSGVO.</p>
 
 <h2>5. Welche Online-Daten in Firebase gespeichert werden</h2>
-<p>Wenn du Systembenachrichtigungen einschaltest, speichert Firebase die Push-Adresse deines Browsers und die öffentlichen Abo-Schlüssel zusammen mit deinem Konto. Für die Zustellung nutzt die Website den Push-Dienst deines Browsers oder Betriebssystems. Chatmeldungen zeigen den Absender und eine kurze Vorschau der Nachricht. Je nach Geräteeinstellung kann die Vorschau auf dem Sperrbildschirm sichtbar sein. Du kannst das Abo auf deinem Gerät im Online-Menü ausschalten. Beim Abmelden auf dem Gerät wird das Abo beendet. Ungültige Abos werden bei einem Zustellversuch entfernt.</p>
+<p>Wenn du Systembenachrichtigungen einschaltest, speichert Firebase die Push-Adresse deines Browsers und die öffentlichen Abo-Schlüssel zusammen mit deinem Konto. Für die Zustellung nutzt die Website den Push-Dienst deines Browsers oder Betriebssystems. Chatmeldungen zeigen den Absender und eine kurze Vorschau der Nachricht. Je nach Geräteeinstellung kann die Vorschau auf dem Sperrbildschirm sichtbar sein. Für Privat- und Gruppenchats speichert Firebase außerdem Zeitpunkte zur Zustellung und zum Lesen. Die jeweiligen Gesprächsteilnehmer sehen daraus den Status ihrer gesendeten Nachrichten. Du kannst das Abo auf deinem Gerät im Online-Menü ausschalten. Beim Abmelden auf dem Gerät wird das Abo beendet. Ungültige Abos werden bei einem Zustellversuch entfernt.</p>
 <p>Für Online-Funktionen nutze ich die Firebase Realtime Database. Dort können je nach Nutzung folgende Daten gespeichert werden:</p>
 <ul>
 <li><strong>Profil:</strong> Benutzername, technische Nutzerkennung, Erstellungszeitpunkt, Online-Spielstatistiken, dein Spielfortschritt (Erfolge, Siege und Niederlagen je Spiel, Highscores, Matchzähler, Reaktionsbestzeit, Favoriten, zuletzt gespielte Spiele, gewählte Farben sowie die Einstellungen Ton, Animationen, Darstellung, Schwierigkeit und Zielwert) sowie Werte, mit denen die Stärke der Computergegner an dein Spielverhalten angepasst wird.</li>
@@ -5492,7 +5492,7 @@ const fromHash=()=>{const k=location.hash.slice(1);if(T[k])open(k)};addEventList
 })();
 </script>
 <script src="./group-chat.js"></script>
-<script src="./direct-chat.js"></script>
+<script src="./direct-chat.js?v=2"></script>
 <script src="./game-chat.js"></script>
 <script src="./chat-moderation.js"></script>
 <script src="./notifications.js"></script>

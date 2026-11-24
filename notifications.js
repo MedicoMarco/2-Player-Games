@@ -303,6 +303,7 @@
 
   window.gameNotifications = {
     render, toggle, logout, peer, dispatch,
+    chatReceipts(options) { return service()({action:'chatReceipts',...options}); },
     signedIn() { prepare(); openPending(); },
     signedOut() { config = subscribed = null; enabled = false; clearTimeout(visibilityTimer); status = ''; render(); }
   };

@@ -219,6 +219,46 @@ async function saveVisibility(db, uid, {endpoint,tab,visible,version}) {
   return 409;
 }
 
+async function chatReceipts(db, uid, {chat,kind,received,read}) {
+  if (typeof chat!=='string' || !id.test(chat) || !['direct','group'].includes(kind)) return {status:400};
+  let members;
+  let path;
+  if (kind==='direct') {
+    if (chat===uid) return {status:400};
+    const [friend,reverse,blocked,otherBlocked] = await Promise.all([
+      db('friends/'+uid+'/'+chat),db('friends/'+chat+'/'+uid),db('blocked/'+uid+'/'+chat),db('blocked/'+chat+'/'+uid)
+    ]);
+    if (friend.value!==true || reverse.value!==true || blocked.value!==null || otherBlocked.value!==null) return {status:403};
+    members = [{uid,since:0},{uid:chat,since:0}];
+    path = 'chatReceipts/direct/'+[uid,chat].sort().join('/');
+  } else {
+    const [{value:group},{value:slot}] = await Promise.all([db('groups/'+chat),db('groupIndex/'+uid+'/'+chat)]);
+    members = Object.values(group?.members||{});
+    if (!group?.info || group.info.closed || group.members?.[slot]?.uid!==uid) return {status:403};
+    path = 'chatReceipts/group/'+chat;
+  }
+  const isTimestamp = value => Number.isSafeInteger(value) && value>=0 && value<=Date.now()+5000;
+  if (received!==undefined || read!==undefined) {
+    if (!isTimestamp(received) || !isTimestamp(read)) return {status:400};
+    const self = members.find(member=>member.uid===uid);
+    const own = path+'/'+uid;
+    for (let attempt=0;attempt<3;attempt++) {
+      const {value,etag} = await db(own,'GET',undefined,{'X-Firebase-ETag':'true'});
+      const previous = value?.since===self.since ? value : {};
+      const state = {since:self.since,received:Math.max(previous.received||0,received,read),read:Math.max(previous.read||0,read)};
+      if (state.received===previous.received && state.read===previous.read) break;
+      if ((await db(own,'PUT',state,{'If-Match':etag??'null_etag'})).ok) break;
+      if (attempt===2) return {status:409};
+    }
+    return {status:200};
+  }
+  const {value} = await db(path);
+  return {status:200,peers:members.filter(member=>member.uid!==uid).map(member=>{
+    const state = value?.[member.uid];
+    return {since:member.since,received:state?.since===member.since?state.received:0,read:state?.since===member.since?state.read:0};
+  })};
+}
+
 export async function onRequest({request,env,waitUntil}) {
   const fromOrigin = request.headers.get('Origin');
   const allowed = !fromOrigin || fromOrigin===origin || fromOrigin===pages || fromOrigin===new URL(request.url).origin;
@@ -247,6 +287,12 @@ export async function onRequest({request,env,waitUntil}) {
     if (body.action==='send') {
       waitUntil(send(db,{publicKey,privateKey,subject},uid,body).catch(()=>console.error('Push dispatch failed')));
       return reply({},202);
+    }
+    if (body.action==='chatReceipts') {
+      const [profile,lock] = await Promise.all([db('users/'+uid+'/name'),db('deletionLocks/'+uid)]);
+      if (!profile.value || lock.value!==null) return reply({error:'Account'},403);
+      const {status,peers} = await chatReceipts(db,uid,body);
+      return reply({peers},status);
     }
     if (body.action==='visibility') {
       const status = await saveVisibility(db,uid,body);

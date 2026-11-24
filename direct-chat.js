@@ -26,7 +26,48 @@
   function setPref(key,field,value){
     return OL.db.ref(['chatPreferences',OL.me,key,field].join('/')).set(value);
   }
+  function updateReceipt(key, ts, read=false){
+    const account=identity;
+    if(!account || !Number.isSafeInteger(ts) || ts<=0)return;
+    account.receipts ||= new Map();
+    const state=account.receipts.get(key)||{received:0,read:0,savedReceived:0,savedRead:0};
+    account.receipts.set(key,state);
+    state.received=Math.max(state.received,ts);
+    if(read)state.read=Math.max(state.read,ts);
+    sendReceipt(account,key,state);
+  }
+
+  async function sendReceipt(account,key,state){
+    if(!account.online || state.sending || (state.received===state.savedReceived && state.read===state.savedRead) ||
+       !window.gameNotifications?.chatReceipts)return;
+    const received=state.received, read=state.read;
+    if(identity!==account || OL.auth?.currentUser?.uid!==account.uid)return;
+    state.sending=true;
+    let saved=false;
+    try{
+      await window.gameNotifications.chatReceipts({
+        kind:key.startsWith('group_')?'group':'direct', chat:key.slice(key.startsWith('group_')?6:3), received, read
+      });
+      state.savedReceived=received;state.savedRead=read;saved=true;
+    }catch{}
+    finally{
+      state.sending=false;
+      if(identity===account && saved)sendReceipt(account,key,state);
+    }
+  }
+
+  function pollReceipts(s){
+    if(session!==s || document.hidden || !identity?.online || s.polling || !window.gameNotifications?.chatReceipts)return;
+    s.polling=true;
+    const account=identity,state=account.receipts?.get(s.key);
+    if(state)sendReceipt(account,s.key,state);
+    window.gameNotifications.chatReceipts({kind:s.group?'group':'direct',chat:s.group||s.peer})
+      .then(({data})=>{if(session===s && Array.isArray(data.peers)){s.receipts=data.peers;queueRender(s);}})
+      .catch(()=>{}).finally(()=>{s.polling=false;});
+  }
+
   function markSeen(key,ts){
+    updateReceipt(key,ts,true);
     const account=identity;
     if(!account?.online || ts<=Math.max(pref(key).seen||0,account.seen.get(key)||0))return;
     account.seen.set(key,ts);
@@ -76,6 +117,8 @@
       summary.latest=last?{id:last.id,...last.value}:null;
       if(!notify)recent=rows.map(row=>row.value);
       const m=summary.latest;
+      const incoming=rows.findLast(row=>visibleIncoming(row.value));
+      if(incoming)updateReceipt(key,incoming.value.created);
       const after=(a,b)=>a && (!b || a.created>b.created || a.created===b.created && a.id>b.id);
       if(visibleIncoming(m) && m.id!==newestSeen?.id && after(m,newestSeen)){
         newestSeen=m;
@@ -136,7 +179,11 @@
         if(identity!==account)return;
         account.online=snap.val()===true;
         updateComposer();
-        if(account.online)markCurrentSeen();
+        if(account.online){
+          markCurrentSeen();
+          account.receipts?.forEach((state,key)=>sendReceipt(account,key,state));
+          if(session)pollReceipts(session);
+        }
       };
       identity=account;
       connection.on('value',account.connected);
@@ -228,6 +275,7 @@
     const previous=session;
     session=null;
     if(previous){
+      clearInterval(previous.receiptTimer);
       cancelAnimationFrame(previous.frame);
       previous.pages.forEach(p => p.query.off('value',p.listen));
       summaries.get(previous.key)?.resume();
@@ -281,6 +329,8 @@
     el('h2').textContent=target?(target.peer?olNameOf(target.peer):target.name):'Chats';
     if(!target){sync();(tab==='groups'?el('[data-groups]'):el('[data-search]')).focus();return;}
     const s=session={...target,pages:[],bubbles:new Map(),frame:0,depth:1};
+    s.receiptTimer=setInterval(()=>pollReceipts(s),8000);
+    pollReceipts(s);
     summaries.get(s.key)?.pause();
     el('[data-block]').hidden=!s.peer;el('[data-manage]').hidden=!s.group;
     drawActions(s);
@@ -339,6 +389,20 @@
     if(row)markSeen(session.key,row.value.created);
     el('[data-latest]').hidden=true;
   }
+  function paintReceipt(element,s,message,id){
+    if(!element)return;
+    const pending=identity?.pending?.id===id;
+    const peers=s.receipts?.filter(peer=>peer.since<message.created)||[];
+    const allRead=peers.length>0 && peers.every(peer=>peer.read>=message.created);
+    const allReceived=peers.length>0 && peers.every(peer=>peer.received>=message.created);
+    const state=pending?'pending':allRead?'read':allReceived?'delivered':'sent';
+    if(element.dataset.state===state)return;
+    element.dataset.state=state;
+    const label={pending:'Wird gesendet',sent:'Abgesendet',delivered:'Zugestellt',read:'Gelesen'}[state];
+    element.setAttribute('aria-label',label);
+    element.title=label;
+    element.textContent=pending?'◷':state==='sent'?'✓':'✓✓';
+  }
   function render(s) {
     if(!s.pages[0]?.loaded)return;
     feed.setAttribute('aria-busy','false');
@@ -354,10 +418,13 @@
       }
     }
     rows.reverse();
+    const incoming=rows.findLast(({value})=>visibleIncoming(value));
+    if(incoming)updateReceipt(s.key,incoming.value.created);
     const next=new Map();let cursor=feed.firstChild;
     for (const {id,value:m,fresh} of rows) {
       const existing=s.bubbles.get(id);
       if(existing && existing.value.text===m.text && existing.value.changed===m.changed){
+        paintReceipt(existing.receipt,s,m,id);
         if(existing.node!==cursor)feed.insertBefore(existing.node,cursor);
         cursor=existing.node.nextSibling;next.set(id,existing);continue;
       }
@@ -365,10 +432,21 @@
       bubble.dataset.id = id; bubble.className = (mine ? 'dm-own' : 'dm-peer')+(fresh?' dm-new':'');
       const meta = document.createElement('small'), body = document.createElement('p');
       const time=document.createElement('time');time.dateTime=new Date(m.created).toISOString();time.textContent=formattedTime(m.created);
-      meta.append(mine?'Du':m.name,' · ',time,m.changed!==m.created?' · bearbeitet':'');
-      body.textContent = m.text; bubble.append(meta,body);
+      meta.className='dm-message-meta';
+      if(!mine && s.group){
+        const name=document.createElement('strong');
+        name.className='dm-message-author';name.textContent=m.name;bubble.append(name);
+      }
+      meta.append(time);
+      if(m.changed!==m.created)meta.append(' · bearbeitet');
+      const receipt=mine?document.createElement('span'):null;
+      if(receipt){
+        receipt.className='dm-receipt';receipt.setAttribute('role','img');
+        meta.append(receipt);paintReceipt(receipt,s,m,id);
+      }
+      body.textContent = m.text; bubble.append(body,meta);
       const menu = document.createElement('details'), summary = document.createElement('summary');
-      summary.textContent = 'Optionen'; menu.append(summary);
+      summary.textContent = '⋯'; summary.setAttribute('aria-label','Nachrichtenoptionen'); menu.append(summary);
       menu.append(button('Antworten',()=>{
         resetEdit(s);s.reply=m;
         const reply=el('[data-reply]');
@@ -386,7 +464,7 @@
         menu.append(button('Melden',()=>window.chatModeration.report({path:path.join('/'),text:m.text,author:m.author,name:m.name})));
         if(s.group)menu.append(button('Blockieren',()=>olBlock(m.author,m.name)));
       }
-      bubble.append(menu);feed.insertBefore(bubble,cursor);next.set(id,{node:bubble,value:m});
+      bubble.append(menu);feed.insertBefore(bubble,cursor);next.set(id,{node:bubble,value:m,receipt});
     }
     for(const node of [...feed.children])if(next.get(node.dataset.id)?.node!==node)node.remove();
     s.bubbles=next;
@@ -466,7 +544,7 @@
       }
     }finally{
       account.pending=null;
-      if(identity===account)updateComposer();
+      if(identity===account){updateComposer();if(session)queueRender(session);}
     }
   }
   el('[data-search]').oninput=drawIndex;
@@ -474,6 +552,7 @@
   document.addEventListener('visibilitychange',()=>{
     if(document.visibilityState!=='visible'){hideAlert();return;}
     markCurrentSeen();
+    if(session)pollReceipts(session);
   });
   el('[data-private]').onclick=()=>open();el('[data-groups]').onclick=()=>show(null,'groups');
   for(const [attr,field] of [['data-mute','muted'],['data-pin','pinned']]){
