@@ -3,5 +3,11 @@
   "type": "module",
   "dependencies": {
     "@block65/webcrypto-web-push": "2.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "scripts": {
+    "build:pages": "esbuild cloudflare/pages-worker.js --bundle --format=esm --platform=browser --target=es2022 --minify --legal-comments=inline --outfile=_worker.js"
   }
 }
