@@ -35,23 +35,28 @@ async function databaseToken(env) {
 
 function databaseClient(token) {
   return async (path, method='GET', value, headers={}) => {
+    let response;
     try {
-      const response = await fetch(database+'/'+path+'.json', {
+      response = await fetch(database+'/'+path+'.json', {
         method, headers:{Authorization:'Bearer '+token, ...headers,
           ...(value===undefined?{}:{'Content-Type':'application/json'})},
-        body:value===undefined?undefined:JSON.stringify(value),redirect:'error'
+        body:value===undefined?undefined:JSON.stringify(value),redirect:'manual'
       });
-      if (!response.ok && response.status!==412) {
-        throw Object.assign(Error('Database request failed'), {
-          code:['GET','PUT','DELETE'].includes(method)?'Database '+method:'Database access',
-          upstream:response.status
-        });
-      }
-      const text = await response.text();
-      return {ok:response.ok,etag:response.headers.get('etag'),value:text?JSON.parse(text):null};
     } catch (error) {
-      if (error.code) throw error;
-      throw Object.assign(Error('Database response unavailable'), {code:'Database connection'});
+      console.error('Firebase transport',method,error.name,error.message);
+      throw Object.assign(Error('Database network unavailable'), {code:'Database network '+method});
+    }
+    if (!response.ok && response.status!==412) {
+      throw Object.assign(Error('Database request failed'), {
+        code:['GET','PUT','DELETE'].includes(method)?'Database '+method:'Database access',
+        upstream:response.status
+      });
+    }
+    const body = await response.text();
+    try {
+      return {ok:response.ok,etag:response.headers.get('etag'),value:body?JSON.parse(body):null};
+    } catch {
+      throw Object.assign(Error('Database response unreadable'), {code:'Database response '+method});
     }
   };
 }
@@ -157,6 +162,17 @@ export async function onRequest({request,env,waitUntil}) {
   const reply = (value,status=200) => new Response(JSON.stringify(value),{headers,status});
   if (!allowed) return reply({error:'Origin'},403);
   if (request.method==='OPTIONS') return new Response(null,{headers,status:204});
+  if (request.method==='GET' && new URL(request.url).searchParams.has('setup-check')) {
+    let token;
+    try { token = await databaseToken(env); }
+    catch { return reply({error:'Firebase setup'},503); }
+    try {
+      const result = await databaseClient(token)('pushSubscriptions/setup-check','GET',undefined,{'X-Firebase-ETag':'true'});
+      return reply({firebase:'ready',etag:!!result.etag});
+    } catch (error) {
+      return reply({error:error.code||'Database response',upstream:error.upstream},503);
+    }
+  }
   if (request.method!=='POST') return reply({error:'Method'},405);
   let stage = 'Request';
   try {
