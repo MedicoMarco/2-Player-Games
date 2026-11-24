@@ -1,4 +1,4 @@
-const CACHE_NAME = "play2gether-pwa-v16";
+const CACHE_NAME = "play2gether-pwa-v17";
 const APP_ROOT = new URL("./", self.registration.scope).href;
 const NOTIFICATION_SCRIPT = new URL("notifications.js", APP_ROOT).href;
 const FACTORY_ASSETS = new Set([

@@ -13,7 +13,7 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw Object.assign(Error('Push service unavailable'), {
-      code:data.error || 'Connection', http:response.status
+      code:data.error || 'Connection', http:response.status, upstream:data.upstream
     });
     return {data};
   };
@@ -111,7 +111,11 @@
     if (Notification.permission === 'denied') return 'Erlaube Mitteilungen in den iPad-Einstellungen.';
     if (error.code === 'Authentication') return 'Die Online-Anmeldung wurde nicht bestätigt. Melde dich bei Play2Gether neu an.';
     if (error.code === 'Firebase setup') return 'Cloudflare konnte sich nicht bei Firebase anmelden. Prüfe das Firebase-Secret.';
-    if (error.code === 'Database access') return 'Der Push-Dienst hat keinen Zugriff auf die Firebase-Datenbank.';
+    if (error.code?.startsWith('Database ')) {
+      return 'Firebase-Datenbankfehler ('+error.code+(error.upstream?', HTTP '+error.upstream:'')+').';
+    }
+    if (error.code === 'Authentication service') return 'Cloudflare konnte die Firebase-Anmeldung nicht prüfen.';
+    if (error.code === 'Subscription storage') return 'Cloudflare konnte das Geräte-Abo nicht speichern (Subscription storage).';
     if (error.code === 'Push setup') return 'Die Push-Secrets fehlen oder sind ungültig. Prüfe das Cloudflare-Produktionsdeployment.';
     if (error.code === 'Subscription') return 'Der Push-Dienst konnte das Geräte-Abo nicht lesen.';
     if (stage === 'device') return 'Das Gerät konnte kein Push-Abo erstellen ('+(error.name||'Fehler')+'). Öffne Play2Gether über das Home-Bildschirm-Symbol.';

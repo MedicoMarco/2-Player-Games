@@ -35,12 +35,24 @@ async function databaseToken(env) {
 
 function databaseClient(token) {
   return async (path, method='GET', value, headers={}) => {
-    const response = await fetch(database+'/'+path+'.json', {
-      method, headers:{Authorization:'Bearer '+token,'Content-Type':'application/json', ...headers},
-      body:value===undefined?undefined:JSON.stringify(value),redirect:'error'
-    });
-    if (!response.ok && response.status!==412) throw Object.assign(Error('Database request failed'), {code:'Database access'});
-    return {ok:response.ok,etag:response.headers.get('etag'),value:await response.json()};
+    try {
+      const response = await fetch(database+'/'+path+'.json', {
+        method, headers:{Authorization:'Bearer '+token, ...headers,
+          ...(value===undefined?{}:{'Content-Type':'application/json'})},
+        body:value===undefined?undefined:JSON.stringify(value),redirect:'error'
+      });
+      if (!response.ok && response.status!==412) {
+        throw Object.assign(Error('Database request failed'), {
+          code:['GET','PUT','DELETE'].includes(method)?'Database '+method:'Database access',
+          upstream:response.status
+        });
+      }
+      const text = await response.text();
+      return {ok:response.ok,etag:response.headers.get('etag'),value:text?JSON.parse(text):null};
+    } catch (error) {
+      if (error.code) throw error;
+      throw Object.assign(Error('Database response unavailable'), {code:'Database connection'});
+    }
   };
 }
 
@@ -146,10 +158,12 @@ export async function onRequest({request,env,waitUntil}) {
   if (!allowed) return reply({error:'Origin'},403);
   if (request.method==='OPTIONS') return new Response(null,{headers,status:204});
   if (request.method!=='POST') return reply({error:'Method'},405);
+  let stage = 'Request';
   try {
     const raw = await request.text();
     if (raw.length>4096) return reply({error:'Payload'},413);
     const body = JSON.parse(raw);
+    stage = 'Authentication service';
     const uid = await authenticate(request);
     if (!uid) return reply({error:'Authentication'},401);
     const [publicKey,privateKey,subject] = String(env.PLAY2GETHER_PUSH_VAPID||'').split(',');
@@ -165,6 +179,7 @@ export async function onRequest({request,env,waitUntil}) {
     }
     const sub = subscriptionFrom(body.subscription);
     if (!sub || !['add','remove'].includes(body.action)) return reply({error:'Subscription'},400);
+    stage = 'Subscription storage';
     const key = await digest(sub.endpoint);
     const path = 'pushSubscriptions/'+uid;
     if (body.action==='remove') {
@@ -176,12 +191,15 @@ export async function onRequest({request,env,waitUntil}) {
         const current = await db(path,'GET',undefined,{'X-Firebase-ETag':'true'});
         const values = {...current.value,[key]:{...sub,updated:Date.now()}};
         const newest = Object.entries(values).sort(([,a],[,b])=>b.updated-a.updated).slice(0,8);
-        if ((await db(path,'PUT',Object.fromEntries(newest),{'If-Match':current.etag})).ok) return reply({});
+        if ((await db(path,'PUT',Object.fromEntries(newest),{'If-Match':current.etag ?? 'null_etag'})).ok) return reply({});
       }
       return reply({error:'Retry'},409);
     }
     return reply({});
   } catch (error) {
-    return reply({error:error.code==='Database access'?'Database access':'Push service unavailable'},503);
+    const databaseError = error.code?.startsWith('Database ');
+    const code = databaseError?error.code:stage;
+    console.error('Push setup failed',code,error.upstream||'');
+    return reply({error:code,...(databaseError&&error.upstream?{upstream:error.upstream}:{})},503);
   }
 }
