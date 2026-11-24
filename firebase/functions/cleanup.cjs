@@ -1,12 +1,16 @@
 'use strict';
 // Operates only on the data paths used by index.html. No other profiles are removed.
 function cleanup(data,uid){
-  for(const path of ['users','presence','friends','requests','invites','blocked']){
+  for(const path of ['users','presence','friends','requests','invites','blocked','pushSubscriptions','pushDispatch']){
     if(data[path])delete data[path][uid];
   }
   for(const path of ['friends','requests','invites','blocked']){
     for(const entries of Object.values(data[path]||{}))if(entries&&typeof entries==='object')delete entries[uid];
   }
+  const direct=data.chatReceipts?.direct||{};
+  delete direct[uid];
+  for(const receipts of Object.values(direct))delete receipts[uid];
+  for(const receipts of Object.values(data.chatReceipts?.group||{}))delete receipts[uid];
   for(const [name,id] of Object.entries(data.names||{}))if(id===uid)delete data.names[name];
   for(const [id,m] of Object.entries(data.matches||{}))if(m.host===uid||m.guest===uid)delete data.matches[id];
   const removedRooms=new Set();

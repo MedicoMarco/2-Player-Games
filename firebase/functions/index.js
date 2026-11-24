@@ -47,3 +47,5 @@ exports.finishAccountDeletion=onSchedule({...options,schedule:'every 60 minutes'
     });
   }
 });
+
+Object.assign(exports,require('./push'));

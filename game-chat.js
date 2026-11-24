@@ -140,6 +140,7 @@
     const entry = {seat, id, uid:author.uid, name:author.name, text, received:performance.now(), life};
     active.entries.push(entry);
     if(!expanded && seat!==active.seat)trigger.dataset.unread = '';
+    if(active.kind==='peer' && seat!==active.seat)window.gameNotifications?.peer(active.ss.mid,author.name,text);
     const previous = bubbles.get(seat);
     if(previous){clearTimeout(previous.timer);previous.node.remove();}
     const node = item(entry,'gc-bubble');
@@ -282,6 +283,10 @@
         id=room.ref.push().key;
         status.textContent='Warte auf Bestätigung von Firebase …';
         await room.ref.child('chat/'+room.seat).set({uid,text,ts:olTS(),id});
+        if(OL.me===uid)window.gameNotifications?.dispatch(
+          {kind:'room',source:room.code,seat:room.seat,message:id},
+          Object.values(room.names).map(player=>player.uid)
+        );
       }else{
         const channel=room.ss.ctl;
         if(channel?.readyState!=='open')throw Error('offline');
@@ -316,5 +321,15 @@
     chat.style.setProperty('--gc-keyboard',Math.max(0,innerHeight-visualViewport.height-visualViewport.offsetTop)+'px');
     layout();
   });
-  window.gameChat={room,peer,receivePeer,stop,refreshBlocks};
+  function openNotification(target){
+    if(!active || (target.kind==='room'
+      ? active.kind!=='room'||active.code!==target.id
+      : active.kind!=='peer'||active.ss.mid!==target.id))return false;
+    window.directChat?.close();
+    olClose();
+    toggle(true);
+    return true;
+  }
+
+  window.gameChat={room,peer,receivePeer,stop,refreshBlocks,openNotification};
 })();

@@ -1,0 +1,326 @@
+import { encryptNotification, vapidHeaders } from '@block65/webcrypto-web-push';
+
+const project = 'play2gether-c4e05';
+const firebaseWebKey = 'AIzaSyAxc-cOxcn5cz18KVpnmby3znZgkTGQ8oc';
+const database = 'https://play2gether-c4e05-default-rtdb.europe-west1.firebasedatabase.app';
+const origin = 'https://medicomarco.github.io';
+const pages = 'https://2-player-games.pages.dev';
+const id = /^[A-Za-z0-9_-]{1,128}$/;
+const encoder = new TextEncoder();
+const b64 = value => btoa(String.fromCharCode(...value)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+const json64 = value => b64(encoder.encode(JSON.stringify(value)));
+const tokenURL = 'https://oauth2.googleapis.com/token';
+const visibleMs = 45000;
+const validTab = /^[a-f0-9-]{36}$/;
+let access;
+
+async function databaseToken(env) {
+  if (access?.expires > Date.now()) return access.token;
+  const account = JSON.parse(env.PLAY2GETHER_FIREBASE_SERVICE_ACCOUNT);
+  if (account.project_id !== project) throw Error('Invalid Firebase project');
+  const der = Uint8Array.from(atob(account.private_key.replace(/-----[^-]+-----|\s/g, '')), ch => ch.charCodeAt(0));
+  const key = await crypto.subtle.importKey('pkcs8', der, {name:'RSASSA-PKCS1-v1_5', hash:'SHA-256'}, false, ['sign']);
+  const now = Math.floor(Date.now() / 1000);
+  const claims = json64({alg:'RS256',typ:'JWT'}) + '.' + json64({
+    iss:account.client_email, aud:tokenURL, iat:now, exp:now+3600,
+    scope:'https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email'
+  });
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, encoder.encode(claims));
+  const response = await fetch(tokenURL, {method:'POST',body:new URLSearchParams({
+    grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion:claims+'.'+b64(new Uint8Array(signature))
+  })});
+  if (!response.ok) throw Error('Firebase credentials rejected');
+  const value = await response.json();
+  access = {token:value.access_token, expires:Date.now()+(value.expires_in-60)*1000};
+  return access.token;
+}
+
+function databaseClient(token) {
+  return async (path, method='GET', value, headers={}) => {
+    let response;
+    for (let attempt=0;attempt<2;attempt++) try {
+      response = await fetch(database+'/'+path+'.json', {
+        method, headers:{Authorization:'Bearer '+token, ...headers,
+          ...(value===undefined?{}:{'Content-Type':'application/json'})},
+        body:value===undefined?undefined:JSON.stringify(value),redirect:'manual'
+      });
+      break;
+    } catch (error) {
+      if (attempt===0 && (method==='GET' || headers['If-Match'])) continue;
+      console.error('Firebase transport',method,error.name);
+      throw Object.assign(Error('Database network unavailable'), {code:'Database network '+method});
+    }
+    if (!response.ok && response.status!==412) {
+      throw Object.assign(Error('Database request failed'), {
+        code:['GET','PUT','DELETE'].includes(method)?'Database '+method:'Database access',
+        upstream:response.status
+      });
+    }
+    try {
+      const body = await response.text();
+      return {ok:response.ok,etag:response.headers.get('etag'),value:body?JSON.parse(body):null};
+    } catch {
+      throw Object.assign(Error('Database response unreadable'), {code:'Database response '+method});
+    }
+  };
+}
+
+async function authenticate(request) {
+  const token = request.headers.get('Authorization')?.match(/^Bearer ([A-Za-z0-9_.-]{1,5000})$/)?.[1];
+  if (!token) return null;
+  const response = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key='+firebaseWebKey,{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:token})
+  });
+  if (!response.ok) return null;
+  const user = (await response.json()).users?.[0];
+  return !user?.disabled && id.test(user?.localId || '') ? user.localId : null;
+}
+
+function subscriptionFrom(value) {
+  try {
+    const endpoint = new URL(value.endpoint);
+    const {p256dh,auth} = value.keys;
+    const hosts = /^(?:fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|(?:[a-z0-9-]+\.)*push\.apple\.com|(?:[a-z0-9-]+\.)+notify\.windows\.com)$/i;
+    if (endpoint.protocol!=='https:' || endpoint.username || endpoint.password || endpoint.port || endpoint.hash ||
+        !hosts.test(endpoint.hostname) || endpoint.href.length>2048 ||
+        typeof p256dh!=='string' || !/^[A-Za-z0-9_-]{87}$/.test(p256dh) || !p256dh.startsWith('B') ||
+        typeof auth!=='string' || !/^[A-Za-z0-9_-]{22}$/.test(auth)) return null;
+    return {endpoint:endpoint.href, keys:{p256dh,auth},expirationTime:null};
+  } catch { return null; }
+}
+
+const digest = async value => b64(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value))));
+
+function shortText(value, limit) {
+  if (typeof value !== 'string') return '';
+  const chars = Array.from(value.replace(/\s+/g,' ').trim());
+  return chars.length>limit?chars.slice(0,limit-1).join('')+'…':chars.join('');
+}
+
+function chatPreview(name, text, channel='') {
+  return {author:shortText(name,40),preview:shortText(text,140),channel:shortText(channel,40)};
+}
+
+async function notification(db, from, {kind,to,source,message,seat}) {
+  if (!id.test(to||'') || to===from || !['invite','direct','group','room'].includes(kind)) return null;
+  if (kind==='invite') {
+    const invite = (await db('invites/'+to+'/'+from)).value;
+    if (!invite || invite.mid!==message) return null;
+    const room = invite.mid.startsWith('room:');
+    const path = room?'rooms/'+invite.code:'matches/'+invite.mid;
+    const match = (await db(path)).value;
+    if (match?.host!==from || (room ? match.status!=='lobby' : match.state!=='invited'||match.guest!==to)) return null;
+    const ttl = Math.floor((invite.ts-Date.now())/1000)+(room?300:60);
+    return {ts:invite.ts,ttl,data:{kind,sender:from,id:invite.mid,ts:invite.ts,author:shortText(invite.name,40)}};
+  }
+  if (!id.test(message||'')) return null;
+  if (kind==='direct') {
+    const path = [from,to].sort().join('/');
+    const [entry,friend,reverse] = await Promise.all([
+      db('directMessages/'+path+'/'+message),db('friends/'+from+'/'+to),db('friends/'+to+'/'+from)
+    ]);
+    if (entry.value?.author!==from || friend.value!==true || reverse.value!==true) return null;
+    return {ts:entry.value.created,ttl:3600,key:'dm_'+from,data:{kind,id:from,...chatPreview(entry.value.name,entry.value.text)}};
+  }
+  if (!id.test(source||'')) return null;
+  if (kind==='group') {
+    const [entry,group] = await Promise.all([db('groupMessages/'+source+'/'+message),db('groups/'+source)]);
+    const members = Object.values(group.value?.members || {});
+    if (entry.value?.author!==from || !group.value?.info || group.value.info.closed ||
+        !members.some(m=>m.uid===from && m.since<entry.value.created) ||
+        !members.some(m=>m.uid===to && m.since<entry.value.created)) return null;
+    return {ts:entry.value.created,ttl:3600,key:'group_'+source,data:{kind,id:source,...chatPreview(entry.value.name,entry.value.text,group.value.info.name)}};
+  }
+  if (!/^[0-9]$/.test(seat||'')) return null;
+  const {value:room} = await db('rooms/'+source);
+  const entry = room?.chat?.[seat];
+  if (room?.status!=='play' || room.seats?.[seat]?.uid!==from || entry?.uid!==from || entry.id!==message ||
+      !Object.values(room.seats).some(p=>p.k==='p' && p.uid===to)) return null;
+  return {ts:entry.ts,ttl:60,data:{kind,id:source,...chatPreview(room.seats[seat].name,entry.text,'Spielchat')}};
+}
+
+async function send(db, vapid, from, body) {
+  const {to,kind} = body;
+  const note = await notification(db,from,body);
+  if (!note || note.ttl<=0 || !Number.isFinite(note.ts) || Date.now()-note.ts>120000) return;
+  const [subscriptions,profile,lock,blocked,reverse,pref] = await Promise.all([
+    db('pushSubscriptions/'+to), db('users/'+to+'/name'), db('deletionLocks/'+to),
+    db('blocked/'+to+'/'+from), db('blocked/'+from+'/'+to),
+    note.key?db('chatPreferences/'+to+'/'+note.key):null
+  ]);
+  if (!subscriptions.value || !profile.value || lock.value!==null || blocked.value!==null || reverse.value!==null ||
+      pref?.value?.muted || pref?.value?.seen>=note.ts) return;
+  const now = Date.now();
+  const devices = Object.entries(subscriptions.value).sort(([,a],[,b])=>b.updated-a.updated).slice(0,8)
+    .filter(([,device])=>!Object.values(device.visibleTabs||{}).some(tab=>tab.visible && tab.expires>now));
+  if (!devices.length) return;
+  const topic = (await digest(kind+':'+from+':'+(kind==='invite'?'':note.data.id))).slice(0,32);
+  const marker = 'pushDispatch/'+to+'/'+topic;
+  const previous = await db(marker,'GET',undefined,{'X-Firebase-ETag':'true'});
+  if (previous.value?.ts>=note.ts || (kind==='invite' && Date.now()-previous.value?.sent<15000)) return;
+  if (!(await db(marker,'PUT',{ts:note.ts,sent:Date.now()},{'If-Match':previous.etag??'null_etag'})).ok) return;
+  for (let i=0;i<devices.length;i+=4) {
+    await Promise.allSettled(devices.slice(i,i+4).map(async ([key,device])=>{
+      const code = await deliver(device,vapid,{...note.data,account:to},note.ttl,topic);
+      if (code===404 || code===410) await db('pushSubscriptions/'+to+'/'+key,'DELETE');
+      if (code<200 || code>=300) console.warn('Push provider rejected delivery',code);
+    }));
+  }
+}
+
+async function pushRequest(subscription,vapid,data,ttl,topic) {
+  let headers;
+  try {
+    ({headers} = await vapidHeaders(subscription,vapid));
+  } catch (error) {
+    console.error('Push signing failed',error.name);
+    throw Object.assign(Error(),{code:'Push signing'});
+  }
+  let body;
+  try {
+    body = await encryptNotification(subscription,encoder.encode(JSON.stringify(data)),{pad:false});
+  } catch (error) {
+    console.error('Push encryption failed',error.name);
+    throw Object.assign(Error(),{code:'Push encryption'});
+  }
+  return {
+    method:'POST',body,
+    headers:{...headers,ttl:String(ttl),topic,urgency:data.kind==='invite'?'high':'normal',
+      'content-encoding':'aes128gcm','content-type':'application/octet-stream'},
+    redirect:'manual'
+  };
+}
+
+async function deliver(device,vapid,data,ttl,topic) {
+  const subscription = subscriptionFrom(device);
+  if (!subscription) return 400;
+  const options = await pushRequest(subscription,vapid,data,ttl,topic);
+  const response = await fetch(subscription.endpoint,options);
+  response.body?.cancel().catch(()=>{});
+  return response.status;
+}
+
+async function saveVisibility(db, uid, {endpoint,tab,visible,version}) {
+  if (typeof endpoint!=='string' || endpoint.length>2048 || typeof tab!=='string' || !validTab.test(tab) ||
+      typeof visible!=='boolean' || !Number.isSafeInteger(version) || version<1) return 400;
+  const path = 'pushSubscriptions/'+uid+'/'+await digest(endpoint);
+  for(let attempt=0;attempt<3;attempt++){
+    const current = await db(path,'GET',undefined,{'X-Firebase-ETag':'true'});
+    if (current.value?.endpoint!==endpoint) return 404;
+    const now = Date.now(), tabs = current.value.visibleTabs || {};
+    if (tabs[tab]?.version>=version) return 200;
+    const active = Object.entries(tabs).filter(([key,state])=>key!==tab && state.expires>now)
+      .sort(([,a],[,b])=>b.expires-a.expires).slice(0,23);
+    const device = {...current.value,visibleTabs:{...Object.fromEntries(active),[tab]:{
+      visible,version,expires:now+visibleMs
+    }}};
+    if ((await db(path,'PUT',device,{'If-Match':current.etag??'null_etag'})).ok) return 200;
+  }
+  return 409;
+}
+
+async function chatReceipts(db, uid, {chat,kind,received,read}) {
+  if (typeof chat!=='string' || !id.test(chat) || !['direct','group'].includes(kind)) return {status:400};
+  let members;
+  let path;
+  if (kind==='direct') {
+    if (chat===uid) return {status:400};
+    const [friend,reverse,blocked,otherBlocked] = await Promise.all([
+      db('friends/'+uid+'/'+chat),db('friends/'+chat+'/'+uid),db('blocked/'+uid+'/'+chat),db('blocked/'+chat+'/'+uid)
+    ]);
+    if (friend.value!==true || reverse.value!==true || blocked.value!==null || otherBlocked.value!==null) return {status:403};
+    members = [{uid,since:0},{uid:chat,since:0}];
+    path = 'chatReceipts/direct/'+[uid,chat].sort().join('/');
+  } else {
+    const [{value:group},{value:slot}] = await Promise.all([db('groups/'+chat),db('groupIndex/'+uid+'/'+chat)]);
+    members = Object.values(group?.members||{});
+    if (!group?.info || group.info.closed || group.members?.[slot]?.uid!==uid) return {status:403};
+    path = 'chatReceipts/group/'+chat;
+  }
+  const isTimestamp = value => Number.isSafeInteger(value) && value>=0 && value<=Date.now()+5000;
+  if (received!==undefined || read!==undefined) {
+    if (!isTimestamp(received) || !isTimestamp(read)) return {status:400};
+    const self = members.find(member=>member.uid===uid);
+    const own = path+'/'+uid;
+    for (let attempt=0;attempt<3;attempt++) {
+      const {value,etag} = await db(own,'GET',undefined,{'X-Firebase-ETag':'true'});
+      const previous = value?.since===self.since ? value : {};
+      const state = {since:self.since,received:Math.max(previous.received||0,received,read),read:Math.max(previous.read||0,read)};
+      if (state.received===previous.received && state.read===previous.read) break;
+      if ((await db(own,'PUT',state,{'If-Match':etag??'null_etag'})).ok) break;
+      if (attempt===2) return {status:409};
+    }
+    return {status:200};
+  }
+  const {value} = await db(path);
+  return {status:200,peers:members.filter(member=>member.uid!==uid).map(member=>{
+    const state = value?.[member.uid];
+    return {since:member.since,received:state?.since===member.since?state.received:0,read:state?.since===member.since?state.read:0};
+  })};
+}
+
+export async function onRequest({request,env,waitUntil}) {
+  const fromOrigin = request.headers.get('Origin');
+  const allowed = !fromOrigin || fromOrigin===origin || fromOrigin===pages || fromOrigin===new URL(request.url).origin;
+  const headers = {'Cache-Control':'no-store','Content-Type':'application/json','Vary':'Origin',
+    'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type'};
+  if (allowed && fromOrigin) headers['Access-Control-Allow-Origin']=fromOrigin;
+  const reply = (value,status=200) => new Response(JSON.stringify(value),{headers,status});
+  if (!allowed) return reply({error:'Origin'},403);
+  if (request.method==='OPTIONS') return new Response(null,{headers,status:204});
+  if (request.method!=='POST') return reply({error:'Method'},405);
+  let stage = 'Request';
+  try {
+    const raw = await request.text();
+    if (raw.length>4096) return reply({error:'Payload'},413);
+    const body = JSON.parse(raw);
+    stage = 'Authentication service';
+    const uid = await authenticate(request);
+    if (!uid) return reply({error:'Authentication'},401);
+    const [publicKey,privateKey,subject] = String(env.PLAY2GETHER_PUSH_VAPID||'').split(',').map(part=>part.trim());
+    if (!publicKey || !privateKey || !subject || !env.PLAY2GETHER_FIREBASE_SERVICE_ACCOUNT) return reply({error:'Push setup'},503);
+    if (body.action==='key') return reply({key:publicKey});
+    let token;
+    try { token = await databaseToken(env); }
+    catch { return reply({error:'Firebase setup'},503); }
+    const db = databaseClient(token);
+    if (body.action==='send') {
+      waitUntil(send(db,{publicKey,privateKey,subject},uid,body).catch(()=>console.error('Push dispatch failed')));
+      return reply({},202);
+    }
+    if (body.action==='chatReceipts') {
+      const [profile,lock] = await Promise.all([db('users/'+uid+'/name'),db('deletionLocks/'+uid)]);
+      if (!profile.value || lock.value!==null) return reply({error:'Account'},403);
+      const {status,peers} = await chatReceipts(db,uid,body);
+      return reply({peers},status);
+    }
+    if (body.action==='visibility') {
+      const status = await saveVisibility(db,uid,body);
+      return reply({},status);
+    }
+    const sub = subscriptionFrom(body.subscription);
+    if (!sub || !['add','remove'].includes(body.action)) return reply({error:'Subscription'},400);
+    stage = 'Subscription storage';
+    const key = await digest(sub.endpoint);
+    const path = 'pushSubscriptions/'+uid;
+    if (body.action==='remove') {
+      await db(path+'/'+key,'DELETE');
+    } else {
+      const [user,lock] = await Promise.all([db('users/'+uid+'/name'),db('deletionLocks/'+uid)]);
+      if (!user.value || lock.value!==null) return reply({error:'Account'},403);
+      for(let attempt=0;attempt<3;attempt++){
+        const current = await db(path,'GET',undefined,{'X-Firebase-ETag':'true'});
+        const values = {...current.value,[key]:{...current.value?.[key],...sub,updated:Date.now()}};
+        const newest = Object.entries(values).sort(([,a],[,b])=>b.updated-a.updated).slice(0,8);
+        if ((await db(path,'PUT',Object.fromEntries(newest),{'If-Match':current.etag ?? 'null_etag'})).ok) return reply({});
+      }
+      return reply({error:'Retry'},409);
+    }
+    return reply({});
+  } catch (error) {
+    const databaseError = error.code?.startsWith('Database ');
+    const code = databaseError || ['Push signing','Push encryption'].includes(error.code)?error.code:stage;
+    console.error('Push setup failed',code,error.upstream||'');
+    return reply({error:code,...(databaseError&&error.upstream?{upstream:error.upstream}:{})},503);
+  }
+}

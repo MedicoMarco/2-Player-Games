@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Push-Schlüssel für Play2Gether</title>
+<style>
+body{font:1rem system-ui;max-width:38rem;margin:auto;padding:1.25rem}
+form{display:grid;gap:.75rem}input,button,textarea{font:inherit;padding:.65rem}textarea{width:100%;box-sizing:border-box;overflow-wrap:anywhere}
+</style>
+<h1>Push-Schlüssel für Play2Gether</h1>
+<p>Erzeuge den Wert einmalig auf diesem Gerät und speichere ihn direkt als Cloudflare-Secret <code>PLAY2GETHER_PUSH_VAPID</code>.</p>
+<form>
+<label for="email">Kontakt-E-Mail für den Push-Dienst</label>
+<input id="email" type="email" required autocomplete="email">
+<button>Schlüssel erzeugen</button>
+</form>
+<p><label for="secret">Wert für das Cloudflare-Secret</label></p>
+<textarea id="secret" rows="7" readonly></textarea>
+<p id="status" role="status"></p>
+<script>
+const form = document.querySelector('form');
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = form.querySelector('button');
+  const status = document.querySelector('#status');
+  const email = document.querySelector('#email').value;
+  button.disabled = true;
+  try {
+    const pair = await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+    const publicKey = new Uint8Array(await crypto.subtle.exportKey('raw',pair.publicKey));
+    const secret = await crypto.subtle.exportKey('jwk',pair.privateKey);
+    const key = btoa(String.fromCharCode(...publicKey)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    const output = document.querySelector('#secret');
+    output.value = [key,secret.d,'mailto:'+email].join(',');
+    output.focus();
+    output.select();
+    status.textContent = 'Kopiere den markierten Wert und füge ihn in Cloudflare als Secret ein.';
+  } catch {
+    status.textContent = 'Der Schlüssel konnte nicht erzeugt werden. Öffne diese Seite über HTTPS.';
+    button.disabled = false;
+  }
+});
+</script>
+</html>

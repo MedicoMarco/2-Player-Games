@@ -293,7 +293,8 @@ body.onl #rs,body.onl-guest #rs{display:none}
 #legal .lg-body h1{font-size:22px}#legal .lg-body h2{font-size:18px}#legal .lg-body h3{font-size:16px}
 #legal .lg-body a{color:var(--b)}#legal .lg-body p,#legal .lg-body ul,#legal .lg-body ol{margin:.5em 0}
 </style>
-<link rel="stylesheet" href="./direct-chat.css">
+<link rel="stylesheet" href="./direct-chat.css?v=2">
+<link rel="stylesheet" href="./poker.css">
 <link rel="stylesheet" href="./game-chat.css">
 <link rel="stylesheet" href="./chat-moderation.css">
 </head><body>
@@ -342,6 +343,7 @@ E-Mail: <a href="mailto:projektinfo.kontakt@gmail.com">projektinfo.kontakt@gmail
 <p>Rechtsgrundlage für die Konto- und Online-Funktionen ist Art. 6 Abs. 1 lit. b DSGVO, soweit die Verarbeitung erforderlich ist, um die von dir angeforderten Funktionen bereitzustellen. Für Sicherheit, Missbrauchsabwehr und den Schutz der Konten stütze ich mich ergänzend auf Art. 6 Abs. 1 lit. f DSGVO.</p>
 
 <h2>5. Welche Online-Daten in Firebase gespeichert werden</h2>
+<p>Wenn du Systembenachrichtigungen einschaltest, speichert Firebase die Push-Adresse deines Browsers und die öffentlichen Abo-Schlüssel zusammen mit deinem Konto. Für die Zustellung nutzt die Website den Push-Dienst deines Browsers oder Betriebssystems. Chatmeldungen zeigen den Absender und eine kurze Vorschau der Nachricht. Je nach Geräteeinstellung kann die Vorschau auf dem Sperrbildschirm sichtbar sein. Für Privat- und Gruppenchats speichert Firebase außerdem Zeitpunkte zur Zustellung und zum Lesen. Die jeweiligen Gesprächsteilnehmer sehen daraus den Status ihrer gesendeten Nachrichten. Du kannst das Abo auf deinem Gerät im Online-Menü ausschalten. Beim Abmelden auf dem Gerät wird das Abo beendet. Ungültige Abos werden bei einem Zustellversuch entfernt.</p>
 <p>Für Online-Funktionen nutze ich die Firebase Realtime Database. Dort können je nach Nutzung folgende Daten gespeichert werden:</p>
 <ul>
 <li><strong>Profil:</strong> Benutzername, technische Nutzerkennung, Erstellungszeitpunkt, Online-Spielstatistiken, dein Spielfortschritt (Erfolge, Siege und Niederlagen je Spiel, Highscores, Matchzähler, Reaktionsbestzeit, Favoriten, zuletzt gespielte Spiele, gewählte Farben sowie die Einstellungen Ton, Animationen, Darstellung, Schwierigkeit und Zielwert) sowie Werte, mit denen die Stärke der Computergegner an dein Spielverhalten angepasst wird.</li>
@@ -564,6 +566,10 @@ Deutschland</p>
 <script src="./factory-empire/terrain.js?v=5"></script>
 <script src="./factory-empire/world.js?v=4"></script>
 <script src="./factory-empire/game.js?v=23"></script>
+<script src="./poker.js"></script>
+<script src="./poker-table.js"></script>
+<script src="./blackjack.js"></script>
+<script src="./blackjack-table.js"></script>
 <script>
 const $=s=>document.querySelector(s),W=800,H=480,cl=(v,a,b)=>Math.max(a,Math.min(b,v)),rnd=(a,b)=>a+Math.random()*(b-a),now=()=>performance.now();
 let S={vm:'auto',cpu:0,d:1,t:5,snd:1,anim:1,theme:'auto',ori:'a',side:0,st:{},fav:[],rec:[],cat:'all',ach:{},pl:0,sk:[0,0]},B='#3b82f6',R='#ef4444';
@@ -3353,7 +3359,7 @@ function luMk(){
     const st_=u=>!OL.P[u]?0:OL.P[u].g?1:2;
     return fr.sort((a,b)=>st_(b)-st_(a)||olNameOf(a).localeCompare(olNameOf(b))).map(u=>{
       const k=st_(u),sent=LUN.inv[u]&&olNow()-LUN.inv[u]<45000,col=['#9ca3af','#f59e0b','#22c55e'][k];
-      const btn=k==2?(sent?'<button class=mini disabled>Eingeladen ✓</button>':`<button class=mini data-lu=inv data-u=${u}>Einladen</button>`):`<button class=mini disabled>${k?'Beschäftigt':'Offline'}</button>`;
+      const btn=k!=1?(sent?'<button class=mini disabled>Eingeladen ✓</button>':`<button class=mini data-lu=inv data-u=${u}>Einladen</button>`):'<button class=mini disabled>Beschäftigt</button>';
       return`<div class=lurow><i style="background:${col}"></i><b>${luHtml(olNameOf(u))}</b>${btn}</div>`}).join('')
   }
   const refreshFr=()=>{const e=$('#lufr');if(e&&mode=='lobby'&&LUN.role=='host'&&LUN.room&&LUN.room.status=='lobby')e.innerHTML=frHTML(LUN.room)};
@@ -3361,7 +3367,7 @@ function luMk(){
   async function invite(u){
     if(!olCanContact(u))return;
     if(LUN.role!='host'||!LUN.room||LUN.room.status!='lobby'||!u)return;
-    if(!OL.P[u]||OL.P[u].g){toast(olNameOf(u)+' ist gerade nicht frei.');refreshFr();return}
+    if(!OL.F[u]||OL.P[u]?.g){toast(olNameOf(u)+' ist gerade nicht frei.');refreshFr();return}
     try{
       await olWriteInvite(u,{mid:'room:'+LUN.code,code:LUN.code,name:OL.name,game:'ludo',t:0,ts:olTS()});
       LUN.inv[u]=olNow();
@@ -3650,7 +3656,7 @@ GAMES.push({id:'ludo',n:'Mensch ärgere dich nicht',ic:'\ud83c\udfb2',d:'Würfel
 RULES.ludo='Jeder hat vier Figuren (in den Spieleinstellungen auch nur zwei für kürzere Runden). Mit einer 6 kommt eine Figur aufs Startfeld; nach jeder 6 würfelst du nochmal. Ohne Figur auf dem Feld hast du drei Versuche. Wer auf ein besetztes Feld zieht, schmeißt die Figur raus – das ist freiwillig, du darfst den anderen auch verschonen (Computer schlagen meistens). Bei einer 6 darfst du wählen: rauskommen oder mit einer Figur ziehen. Rauskommen geht nicht, solange eine eigene Figur auf dem Startfeld steht. Im Zielhaus wird nicht gesprungen, du brauchst die genaue Augenzahl. Wer zuerst alle vier Figuren im Ziel hat, gewinnt.';
 ICON.maumau=GI(`<rect x="6" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(-12 16 24)"/><rect x="20" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(10 30 24)"/><path d="M31 17c-3-4-8 0-5 5l5 5 5-5c3-5-2-9-5-5z" fill="${Rd}" stroke="none" transform="rotate(10 30 24)"/>`);
 NM.maumau=['Mau-Mau','Das Kartenspiel für 2–10 Spieler, auch online.'];
-const ROOMG=['ludo','maumau','fabrik'];
+const ROOMG=['ludo','maumau','poker','blackjack','fabrik'];
 /* ===== Karten-Bibliothek (für alle Kartenspiele) =====
    Karte = Zahl 0..51: Farbe = id/13 (0 Pik, 1 Herz, 2 Karo, 3 Kreuz), Rang = id%13 (0 = 2 ... 8 = 10, 9 = Bube, 10 = Dame, 11 = König, 12 = Ass).
    cdSprite() zeichnet jede Karte einmal vektorscharf in ein Bild, drawCard() stempelt sie in beliebiger Größe (Rückseite: id -1). */
@@ -3759,6 +3765,7 @@ function drawCard(x,y,w,id,o){o=o||{};const h=w*1.4,rd=w*.09;c.save();c.translat
 /* ===== Mau-Mau: 2–10 Spieler, lokal gegen Computer oder online (Host berechnet, Hände bleiben privat) =====
    52 Karten (2 bis Ass). 6 = Richtungswechsel, 7 = nächster zieht 2 (weitergeben mit einer 7), 8 = nächster setzt aus, Bube = Farbe wünschen (nicht auf Bube), Ass = normale Karte.
    15 s pro Zug (sonst Strafkarte). Erst legen, dann innerhalb von 3 s „Mau“ (vorletzte Karte, 1 Strafkarte) bzw. „Mau Mau“ (letzte Karte, 2 Strafkarten) rufen. */
+const MM_HAND_SIZE=7,MM_DEAL_MS=1500;
 const MMN=10,MMS=[0,1,2,3,4,5,6,7,8,9],MMC=['#e0533d','#3a7bd5','#3f9b4f','#f2c94c','#9b59b6','#e67e22','#16a5a5','#e75480','#8d6e63','#7f8c8d'];
 const mmSeats=room=>MMS.map(i=>(room&&room.seats&&room.seats[i])||{k:'off'});
 const mmShuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -3773,10 +3780,9 @@ function mmOK(st,hand,c,drc){
 }
 function mmNew(sp,nm,cfg,seq0,rn){
   const act=MMS.filter(s=>sp[s]!='x'),nd=act.length<=4?1:act.length<=7?2:3,deck=mmDeck(nd),H=MMS.map(()=>[]);
-  for(let k=0;k<5;k++)for(const s of act)H[s].push(deck.pop());
-  let top;const skip=[];
-  for(;;){top=deck.pop();const r=cdR(top);if(r==7||r==8||r==10||r==11)break;skip.push(top)}
-  deck.unshift(...skip);
+  const topAt=deck.findLastIndex(card=>[7,8,10,11].includes(cdR(card)));
+  const [top]=deck.splice(topAt,1);
+  for(let k=0;k<MM_HAND_SIZE;k++)for(const s of act)H[s].push(deck.pop());
   const st={seq:seq0|0,rn:rn|0,sp:sp.slice(),nm:nm.slice(),hu:sp.map(x=>x=='h'||x=='o'?1:0),n:H.map(h=>h.length),t:act[Math.random()*act.length|0],top,suit:cdS(top),pend:0,dr:0,nd,mau:MMS.map(()=>0),mm:MMS.map(()=>0),fin:[],gu:MMS.map(()=>0),lf:MMS.map(()=>0),ab:0,aft:0,dir:1,cw:-1,ck:0,tl:-1,cwl:-1,dk:deck.length,dcn:0,ph:'play',msg:'',rk:[],rm:MMS.map(()=>0),cfg:{d:cfg.d|0,mau:cfg.mau?1:0}};
   st.msg=st.nm[st.t]+' beginnt';
   return{st,H,deck,disc:[]}
@@ -3964,7 +3970,11 @@ function mmHostMake(G,emit,hooks){
     if(force||hs.every(s=>st.rm[s])){rmDone=1;clearTimeout(rmT);hooks.onRematch(hs.filter(s=>st.rm[s]==1))}
   }
   return{
-    start(){out({k:'start'});arm(st.t);later(()=>{st.ph=='play'&&out();prompt()},900)},
+    start(dealMs){
+      const begin=()=>{st.ph='play';st.msg=nm(st.t)+' beginnt';arm(st.t);out();prompt()};
+      if(!dealMs){begin();return}
+      st.ph='deal';st.msg='Karten werden ausgeteilt …';out({k:'start'});later(begin,dealMs)
+    },
     act(seat,a,p,w){
       if(stopped)return;
       if(st.ph=='end'){
@@ -4002,11 +4012,12 @@ function mmHostMake(G,emit,hooks){
 function mmMk(){
   let ulS=0,ulV=0,ulBolts=[],ulBurst=[],ulP=[],ulShk=0,ulLast=0,st=null,mode='setup',host=null,my=0,myH=[],myDr=-1,ani=[],pile=[],dTop=0,endShown=0,rmSig='',lastTurn=-1,flash={},shake={},wishFor=-1,lastPlay=null,dlT=0,cwT=0,hsent={};
   const DXc=340,PXc=430,PYc=176,PW=78,HW=84,HY=352;
+  let dealStart=0,handRound=null;
+  const animateDeal=()=>S.anim&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
   const sortH=h=>h.slice().sort((a,b)=>a-b);
   const demo=()=>{
     const G=mmNew(MMS.map((_,i)=>i<4?(i?'c':'h'):'x'),['Du','Computer 1','Computer 2','Computer 3',...MMS.slice(4).map(i=>'Platz '+(i+1))],{d:1,mau:1},0,0);
-    while(G.H[0].length<7)G.H[0].push(G.deck.pop());
-    G.st.t=0;G.st.msg='Mau-Mau';myH=sortH(G.H[0]);myDr=-1;G.st.n=[7,5,4,6,0,0,0,0,0,0];
+    G.st.t=0;G.st.msg='Mau-Mau';myH=sortH(G.H[0]);myDr=-1;
     pile=[{c:G.deck[0],rot:-.22,dx:-6,dy:4},{c:G.deck[1],rot:.17,dx:5,dy:-3},{c:G.st.top,rot:.04,dx:0,dy:0}];dTop=G.st.top;
     return G.st
   };
@@ -4042,6 +4053,7 @@ function mmMk(){
     const first=!st||mode=='setup'||!st.seq||st.rn!==snap.rn,jump=!!st&&snap.seq>st.seq+1;
     let from=null;
     if(ev&&ev.k=='play'&&ev.s==my&&!first&&!jump){const i=myH.indexOf(ev.c),L=handLay(myH);from=i>=0?L[i]:(lastPlay&&lastPlay.c==ev.c?lastPlay.p:null)}
+    if(snap.ph==='deal'&&(!st||st.ph!=='deal'||st.rn!==snap.rn))dealStart=now();
     st=snap;syncMine();
     dlT=st.tl>=0?now()+st.tl:0;cwT=st.cwl>=0?now()+st.cwl:0;
     if(first||jump){ulS=ulV=st.pend/2;ulBolts=[];ulBurst=[];ulP=[];ani=[];dTop=st.top;pile=[{c:st.top,rot:rnd(-.12,.12),dx:0,dy:0}];flash={};wishFor=-1}
@@ -4071,7 +4083,7 @@ function mmMk(){
     if(mode!='host'||!LUN.ref||!host||!LUN.room)return;const seats=mmSeats(LUN.room);
     for(let s=0;s<MMN;s++){
       if(snap.sp[s]!='o')continue;const u=seats[s].uid;if(!u)continue;
-      const str=JSON.stringify({h:host.hand(s),dr:host.dr(s)});
+      const str=JSON.stringify({h:host.hand(s),dr:host.dr(s),rn:snap.rn});
       if(hsent[u]!==str){hsent[u]=str;OL.db.ref('hands/'+LUN.code+'/'+u).set(str).catch(e=>toast(luErr(e)))}
     }
   }
@@ -4088,7 +4100,7 @@ function mmMk(){
 <div class=lurow><b>Computer-Gegner</b><div class=seg>${sg('mn',[1,2,3,4,5,6,7,8,9].map(v=>[v,v]),M.n)}</div></div>
 <div class=lurow><b>Stärke</b><div class=seg>${sg('diff',[[0,'Einfach'],[1,'Normal'],[2,'Schwer'],[3,'Adaptiv']],S.d)}</div></div>
 <div class=lurow><b>„Mau“ rufen</b><div class=seg>${sg('mauopt',[[1,'Pflicht'],[0,'Aus']],M.mau)}</div></div></div>
-<div><button class=btn data-lu=go>Spiel starten</button></div>
+<div><button class=btn data-lu=go>Spiel starten</button> <button class=mini data-lu=poker>Poker spielen</button></div>
 <div class=luon><b>🌐 Online</b><button class=btn data-lu=create>Raum erstellen</button><input id=lucode maxlength=20 placeholder="RAUMCODE" autocomplete=off autocapitalize=characters><button class="btn r" data-lu=join>Beitreten</button></div>
 <p class=luhint>Passende Farbe oder Zahl legen. 6: Richtungswechsel · 7: nächster zieht 2 (mit einer 7 weitergeben) und ist danach trotzdem noch voll dran · 8: nächster setzt aus · Bube: Farbe wünschen · 15 s pro Zug · Nach dem Legen der vorletzten Karte „Mau“, nach der letzten „Mau Mau“ rufen (3 s Zeit)! Gespielt wird bis zum letzten Platz.</p></div>`
   }
@@ -4099,7 +4111,7 @@ function mmMk(){
     const st_=u=>!OL.P[u]?0:OL.P[u].g?1:2;
     return fr.sort((a,b)=>st_(b)-st_(a)||olNameOf(a).localeCompare(olNameOf(b))).map(u=>{
       const k=st_(u),sent=LUN.inv[u]&&olNow()-LUN.inv[u]<45000,col=['#9ca3af','#f59e0b','#22c55e'][k];
-      const btn=k==2?(sent?'<button class=mini disabled>Eingeladen ✓</button>':`<button class=mini data-lu=inv data-u=${u}>Einladen</button>`):`<button class=mini disabled>${k?'Beschäftigt':'Offline'}</button>`;
+      const btn=k!=1?(sent?'<button class=mini disabled>Eingeladen ✓</button>':`<button class=mini data-lu=inv data-u=${u}>Einladen</button>`):'<button class=mini disabled>Beschäftigt</button>';
       return`<div class=lurow><i style="background:${col}"></i><b>${luHtml(olNameOf(u))}</b>${btn}</div>`}).join('')
   }
   const refreshFr=()=>{const e=$('#lufr');if(e&&mode=='lobby'&&LUN.role=='host'&&LUN.room&&LUN.room.status=='lobby')e.innerHTML=frHTML(LUN.room)};
@@ -4107,7 +4119,7 @@ function mmMk(){
   async function invite(u){
     if(!olCanContact(u))return;
     if(LUN.role!='host'||!LUN.room||LUN.room.status!='lobby'||!u)return;
-    if(!OL.P[u]||OL.P[u].g){toast(olNameOf(u)+' ist gerade nicht frei.');refreshFr();return}
+    if(!OL.F[u]||OL.P[u]?.g){toast(olNameOf(u)+' ist gerade nicht frei.');refreshFr();return}
     try{
       await olWriteInvite(u,{mid:'room:'+LUN.code,code:LUN.code,name:OL.name,game:'maumau',t:0,ts:olTS()});
       LUN.inv[u]=olNow();
@@ -4147,7 +4159,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
   function launch(G,emitFn){
     ani=[];endShown=0;rmSig='';wishFor=-1;hsent={};st=null;
     host=mmHostMake(G,emitFn,mode=='host'?{onRematch:doRematch}:null);
-    ovHide();host.start()
+    ovHide();host.start(mode==='host'||animateDeal()?MM_DEAL_MS:0)
   }
   function startLocal(){
     const M=S.mm,n=Math.max(1,Math.min(9,M.n|0)),sp=MMS.map((_,i)=>i?'x':'h'),nm=MMS.map((_,i)=>i?'Platz '+(i+1):(OL&&OL.name)||'Du');
@@ -4217,9 +4229,9 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
         if(v.status=='play'&&v.snap){
           let o;try{o=JSON.parse(v.snap)}catch(e){return}
           if(mode!='guest'){
-            mode='guest';my=i;ani=[];endShown=0;ovHide();st=null;LUN.lastSeq=0;myH=[];myDr=-1;
+            mode='guest';my=i;ani=[];endShown=0;ovHide();st=null;LUN.lastSeq=0;myH=[];myDr=-1;handRound=null;
             LUN.hr=OL.db.ref('hands/'+LUN.code+'/'+OL.me);
-            LUN.hr.on('value',hs=>{const t=hs.val();if(!t)return;try{const q=JSON.parse(t);myH=sortH(q.h||[]);myDr=q.dr==null?-1:q.dr}catch(e){}},e=>{if(!LUN.left)toast(luErr(e))})
+            LUN.hr.on('value',hs=>{const t=hs.val();if(!t)return;try{const q=JSON.parse(t);myH=sortH(q.h||[]);myDr=q.dr==null?-1:q.dr;handRound=q.rn??null}catch(e){}},e=>{if(!LUN.left)toast(luErr(e))})
           }
           if(o.snap.seq>LUN.lastSeq){LUN.lastSeq=o.snap.seq;onSnap(o.snap,o.ev)}
         }
@@ -4243,7 +4255,8 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
   /* ----- Klicks in den Overlays ----- */
   function luClick(b){
     const a=b.dataset.lu,v=b.dataset.v,s=b.dataset.s;
-    if(a=='mn'){S.mm.n=+v;save();showOv(setupHTML())}
+    if(a=='poker'&&mode==='setup'){api.leave();start('poker')}
+    else if(a=='mn'){S.mm.n=+v;save();showOv(setupHTML())}
     else if(a=='diff'){S.d=+v;save();showOv(setupHTML())}
     else if(a=='mauopt'){S.mm.mau=+v;save();showOv(setupHTML())}
     else if(a=='go'||a=='again')startLocal();
@@ -4296,8 +4309,8 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
   /* ----- Zeichnen ----- */
   const fitText=(t,w,size,wt)=>{c.font=(wt||700)+' '+size+'px system-ui';while(size>10&&c.measureText(t).width>w){size--;c.font=(wt||700)+' '+size+'px system-ui'}};
   /* Spieler-Kachel: Name (eigene Zeile, passt sich an), darunter Mini-Kartenfächer und Anzahl */
-  function tile(t,s){
-    const on=st.sp[s]!='x',cur=on&&st.t==s&&st.ph!='end'&&mode!='setup',x=t.x,y=t.y,w=t.w,h=t.h,n=st.n[s],fp=st.fin.indexOf(s),bds=[];
+  function tile(t,s,n=st.n[s]){
+    const on=st.sp[s]!='x',cur=on&&st.t==s&&st.ph!=='end'&&st.ph!=='deal'&&mode!='setup',x=t.x,y=t.y,w=t.w,h=t.h,fp=st.fin.indexOf(s),bds=[];
     if(st.mm&&st.mm[s]&&n==1)bds.push(['MAU MAU',58,'#ff9f1c']);else if(st.mau&&st.mau[s]&&fp<0)bds.push(['MAU',36,'#ffd24a']);
     if(st.gu&&st.gu[s]&&fp<0)bds.push(['AUFGABE',56,'#e6e9f2']);
     const mw=bds.reduce((q,b)=>q+b[1]+4,0);
@@ -4374,10 +4387,26 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     /* Tisch */
     const g=c.createRadialGradient(400,210,40,400,240,520);g.addColorStop(0,'#2b6a55');g.addColorStop(1,'#0e2a23');c.fillStyle=g;c.fillRect(0,0,W,H);
     c.strokeStyle='#ffffff10';c.lineWidth=2;c.beginPath();c.ellipse(385,178,162,104,0,0,7);c.stroke();
+    const seats=actSeats(),R=tiles(),dealing=st.ph==='deal'&&animateDeal();
+    const privateHand=mode==='guest'&&handRound!==null&&handRound!==st.rn?[]:myH;
+    const hand=handLay(dealing?Array.from({length:st.n[my]},(_,i)=>privateHand[i]??-1):privateHand);
+    const arrived=st.n.slice(),flights=[];
+    if(dealing){
+      const step=900/(MM_HAND_SIZE*seats.length);
+      for(let i=0;i<MM_HAND_SIZE;i++)seats.forEach((s,j)=>{
+        if(i>=st.n[s])return;
+        const progress=(T-dealStart-(i*seats.length+j)*step)/300;
+        if(progress>=1)return;
+        arrived[s]--;
+        if(progress<0)return;
+        const q=s===my?hand[i]:null,[x,y]=q?[q.x+q.w/2,q.y+q.w*.7]:anchor(s);
+        flights.push({progress,x,y,w:q?q.w:22})
+      });
+    }
     /* Gegner */
-    {const R=tiles();for(const s of actSeats()){if(mine(s)||(mode=='setup'&&s==my)||!R[s])continue;tile(R[s],s)}}
+    for(const s of seats)if(R[s])tile(R[s],s,arrived[s]);
     /* Stapel */
-    const dk=st.dk;
+    const dk=st.dk+st.n.reduce((count,n,s)=>count+n-arrived[s],0);
     if(dk>0){for(let i=Math.min(3,dk)-1;i>=0;i--)drawCard(DXc-PW/2-i*1.6,PYc-PW*.7-i*1.6,PW,-1,{sh:i==0?1:0})}
     else{c.strokeStyle='#ffffff40';c.setLineDash([5,5]);c.lineWidth=2;c.beginPath();c.roundRect(DXc-PW/2,PYc-PW*.7,PW,PW*1.4,PW*.09);c.stroke();c.setLineDash([])}
     c.fillStyle='#cfe0d8';c.font='700 11px system-ui';c.textAlign='center';c.textBaseline='alphabetic';c.fillText(dk+' im Stapel',DXc,PYc+PW*.7+16);
@@ -4432,13 +4461,16 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
       c.restore()
     }
     else if(st.sp[my]!='x'){
-      tile({x:14,y:300,w:176,h:TILE_H},my);
-      const L=handLay(myH);
-      L.forEach((q,i)=>{
+      tile({x:14,y:300,w:176,h:TILE_H},my,arrived[my]);
+      hand.slice(0,arrived[my]).forEach(q=>{
         const lg=my_t&&ok(q.c),dm=my_t&&!lg?.45:0;
         const sk=shake[q.c]&&T-shake[q.c]<260?Math.sin((T-shake[q.c])/22)*5:0;
         drawCard(q.x+sk,q.y+(lg?-14:0),q.w,q.c,{dim:dm,hl:my_t&&st.dr&&q.c==myDr?'#ffd24a':0})
       })
+    }
+    for(const {progress,x,y,w} of flights){
+      const e=progress*progress*(3-2*progress),width=PW+(w-PW)*e;
+      drawCard(DXc+(x-DXc)*e-width/2,PYc+(y-PYc)*e-width*.7-Math.sin(progress*Math.PI)*18,width,-1,{rot:.18*Math.sin(progress*Math.PI)});
     }
     /* Karten im Flug */
     ani=ani.filter(a=>{
@@ -4476,7 +4508,15 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
   return api
 }
 GAMES.push({id:'maumau',n:'Mau-Mau',ic:'🃏',d:'Das Kartenspiel für 2–10 Spieler, auch online.',cat:'Karten',h:'Karte antippen zum Ausspielen · Stapel antippen zum Ziehen · nach der vorletzten Karte „Mau!“, nach der letzten „Mau Mau!“ rufen · 15 s pro Zug',sub:'2–10 Spieler · Computer · Online',mk:mmMk});
-RULES.maumau='Gespielt wird mit 52 Karten (2 bis Ass), jeder bekommt 5. Du legst eine Karte, die zur obersten in Farbe oder Zahl passt – wer nichts hat, zieht eine Karte und darf sie sofort legen, wenn sie passt. 7: Der Nächste muss 2 Karten ziehen, kann aber mit einer eigenen 7 weitergeben (dann +2 mehr). Wer keine 7 hat, muss selbst vom Stapel ziehen – die Ulti-Energie aller gelegten Siebenen entlädt sich dann auf ihn. Danach ist er trotzdem noch mit einem vollen Zug dran: eine passende Karte legen oder, wenn keine passt, noch eine Karte ziehen. 6: Richtungswechsel (zu zweit darfst du nochmal). 8: Der Nächste setzt aus. Bube: darf (außer auf einen Buben) immer gelegt werden, du wünschst dir eine Farbe – auch als letzte Karte. Das Ass ist eine ganz normale Karte. Zeitlimit: Du hast 15 Sekunden pro Zug; ab 10 Sekunden erscheint die Uhr, bei 3 Sekunden blinkt sie rot. Wer zu langsam ist, bekommt eine Strafkarte und der Nächste ist dran. Erst die Karte legen, dann rufen: Bleibt dir nur noch eine Karte, musst du innerhalb von 3 Sekunden „Mau!“ rufen (sonst 1 Strafkarte), nach der letzten Karte „Mau Mau!“ (sonst 2 Strafkarten und du bist noch nicht fertig). Es wird bis zum letzten Platz gespielt: Wer keine Karten mehr hat, ist fertig und schaut zu (oder verlässt die Gruppe); wer zuerst fertig wird, gewinnt. Nach dem ersten Sieger hat jeder, der noch spielt, einen kleinen „Aufgeben“-Knopf (an- und ausschaltbar). Haben alle noch Spielenden aufgegeben, endet die Runde und der Endstand erscheint. Ab 5 Spielern werden mehrere Kartensätze gemischt. Online: Nach der Runde bleiben nur diejenigen in der Gruppe, die „Bereit fürs nächste Spiel“ wählen; alle anderen verlassen den Raum.';
+RULES.maumau='Gespielt wird mit 52 Karten (2 bis Ass), jeder bekommt 7. Du legst eine Karte, die zur obersten in Farbe oder Zahl passt – wer nichts hat, zieht eine Karte und darf sie sofort legen, wenn sie passt. 7: Der Nächste muss 2 Karten ziehen, kann aber mit einer eigenen 7 weitergeben (dann +2 mehr). Wer keine 7 hat, muss selbst vom Stapel ziehen – die Ulti-Energie aller gelegten Siebenen entlädt sich dann auf ihn. Danach ist er trotzdem noch mit einem vollen Zug dran: eine passende Karte legen oder, wenn keine passt, noch eine Karte ziehen. 6: Richtungswechsel (zu zweit darfst du nochmal). 8: Der Nächste setzt aus. Bube: darf (außer auf einen Buben) immer gelegt werden, du wünschst dir eine Farbe – auch als letzte Karte. Das Ass ist eine ganz normale Karte. Zeitlimit: Du hast 15 Sekunden pro Zug; ab 10 Sekunden erscheint die Uhr, bei 3 Sekunden blinkt sie rot. Wer zu langsam ist, bekommt eine Strafkarte und der Nächste ist dran. Erst die Karte legen, dann rufen: Bleibt dir nur noch eine Karte, musst du innerhalb von 3 Sekunden „Mau!“ rufen (sonst 1 Strafkarte), nach der letzten Karte „Mau Mau!“ (sonst 2 Strafkarten und du bist noch nicht fertig). Es wird bis zum letzten Platz gespielt: Wer keine Karten mehr hat, ist fertig und schaut zu (oder verlässt die Gruppe); wer zuerst fertig wird, gewinnt. Nach dem ersten Sieger hat jeder, der noch spielt, einen kleinen „Aufgeben“-Knopf (an- und ausschaltbar). Haben alle noch Spielenden aufgegeben, endet die Runde und der Endstand erscheint. Ab 5 Spielern werden mehrere Kartensätze gemischt. Online: Nach der Runde bleiben nur diejenigen in der Gruppe, die „Bereit fürs nächste Spiel“ wählen; alle anderen verlassen den Raum.';
+
+GAMES.push({id:'poker',n:'Poker',ic:'♠',d:'Texas Hold’em mit Spielchips für 2–10 Spieler.',cat:'Karten',
+  h:'Zwei eigene Karten · Fünf Gemeinschaftskarten · Blinds 5/10',sub:'2–10 Spieler · Computer · Online',mk:window.createPokerGame});
+RULES.poker='Texas Hold’em mit Spielchips. Jeder beginnt mit 500 Chips und erhält in jeder Hand zwei eigene Karten. Die fünf Gemeinschaftskarten erscheinen als Flop (drei Karten), Turn und River. Die beste Kombination aus fünf eigenen und gemeinsamen Karten gewinnt. Bei Gleichstand wird der Pot geteilt. Die Pflicht-Einsätze betragen 5 und 10 Chips. Du kannst schieben, mitgehen, erhöhen oder aussteigen. Gesetzt und erhöht wird vor und am Flop in 10er-Schritten, danach in 20er-Schritten, bis zu viermal je Setzrunde. Wer weniger Chips hat als zum Mitgehen nötig, geht all-in und spielt nur um den entsprechenden Teil des Pots. Nach 25 Sekunden wird automatisch geschoben oder ausgestiegen. Wer als letzter noch Chips hat, gewinnt das Spiel.';
+
+GAMES.push({id:'blackjack',n:'Blackjack',ic:'♣',d:'Mit denselben Karten wie Mau-Mau gegen den Dealer.',cat:'Karten',
+  h:'Komme möglichst nah an 21 · Dealer hält ab 17 · Mit Spielchips',sub:'1–10 Plätze · Computer · Lokal',mk:window.createBlackjackGame});
+RULES.blackjack='Setze 10, 20 oder 50 Spielchips. Ziel ist, näher an 21 zu kommen als der Dealer. Zahlen zählen ihren Wert, Bilder 10 und Ass zählt 1 oder 11. Du kannst ziehen oder halten. Mit den ersten zwei Karten kannst du deinen Einsatz verdoppeln und bekommst genau eine weitere Karte. Karten mit demselben Wert darfst du einmal teilen. Nach dem Teilen von Assen bekommt jede Hand nur eine Karte. Ein Ass mit einer Zehnerkarte in der ursprünglichen Hand ist Blackjack und zahlt 3:2. Bei Gleichstand erhältst du deinen Einsatz zurück. Über 21 verlierst du. Der Dealer zieht bis 16 und hält ab 17, auch bei einer weichen 17 mit Ass. Jeder Platz spielt für sich gegen den Dealer.';
 
 GAMES.forEach(g=>{const m=NM[g.id];if(m){g.n=m[0];g.d=m[1]}g.ic=ICON[g.id]||g.ic});
 const revised={
@@ -4747,9 +4787,10 @@ async function olIn(u){
   try{progMerge(p&&p.progress);OL.pready=1;progPush(1)}catch(e){OL.pready=0}
   try{localStorage.setItem('2pg_ol','1')}catch(e){}
   try{OL.BL=(await OL.db.ref('blocked/'+u.uid).once('value')).val()||{};OL.blocksReady=true}catch(e){OL.blocksReady=false;toast('Blockierliste konnte nicht geladen werden. Online-Kontakte sind vorübergehend gesperrt.')}
-  olPresence();olListen();olRender();olBadge();window.chatModeration?.sync();
+  olPresence();olListen();olRender();olBadge();window.chatModeration?.sync();window.gameNotifications?.signedIn();
 }
 function olGone(){
+  window.gameNotifications?.signedOut();
   window.chatModeration?.logout();
   window.gameChat?.stop();
   window.directChat?.logout();
@@ -4914,6 +4955,7 @@ async function olLogout(){
   if(LUN.ref)toMenu();
   await Promise.race([OL.presence?.stop(true)||Promise.resolve(),new Promise(resolve=>setTimeout(resolve,2500))]);
   try{localStorage.removeItem('2pg_ol')}catch(e){}
+  await window.gameNotifications?.logout();
   await OL.auth.signOut();
 }
 
@@ -4953,12 +4995,13 @@ ${lg?'':'<p>Merke dir das Passwort gut – es gibt keine Zurücksetzen-Funktion.
     const s=OL.stats||{};
     h=`<div class=olme><span class="dot on"></span><b>${olEsc(OL.name)}</b><span style="color:var(--mu);font-size:13px">${s.w||0} Siege · ${s.l||0} Niederlagen · ${s.d||0} Remis</span><button class="btn g" data-o=out style="margin-left:auto;padding:5px 10px;font-size:13px;background:var(--bg);color:var(--tx)">Abmelden</button></div>
 <div style="font-size:12px;color:var(--mu)">☁ Erfolge, Siege, Highscores, Farben und Favoriten werden automatisch in deinem Konto gespeichert.</div>
+<div><button class="btn g" data-o=push hidden>Benachrichtigungen einschalten</button><p class=luhint id=push-status role=status></p></div>
 <div class=seg id=olt></div><div id=oll style="display:flex;flex-direction:column;gap:8px"></div>
 <div style="display:flex;gap:8px"><input id=olf placeholder="Freund per Benutzername hinzufügen" maxlength=16 autocapitalize=off spellcheck=false><button class=btn data-o=addf style="white-space:nowrap">Hinzufügen</button></div>
 <div class=olerr id=olm style="color:var(--mu)"></div><button class="btn r" data-o=delete-open style="align-self:flex-start">Account löschen</button>`;
   }
   $('#olp').innerHTML=`<div class=olc><div class=olh><h2>${t}</h2><button data-o=close aria-label="Schließen">✕</button></div><div class=olb>${h}</div></div>`;
-  if(OL.me&&OL.view=='main')olUpd();
+  if(OL.me&&OL.view=='main'){olUpd();window.gameNotifications?.render()}
 }
 
 function olUpd(){
@@ -4969,7 +5012,7 @@ function olUpd(){
   const nOn=online.length,nFr=fr.length;
   tb.innerHTML=[['on','Online ('+nOn+')'],['fr','Freunde ('+nFr+')'],['rq','Anfragen ('+rq.length+')'],['bl','Blockiert ('+Object.keys(OL.BL).length+')']].map(([k,l])=>`<button data-o=tab data-v=${k} class="${OL.tab==k?'on':''}">${l}</button>`).join('');
   const row=(u,btns,sub)=>`<div class=olrow><span class="dot ${olDot(u)}"></span><div class=nm>${olEsc(olNameOf(u))}<small>${sub}</small></div><div class=acts>${btns}${OL.tab!='bl'?`<button class="btn g" data-o=block data-u="${olEsc(u)}" title="Spieler blockieren">Blockieren</button>`:''}</div></div>`;
-  const ch=u=>OL.P[u]&&!OL.P[u].g&&!OL.sess&&!OL.out?`<button class=btn data-o=ch data-u=${u}>Herausfordern</button>`:`<button class="btn g" disabled>${OL.P[u]?'Beschäftigt':'Offline'}</button>`;
+  const ch=u=>OL.F[u]&&!OL.P[u]?.g&&!OL.sess&&!OL.out?`<button class=btn data-o=ch data-u=${u}>Herausfordern</button>`:`<button class="btn g" disabled>${OL.P[u]?'Beschäftigt':'Offline'}</button>`;
   let h='';
   if(OL.tab=='on'){
     const l=online.sort((a,b)=>(!!OL.F[b]-!!OL.F[a])||olNameOf(a).localeCompare(olNameOf(b)));
@@ -5028,6 +5071,7 @@ async function olDeleteAccount(){
     if(OL.unl)OL.unl();OL.unl=null;stopped=true;
     const uid=user.uid,db=OL.db;
     await OL.presence?.stop(true);
+    await window.gameNotifications?.logout();
     /* Ohne Cloud Function (kostenloser Spark-Plan): Daten im Browser entfernen, dann Account löschen. */
     const rm=[],low=(OL.name||'').toLowerCase();
     for(const p of ['friends','requests','invites','blocked']){
@@ -5093,28 +5137,29 @@ async function olAddName(){
 const olIsRoom=v=>!!v&&/^room:/.test(String(v.mid||''));
 function olWriteInvite(to,invite){
   const me=OL.me;
-  return OL.db.ref().update({['invites/'+to+'/'+me]:invite,['expiry/invites/'+to+'/'+me]:invite.ts});
+  return OL.db.ref().update({['invites/'+to+'/'+me]:invite,['expiry/invites/'+to+'/'+me]:invite.ts})
+    .then(()=>{if(OL.me===me)window.gameNotifications?.dispatch({kind:'invite',message:invite.mid},[to])});
 }
 
 function olCards(){
   let h='';
   if(OL.out)h+=`<div class=olinv><b>Herausforderung an ${olEsc(olNameOf(OL.out.uid))}</b><span>${olEsc(olGameName(OL.out.gid))}${goalOf(OL.out.gid,OL.out.t)?' · '+goalOf(OL.out.gid,OL.out.t):''} – warte auf Antwort…</span><div class=row><button class="btn g" data-o=cx>Abbrechen</button></div></div>`;
   if(OL.sess&&!OL.sess.live)h+=`<div class=olinv><b>Verbinde mit ${olEsc(OL.sess.names[OL.sess.role?0:1])}…</b><span>${olEsc(olGameName(OL.sess.gid))}</span><div class=row><button class="btn g" data-o=lv>Abbrechen</button></div></div>`;
-  for(const u in OL.INV){if(!olAllowed(u))continue;const v=OL.INV[u];if(!olInviteValid(v))continue;if(olIsRoom(v)){h+=`<div class=olinv><b>${olEsc(v.name)} lädt dich zu „${v.game=='maumau'?'Mau-Mau':'Mensch ärgere dich nicht'}“ ein!</b><span>Online-Raum ${olEsc(String(v.mid).slice(5))}</span><div class=row><button class=btn data-o=acc data-u=${u}>Beitreten</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`;continue}h+=`<div class=olinv><b>${olEsc(v.name)} fordert dich heraus!</b><span>${olEsc(olGameName(v.game))}${goalOf(v.game,+v.t||5)?' · '+goalOf(v.game,+v.t||5):''}</span><div class=row><button class=btn data-o=acc data-u=${u}>Annehmen</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`}
+  for(const u in OL.INV){if(!olAllowed(u))continue;const v=OL.INV[u];if(!olInviteValid(v))continue;if(olIsRoom(v)){h+=`<div class=olinv><b>${olEsc(v.name)} lädt dich zu „${olEsc(olGameName(v.game))}“ ein!</b><span>Online-Raum ${olEsc(String(v.mid).slice(5))}</span><div class=row><button class=btn data-o=acc data-u=${u}>Beitreten</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`;continue}h+=`<div class=olinv><b>${olEsc(v.name)} fordert dich heraus!</b><span>${olEsc(olGameName(v.game))}${goalOf(v.game,+v.t||5)?' · '+goalOf(v.game,+v.t||5):''}</span><div class=row><button class=btn data-o=acc data-u=${u}>Annehmen</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`}
   $('#oli').innerHTML=h;
 }
 function olInvites(){
   for(const u in OL.INV){
     if(!olAllowed(u)||!olInviteValid(OL.INV[u]))continue;
     const k=u+OL.INV[u].mid;
-    if(!OL.seen[k]){OL.seen[k]=1;if(OL.sess||OL.out){olDecline(u,1);continue}snd(660,.12,'triangle');setTimeout(()=>snd(880,.15,'triangle'),130)}
+    if(!OL.seen[k]){OL.seen[k]=1;snd(660,.12,'triangle');setTimeout(()=>snd(880,.15,'triangle'),130)}
   }
   olCards();
 }
 async function olInvite(u,gid,t){
   if(!olCanContact(u))return;
   if(OL.out||OL.sess)return;
-  if(!OL.P[u]||OL.P[u].g){toast(olNameOf(u)+' ist gerade nicht frei.');return}
+  if(!OL.F[u]||OL.P[u]?.g){toast(olNameOf(u)+' ist gerade nicht frei.');return}
   const me=OL.me,mid=OL.db.ref('matches').push().key;
   OL.out={mid,uid:u,gid,t,timer:setTimeout(()=>olCancelOut('Keine Antwort von '+olNameOf(u)+'.'),60000)};
   olClose();olCards();
@@ -5171,9 +5216,9 @@ async function olAccept(u){
   }catch(e){toast(olMsg(e))}
 }
 
-/* Einladung in einen Mensch-ärgere-dich-nicht-Raum annehmen */
+/* Einladung in einen Online-Raum annehmen */
 async function olJoinRoom(code,gid){
-  gid=gid=='maumau'?'maumau':'ludo';
+  if(!['ludo','maumau','poker'].includes(gid))return false;
   if(ON||OL.sess){toast('Beende zuerst dein aktuelles Online-Spiel.');return}
   if(!(cur&&gdef&&gdef.id==gid&&cur.canJoin&&cur.canJoin())){
     if(cur&&gdef&&gdef.id==gid&&cur.canJoin&&!cur.canJoin()){toast('Du bist schon in einem Raum.');return}
@@ -5199,6 +5244,7 @@ document.addEventListener('click',e=>{
   else if(o=='m1'||o=='m2'){OL.mode=o=='m1'?'login':'reg';OL.err='';olRender()}
   else if(o=='go')olAuth(OL.mode,($('#olu')||{}).value,($('#olw')||{}).value);
   else if(o=='out')olLogout();
+  else if(o=='push')window.gameNotifications?.toggle();
   else if(o=='tab'){OL.tab=b.dataset.v;olUpd()}
   else if(o=='req')olReq(u);
   else if(o=='af')olAccFr(u);
@@ -5467,7 +5513,8 @@ const fromHash=()=>{const k=location.hash.slice(1);if(T[k])open(k)};addEventList
 })();
 </script>
 <script src="./group-chat.js"></script>
-<script src="./direct-chat.js"></script>
+<script src="./direct-chat.js?v=2"></script>
 <script src="./game-chat.js"></script>
 <script src="./chat-moderation.js"></script>
+<script src="./notifications.js"></script>
 </body></html>
