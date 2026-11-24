@@ -189,7 +189,6 @@ function chkAc(){
   sfx('achieve');
  }
 }
-function starter(){put(7,6,'src',0);put(8,6,'belt',0);put(9,6,'saw',0);put(10,6,'belt',0);put(11,6,'shp',0)}
 /* ===== Audio: Web Audio API, komplett synthetisiert (keine Dateien), Start erst nach Nutzer-Interaktion ===== */
 let wMsg='',wT=-99;
 function deny(message){toast(message);sfx('deny')}
@@ -433,9 +432,16 @@ function init(value){
   }
   G.mg=Object.values(d.mg||{}).filter(e=>e&&MG.some(g=>g.id===e.id)).map(e=>({id:e.id,lv:Math.max(1,Math.min(10,e.lv|0||1)),sp:Math.max(0,Math.min(2,e.sp|0)),x:e.x==null?-1:e.x|0,y:e.y==null?-1:e.y|0,hall:hlv(e.hall)?e.hall:undefined}));
   G.bt=Object.values(d.bt||{}).filter(t=>t=='belt'||MD[t]);G.ac=Object.values(d.ac||{}).filter(id=>AC.some(a=>a.id===id));
-  G.tu=typeof d.tu=='number'?d.tu:-1;if(G.tu>=TU.length)G.tu=-1;G.th=d.th?Object.values(d.th).filter(x=>typeof x=='string'):[];
+  G.tu=typeof d.tu=='number'?d.tu:-1;G.th=d.th?Object.values(d.th).filter(x=>typeof x=='string'):[];
   G.sp=Math.max(0,Math.min(PH.length,G.sp|0));G.sq=Object.values(d.sq||{}).map(v=>Math.max(0,v|0));G.sf=d.sf&&typeof d.sf=='object'&&!Array.isArray(d.sf)?d.sf:{};
   G.campaign=readCampaign(d,G.sp===PH.length);
+  G.guide=readGuide(d.guide);
+  G.tu=G.tu<guideSteps().length?Math.max(-1,G.tu|0):-1;
+  G.tutorialPaused=d.tutorialPaused===true;
+  G.tutorialAward=d.tutorialAward??(!d.guide&&d.tu<0);
+  if(campaignChapter()===2&&G.campaign.stage===0&&d.story?.version===1&&d.guide===undefined){
+   G.guide=newGuide('fleet',[155,12]);G.tu=0;
+  }
   if(campaignChapter()>=2)G.hl.orb=Math.max(1,G.hl.orb||0);
   const compensation=legacyCompensation(d);
   G.m+=compensation.money;G.rp+=compensation.research;
@@ -468,7 +474,7 @@ function init(value){
    G.od.push({s,n,d:done,r:Number.isFinite(reward)&&reward>=0?reward:baseOrderReward(s,n)});
   }
  }
- else{starter();G.tu=0;storyIntro()}
+ else{G.m=220;G.tu=0;G.guide=newGuide('build',[7,6]);G.tutorialAward=false;rot=3;pg='h';tool='hand';}
  G.story=FactoryStory.read(d,storyUnlocked);
  storyReplay=null;storyFocus=false;storyLastCue='';
  refreshIndustrialArea();
@@ -636,7 +642,7 @@ function produce(o){
 function tick(){
  G.tk++;
  G.st+=TICK;
- if(!G.late&&G.st>=DAYS*DAYSEC)lateStory();
+ if(G.sp<PH.length&&!G.late&&G.st>=DAYS*DAYSEC)lateStory();
  const second=Math.floor(G.tk*TICK);
  if(second!=sc){
   sc=second;sb[sc%60]=0;rw=Math.min(60,rw+1);
@@ -692,7 +698,7 @@ function analyze(){
  if(blockedBelt){bn=blockedBelt;msg='Förderband ausgelastet: Prüfe die Abnahme oder entlaste den Abschnitt mit einem zweiten Band.';return}
  const bl=lossPoint(ms);if(bl){bn=bl.object;msg=`Rückstau bei ${MD[bn.t].n}: bis zu ${bl.margin.toFixed(1)} €/Min. Marge. Abnahme hinter der Maschine prüfen.`;return}
  const mi=ORD.findIndex(t=>!L.some(o=>o.t==t));
- msg=mi>=0?`Tipp: ${MD[ORD[mi]].n} in die Linie bauen – Grundwert ${ITEMS[mi+1].v} € pro Stück.`:tipStory()}
+ msg=mi>=0&&campaignChapter()===1?`Tipp: ${MD[ORD[mi]].n} in die Linie bauen – Grundwert ${ITEMS[mi+1].v} € pro Stück.`:tipStory()}
 function tipStory(){if(campaignChapter()>=2){const next=projectPhase();return next?'Horizont · '+next.n+' – benötigte Waren an die Werftrampe liefern.':'Die Flotte ist startbereit.'}
  const q=PH[G.sp];if(!q)return'ARCHE ist fertig. Öffne das Bunkerprojekt, um die Kampagne fortzusetzen.';
  if(!hasProjectRamp())return`Bunker-Phase ${G.sp+1} „${q.n}“: Baue eine Bunker-Rampe neben der Linie und liefere die Quest-Waren an.`;
@@ -811,7 +817,7 @@ function snapshot(){
   tk:G.tk,ord:G.ord,history:G.history,rt:Math.round(rate()*10)/10,
   hl:G.hl,legacyPlots:G.legacyPlots,site:currentSite,campaign:G.campaign,story:G.story,legacyIndustry:G.legacyIndustry,sp:G.sp,sq:G.sq.map(v=>v|0),st:G.st,sd:G.sd,sf:G.sf,late:G.late,end:G.end,
   emp:G.emp,crew:G.crew,crewVersion:1,mg:G.mg,wc:G.wc,xp:G.xp,pl:G.pl,bt:G.bt,ac:G.ac,
-  tu:G.tu,th:G.th,rp:G.rp,rs:G.rs,ds:G.ds,sl:G.sl,saleIncome:G.saleIncome,pc:G.pc,
+  tu:G.tu,guide:G.guide??null,tutorialPaused:!!G.tutorialPaused,tutorialAward:!!G.tutorialAward,th:G.th,rp:G.rp,rs:G.rs,ds:G.ds,sl:G.sl,saleIncome:G.saleIncome,pc:G.pc,
   ...(G.legacySaturation?{sa:G.legacySaturation}:{}),
   plans:G.plans,epoch:G.epoch,stock:G.stock,activeBoosts:G.activeBoosts,milestones:G.milestones,
   lineCounts:G.lineCounts,recent:G.recent,wins:G.wins,goals:G.goals,contracts:G.contracts,contractWins:G.contractWins,
@@ -1095,6 +1101,7 @@ function zoomAt(factor,x,y,previousX=x,previousY=y){
  const nextZ=Math.max(cam.min??.22,Math.min(2.6,cam.z*factor));
  const zoom=nextZ*view.worldScale,nextX=worldX-(x-CX)/zoom,nextY=worldY-(y-CY)/zoom;
  if(!Number.isFinite(nextX)||!Number.isFinite(nextY))return false;
+ if(nextZ!==cam.z)guideAction('zoom');
  if(cam.x!==nextX||cam.y!==nextY||cam.z!==nextZ)lastCameraMotion=tm;
  cam={...cam,x:nextX,y:nextY,z:nextZ};
  clampCam();
@@ -1651,6 +1658,7 @@ function replayStory(id){
 function updateStory(dt){
  const id=currentStoryId(),state=currentStory();
  if(!id||state.paused)return;
+ if(!G.story.muted)musTick();
  const before=state.time;
  state.time+=Math.max(0,Math.min(.25,dt));
  if(state.time>=FactoryStory.duration(id)){finishStory();return}
@@ -1717,6 +1725,7 @@ function beginNextChapter(){
  const region=REGIONS.find(site=>site.id===next.site);
  G.campaign={level:campaignChapter()+1,stage:0,delivery:[],total:0};
  G.end=1;G.hl[region.hall]=1;G.m+=next.grant;
+ G.guide=newGuide('fleet',[155,12]);G.tu=0;G.tutorialPaused=false;
  closeP2();resetPlanning();tool='hand';sel=null;asg=null;
  refreshIndustrialArea();switchSite(region);focusWorld(hrect(hallOf(region.hall)));
  rfx();recalc();analyze();queueStory('horizont-intro');sv(1);
@@ -2309,6 +2318,8 @@ function drawPanel(id,box,draw,close,side=false){
 const NAV=[['mk','📊','Verkauf'],['rs','🔬','Forschung'],['pn','👥','Team'],['hl','🏭','Hallen'],['bk','📖','Bunker'],['ac','🏢','Firma'],['planning','▤','Baupläne']];
 const GROUPS=[['h','Holz','gar'],['m','Metall','met'],['v','Versorg.','vrs'],['e','Elektro','elk'],
  ['n','Energie','ene'],['f','Fahrzeug','fzg'],['t','Hightech','hit'],['b','Module','bnk'],['l','Logistik']];
+const dockGroups=()=>campaignChapter()>=2?[...GROUPS,['o','Werft','orb']]:GROUPS;
+const dockModels=()=>Object.keys(MD).filter(t=>MD[t].g===pg&&!MD[t].legacyOnly&&visibleModel(MD[t]));
 const TOOLS=[['hand','✋','Hand'],['belt','➜','Band'],['rot','↻','Richtung'],['mov','✥','Bewegen'],['del','🗑','Löschen']];
 const dockOffsets={group:0,shop:0};
 let dockTracks={};
@@ -2317,7 +2328,7 @@ function drawHeader(){
  rr(status.x,status.y,status.w,status.h,8,'#0b0f14dd');
  const statusValues=[
   ['💰 '+fm(G.m)+' €','#fde68a',.31],['📈 '+fm(rate())+' €/Min','#a7f3d0',.32],
-  ['⏳ '+(G.late?'∞':nf(dLeft())+' T'),G.late?'#fde68a':dLeft()<DAYS*.15?'#fca5a5':'#cbd5e1',.23],
+  [campaignChapter()>=2?'▱ '+G.campaign.stage+' / '+chapters[campaignChapter()].phases.length:G.sp===PH.length?'ARCHE ✓':'⏳ '+(G.late?'∞':nf(dLeft())+' T'),G.late?'#fde68a':dLeft()<DAYS*.15?'#fca5a5':'#cbd5e1',.23],
   ['⭐ '+LV,'#7dd3fc',.14]
  ];
  let offset=status.x+5;
@@ -2420,15 +2431,16 @@ function drawDockTrack(id,area,count,buttonWidth,draw){
  }
 }
 function drawDock(){
- drawDockTrack('group',view.categories,GROUPS.length,view.categoryWidth,(box,i)=>{
-  const [id,label,hall]=GROUPS[i],locked=hall&&hlv(hall)<1;
+ const groups=dockGroups();
+ drawDockTrack('group',view.categories,groups.length,view.categoryWidth,(box,i)=>{
+  const [id,label,hall]=groups[i],locked=hall&&hlv(hall)<1;
   uiButton(box,()=>{pg=id;dockOffsets.shop=0;sfx('click')},pg===id?'#3a7bd5':'#1f2630ee','pg_'+id);
   fitText((locked?'🔒 ':'')+label,box.x+box.w/2,box.y+box.h/2+5,box.w-8,13*view.dockLabelScale,locked?'#94a3b8':'#fff','center');
  });
  const first=view.shortcuts[0],last=view.shortcuts.at(-1);
  dockBackdrop({...first,w:last.x+last.w-first.x});
  TOOLS.forEach(([id,icon,label],i)=>toolButton(view.shortcuts[i],id,icon,label,id==='belt'?'2 €':''));
- const models=Object.keys(MD).filter(t=>MD[t].g===pg&&!MD[t].legacyOnly&&visibleModel(MD[t]));
+ const models=dockModels();
  drawDockTrack('shop',view.machines,models.length,view.machineWidth,(box,i)=>{
   const id=models[i];
   toolButton(box,id,'',MD[id].s,fm(cst(id))+' €');
@@ -2437,7 +2449,7 @@ function drawDock(){
 function drawWorldControls(){
  drawDock();
  const zooms=[['＋',()=>zoomAt(1.25,CX,CY),'zoom_in'],['−',()=>zoomAt(.8,CX,CY),'zoom_out'],
-  ['⌂',()=>centerSite(REGIONS.find(site=>site.id===currentSite)),'camera_home']];
+  ['⌂',()=>{centerSite(REGIONS.find(site=>site.id===currentSite));guideAction('home')},'camera_home']];
  zooms.forEach(([label,fn,id],i)=>{
   const box=view.camera[i];
   uiButton(box,fn,'#1f2630ee',id);
@@ -2524,7 +2536,7 @@ function panel(o){
   if(d.r&&d.r.length>1){tx('Puffer: '+d.r.map((a,i)=>ITEMS[a[0]].n+' '+o.iv[i]+'/'+inputCap(o,i)).join(' · '),X+14,y-4,10.5,'#94a3b8');y+=18}
   const ok=G.m>=p.tot&&p.n>0;btn(X+14,y,W-28,34,()=>buy(o),ok?'#2f9e6b':'#475569',0,'upg');tx(`Upgrade ×${p.n} · ${fm(p.tot)} €`,X+W/2,y+22,13,'#fff','center',800);y+=40;
   btn(X+14,y,50,28,()=>{qi=(qi+1)%4;sfx('select')},'#334155');tx(QT[qi]?'×'+QT[qi]:'MAX',X+39,y+19,12,'#fff','center',700);
-  btn(X+70,y,76,28,()=>{rotObj(o)},'#334155');tx('↻ Drehen',X+108,y+19,12,'#fff','center',700);delB(152,W-166,'Abbauen')}
+  btn(X+70,y,76,28,()=>{rotObj(o)},'#334155',0,'turn_machine');tx('↻ Drehen',X+108,y+19,12,'#fff','center',700);delB(152,W-166,'Abbauen')}
  else if(jn){
   if(o.j==1){tx('Tippe eine Seite: Eingang → Ausgang → Aus',X+14,y,10.5,'#94a3b8','left',700);y+=12;const cols=['#334155','#2f9e6b','#c2570c'],nm=['Aus','Eingang','Ausgang'],pos=[[W-82,32],[W/2-34,58],[14,32],[W/2-34,6]];
    for(let dd=0;dd<4;dd++){const[px,py]=pos[dd];btn(X+px,y+py,68,26,()=>{o.jm[dd]=(o.jm[dd]+1)%3;if(o.it>=0&&o.jm[dd]==0)o.wt=0;sfx('select');recalc()},cols[o.jm[dd]]);tx(['→ rechts','↓ unten','← links','↑ oben'][dd],X+px+34,y+py+11,9,'#ffffffcc','center',600);tx(nm[o.jm[dd]],X+px+34,y+py+22,10.5,'#fff','center',800)}
@@ -2996,6 +3008,85 @@ function closeP2(){teamSpecialty=null;mkO=rsO=pnO=hlO=bkO=acO=planningOpen=lineO
 let tuTour=0,tuTI=0,tuHn=null,tuHT=-99,tuG=null,tuA=0,tuKey='',tuC=0;
 const tuNeed=()=>cst('frm')+cst('belt')+cst('shp')-Math.floor(cst('shp')/2)+14,hasT=t=>L.some(o=>o.t==t),prodM=o=>!!o&&!!MD[o.t]&&MD[o.t].o!=null,TUH=[['r','status']];
 /* hl: Liste aus ['t',x,y,b,h] (Kacheln), ['u',id] (Knopf der Oberfläche), ['r',name] (Layoutbereich) */
+const newGuide=(kind,anchor)=>({kind,anchor,actions:{},sales:G?.sl?.[1]||0});
+function readGuide(value){
+ if(!value||!['build','fleet'].includes(value.kind)||value.kind==='fleet'&&campaignChapter()<2)return null;
+ const [x,y]=value.anchor||[],hall=hallOf(value.kind==='fleet'?'orb':'gar');
+ const anchor=Number.isInteger(x)&&Number.isInteger(y)&&inR(hrect(hall),x,y)?[x,y]:value.kind==='fleet'?[155,12]:[7,6];
+ const actions={};
+ for(const id of ['pan','zoom','home'])if(value.actions?.[id])actions[id]=true;
+ return {kind:value.kind,anchor,actions,sales:Math.max(0,Number(value.sales)||0)};
+}
+const lessonTile=(dx=0,dy=0)=>[G.guide.anchor[0]+dx,G.guide.anchor[1]+dy];
+const lessonMark=(dx=0,dy=0)=>[['t',...lessonTile(dx,dy),1,1]];
+const lessonObject=(dx=0,dy=0)=>cell(...lessonTile(dx,dy));
+const guideAction=id=>{if(G?.guide&&G.tu>=0&&!G.tutorialPaused&&guideSteps()[G.tu]?.id===id)G.guide.actions[id]=true};
+const menuLesson=(id,title,text,target,done)=>({id,ti:title,tx:text,hl:()=>[['u',target]],dn:done});
+function buildLesson(id,label,type,offset,description,group,needsDirection=true){
+ return {id,ti:label,tx:()=>{
+  if(group&&pg!==group)return 'Öffne unten den Reiter '+(group==='h'?'Holz':group==='l'?'Logistik':'Werft')+'. '+description;
+  if(tool!==type)return 'Wähle „'+(MD[type]?.s||'Band')+'“. '+description;
+  if(needsDirection&&rot!==0)return 'Tippe „Richtung“, bis der Pfeil nach rechts zeigt.';
+  return 'Tippe auf das markierte Feld. '+description;
+ },hl:()=>{
+  if(group&&pg!==group)return [['u','pg_'+group]];
+  if(tool!==type)return [['u','tl_'+type]];
+  return needsDirection&&rot!==0?[['u','tl_rot']]:lessonMark(offset);
+ },dn:()=>lessonObject(offset)?.t===type&&(!needsDirection||lessonObject(offset).r===0)};
+}
+const buildGuide=[
+ {id:'pan',ti:'Kamera bewegen',tx:'Ziehe die freie Fläche ein Stück zur Seite. So wechselst du später zwischen Hallen und Bauplätzen.',hl:()=>[],dn:()=>G.guide.actions.pan},
+ {id:'zoom',ti:'Bauplatz vergrößern',tx:'Tippe auf + oder ziehe zwei Finger auseinander. Aus der Nähe siehst du die einzelnen Bauplätze.',hl:()=>[['u','zoom_in']],dn:()=>G.guide.actions.zoom},
+ {id:'home',ti:'Zur Garage zurück',tx:'Tippe auf das Haussymbol, um zur Standardansicht zurückzukehren.',hl:()=>[['u','camera_home']],dn:()=>G.guide.actions.home},
+ menuLesson('pick-wood','Holzlager auswählen','Wähle im Reiter Holz das Holzlager. Es kauft Rohholz, sobald die Linie Platz dafür hat.','tl_src',()=>tool==='src'),
+ buildLesson('wood','Holzlager aufstellen','src',0,'Das ist der Anfang deiner Produktionslinie.','h',false),
+ {id:'source-turn',ti:'Ausgang ausrichten',tx:'Wähle Hand, tippe das Holzlager an und drehe es, bis der Pfeil nach rechts zeigt.',hl:()=>tool!=='hand'?[['u','tl_hand']]:sel===lessonObject()?[['u','turn_machine']]:lessonMark(),dn:()=>lessonObject()?.t==='src'&&lessonObject().r===0},
+ buildLesson('input-belt','Rohholz zuführen','belt',1,'Dieses Band führt zur Säge.'),
+ buildLesson('saw','Säge anschließen','saw',2,'Die Säge macht aus Rohholz Holzteile.','h'),
+ {id:'inspect-line',ti:'Materialfluss prüfen',tx:'Wähle Hand und tippe die Säge an. „Wartet“ bedeutet fehlendes Material, „Gestaut“ einen blockierten Ausgang.',hl:()=>tool!=='hand'?[['u','tl_hand']]:lessonMark(2),dn:()=>sel===lessonObject(2)},
+ buildLesson('output-belt','Abtransport anschließen','belt',3,'Der Ausgang der Säge verbindet sich mit diesem Band.'),
+ buildLesson('shipment','Versand anschließen','shp',4,'Der Versand verkauft ankommende Waren automatisch.','l',false),
+ {id:'first-sale',ti:'Ersten Verkauf beobachten',tx:'Verfolge ein Holzteil bis zum Versand. Der erste Verkauf erhöht oben dein Guthaben.',hl:()=>lessonMark(4),dn:()=>G.sl[1]>G.guide.sales&&(lessonObject(4)?.stats.sold||0)>0},
+ {id:'machine-upgrade',ti:'Säge verbessern',tx:'Tippe die Säge mit Hand an und kaufe ein Upgrade. Die Zeit pro Stück sinkt.',hl:()=>sel===lessonObject(2)?[['u','upg']]:tool==='hand'?lessonMark(2):[['u','tl_hand']],dn:()=>(lessonObject(2)?.lv||0)>1},
+ buildLesson('spare','Bewegen üben','belt',5,'Setze ein einzelnes Übungsband neben den Versand.'),
+ {id:'move-belt',ti:'Übungsband versetzen',tx:'Wähle „Bewegen“. Tippe erst das Übungsband und dann das freie Feld direkt darunter an.',hl:()=>tool!=='mov'?[['u','tl_mov']]:mvO?lessonMark(5,1):lessonMark(5),dn:()=>lessonObject(5,1)?.t==='belt'&&!lessonObject(5)},
+ {id:'remove-belt',ti:'Übungsband abbauen',tx:'Wähle „Löschen“ und tippe das versetzte Band an. Der Rest deiner Linie läuft weiter.',hl:()=>tool==='del'?lessonMark(5,1):[['u','tl_del']],dn:()=>!lessonObject(5,1)},
+ menuLesson('selling','Verkauf öffnen','Öffne „Verkauf“. Dort stehen Stückpreise, verkaufte Mengen und die erzielten Erlöse.','mk',()=>mkO),
+ menuLesson('orders','Aufträge ansehen','Wähle unter „Verkauf“ den Reiter „Aufträge“. Er zeigt Liefermengen und zusätzliche Prämien.','market_tab_2',()=>mkO&&mkTab===2),
+ menuLesson('research','Forschung öffnen','Öffne „Forschung“. Mit Forschungspunkten kannst du später schnellere Bänder und Maschinen freischalten.','rs',()=>rsO),
+ menuLesson('halls','Hallen ansehen','Öffne „Hallen“. Du siehst hier Ausbaupreise und Voraussetzungen für weitere Produktionslinien.','hl',()=>hlO),
+ menuLesson('arche','Deinen Auftrag öffnen','Öffne „Bunker“. Die Liste zeigt, welche Waren die ARCHE für den ersten Bauabschnitt annimmt.','bk',()=>bkO),
+ menuLesson('plans','Baupläne öffnen','Öffne „Baupläne“. Dort kannst du eine Produktionsgruppe speichern und nochmals platzieren.','blueprints',()=>planningOpen),
+ menuLesson('company','Firma und Spielstand','Öffne „Firma“, dann „Werkzeuge“ und „Spielstand“. Dort siehst du Sicherungsstatus und Offline-Bericht.','ac',()=>saveOpen),
+ {id:'summary',ti:'Deine erste Fabrik läuft',tx:'Du hast eine Linie gebaut, Materialfluss und Verkauf geprüft, ein Upgrade gekauft und ein Band versetzt. Neue Funktionen lernst du kennen, sobald sie verfügbar werden.',hl:()=>[],nx:'Tutorial abschließen'}
+];
+const fleetGuide=[
+ menuLesson('fleet-plan','Flottenbau ansehen','Öffne „Kampagne“. Schau dir den ersten Auftrag für die Außenhaut an.','bk',()=>bkO&&projectView===2),
+ buildLesson('fleet-machine','Verbundwerk aufstellen','laminate',0,'Es verarbeitet Stahlblech und Gehäuse zu Verbundplatten. Auch ältere Produktionsmaschinen sind in der Werft erlaubt.','o',false),
+ buildLesson('fleet-ramp','Werftrampe aufstellen','orbitRamp',1,'Diese Rampe nimmt Waren für Horizont an.','l',false),
+ {id:'fleet-check',ti:'Die Lieferung prüfen',tx:'Wähle Hand und tippe die Werftrampe an. Hier stehen benötigte Teile und bereits quittierte Fracht.',hl:()=>tool==='hand'?lessonMark(1):[['u','tl_hand']],dn:()=>sel===lessonObject(1)},
+ {id:'fleet-summary',ti:'Werft eingerichtet',tx:'Versorge das Verbundwerk mit Stahlblech und Gehäusen. Für weitere Teile legst du zusätzliche Linien an und lieferst sie zur Werftrampe.',hl:()=>[],nx:'Zur Werft'}
+];
+const guideSteps=()=>G.guide?.kind==='build'?buildGuide:G.guide?.kind==='fleet'?fleetGuide:TU;
+function startTutorial(){
+ const kind=campaignChapter()===1?'build':'fleet';
+ const hall=hallOf(kind==='build'?'gar':'orb'),rect=hrect(hall),width=kind==='build'?6:2;
+ for(let y=rect[1]+1;y<rect[3];y++)for(let x=rect[0]+1;x<=rect[2]-width+1;x++){
+  if(Array.from({length:width},(_,i)=>cell(x+i,y)).some(Boolean)||cell(x+width-1,y+1))continue;
+  G.guide=newGuide(kind,[x,y]);G.tu=0;G.tutorialPaused=false;
+  closeP2();sel=null;tool='hand';rot=3;tuTour=0;tuHn=null;
+  switchSite(REGIONS.find(site=>site.id===(kind==='build'?'main':'orbit')));
+  if(kind==='build')pg='h';
+  focusWorld([x,y-1,x+width-1,y+1]);sv(1);return;
+ }
+ closeP2();tuTour=1;tuTI=0;tuA=0;
+ toast('Die Halle ist voll. Die interaktive Hilfe bleibt verfügbar.');
+}
+function toggleTutorial(){
+ G.tutorialPaused=!G.tutorialPaused;
+ if(!G.tutorialPaused)tuA=1;
+ sv(0);
+}
 const TU=[
  {ti:'Willkommen in deiner Garage! 🏭',tx:'Das Holzlager kauft Rohholz für 2 € je Stück. Das erste Band liefert es zur Säge. Sie macht Holzteile, die das zweite Band zum Verkauf bringt.',hl:()=>[['t',tuG.sx-2,tuG.sy,5,1]],dn:()=>G.sold>=1,sf:'achieve'},
  {ti:'Dein erster Verkauf! 🎉',tx:'Jedes Stück bringt Geld – und je weiter es verarbeitet ist, desto mehr: Holzteile 6 €, Rohlinge 12 €, fertige Spielzeuge bis 60 €. Dein Geld siehst du oben links.',hl:()=>TUH,nx:'Weiter'},
@@ -3064,15 +3155,16 @@ const HNT=[
  {id:'mk',ti:'Verkaufsübersicht 📊',tx:'Unter „Verkauf“ findest du den Grundwert jedes Produkts, deinen Stückpreis und die bisher erfassten Erlöse. Der Versand verkauft automatisch.',hl:()=>[['u','mk']],cd:()=>G.sold>=60},
  {id:'bn',ti:'Engpass erkannt ⚠️',tx:'Die rot umrandete Maschine bremst deine Linie. Die Meldung oben nennt den Grund – oft hilft ein Upgrade genau dort, manchmal ein zweites Band oder mehr Material.',hl:()=>bn?[['t',bn.x,bn.y,1,1]]:[],cd:()=>!!bn&&/^Engpass/.test(msg)},
  {id:'hal',ti:'Neue Halle möglich 🏗️',tx:'Du kannst dir eine neue Halle leisten! Im Menü 🏭 Hallen siehst du Preise, Voraussetzungen und Erweiterungen. Jede Halle ist eine eigene Produktionslinie.',hl:()=>[['u','hl']],cd:()=>HL.some(h=>hlv(h.id)<1&&hReq(h)&&G.m>=h.c[0])},
- {id:'rmp',ti:'Bunker-Rampe bauen 📖',tx:'Baue die Bunker-Rampe aus dem Reiter Logistik am Ende einer Produktionslinie. Sie nimmt nur an, was das Bunker-Projekt gerade braucht.',hl:()=>[['u','pg_l']],cd:()=>G.sold>=30&&!hasProjectRamp()},
- {id:'mg',ti:'Personal einstellen 👥',tx:'Setze im Team-Menü Mitarbeiter oder Manager in einer Halle ein. Ihre Rollen bestimmen, wie sie das Team-Lager und die Produktionslinie unterstützen.',hl:()=>[['u','pn']],cd:()=>!G.mg.length&&G.sold>=50&&G.m>=800}];
+ {id:'shelf',ti:'Waren zwischenlagern',tx:'Setze ein Zwischenlager hinter eine Produktionsmaschine. Es sammelt Ware, wenn die nächste Maschine langsamer arbeitet.',hl:()=>pg==='l'?[['u','tl_sto']]:[['u','pg_l']],cd:()=>G.m>=cst('sto')&&!L.some(o=>isStorage(o.t)),dn:()=>L.some(o=>isStorage(o.t))},
+ {id:'rmp',ti:'Bunker-Rampe bauen',tx:'Baue im Reiter Logistik eine Bunker-Rampe. Sie nimmt die Waren für die laufende ARCHE-Phase an.',hl:()=>pg==='l'?[['u','tl_prj']]:[['u','pg_l']],cd:()=>campaignChapter()===1&&G.sp<PH.length&&G.sold>=30&&!hasProjectRamp(),dn:hasProjectRamp},
+ {id:'mg',ti:'Ein Hallenteam einsetzen',tx:'Setze im Team-Menü Personal in der gewünschten Halle ein. Markiere ein Zwischenlager als Team-Lager, damit der Materialdienst Waren holen kann.',hl:()=>[['u','pn']],cd:()=>!G.crew.gar?.p&&G.sold>=50&&G.m>=800,dn:()=>assignedCrew('p')>0&&L.some(o=>o.teamDepot&&!o.needsRelocation)}];
 HNT.forEach(h=>{h.h=1});
 const alteredStart={
  ti:'Deine Startlinie wurde umgebaut',
  tx:'Die markierten Plätze passen nicht mehr zu deiner Fabrik. Du kannst direkt mit dem Aufbau einer eigenen Rohstofflinie und den Lagerübungen weitermachen.',
  nx:'Eigene Linie üben'
 };
-const tuCur=()=>tuTour>0?TOUR[tuTI]:G.tu>=0&&G.tu<TU.length?(tuG?TU[G.tu]:alteredStart):tuHn;
+const tuCur=()=>tuTour>0?TOUR[tuTI]:G.tu>=0&&G.tu<guideSteps().length?(G.guide?guideSteps()[G.tu]:tuG?TU[G.tu]:alteredStart):tuHn;
 function tuGeo(){
  const saw=L.find(o=>o.t=='saw'&&o.r==0&&inG(o.x+4,o.y)&&cell(o.x+1,o.y)?.t=='belt');
  if(!saw&&G.tu<11)return null;
@@ -3081,22 +3173,29 @@ function tuGeo(){
  if(G.tu==0&&!G.sold&&cell(x+2,y)?.t!='shp')return null;
  return {sx:x,sy:y,fx:x+2,fy:y,bx:x+3,vx:x+4};
 }
-function tuFin(){G.tu=-1;G.rp+=2;xp(40);tuHT=tm;sfx('level');toast('🎓 Tutorial abgeschlossen: +2 Forschungspunkte');sv(1)}
+function tuFin(){
+ G.tu=-1;G.tutorialPaused=false;
+ const reward=!G.tutorialAward&&G.guide?.kind!=='fleet';
+ if(reward){G.tutorialAward=true;G.rp+=2;xp(40)}
+ tuHT=tm;sfx('level');toast(reward?'Tutorial abgeschlossen · +2 Forschungspunkte':'Tutorial abgeschlossen');sv(1);
+}
 function tuAdv(){const it=tuCur();if(!it)return;tuA=0;
  if(tuTour){if(tuTI>=TOUR.length-1){tuTour=0;sfx('unlock')}else{tuTI++;sfx('select')}return}
  if(it===alteredStart){G.tu=TU.findIndex(step=>step.id=='own-line');tuG=tuGeo();sv(0);return}
  if(it.h){G.th.push(it.id);tuHn=null;tuHT=tm;sfx('click');sv(0);return}
- sfx(it.sf||'select');G.tu++;if(G.tu>=TU.length)tuFin();else sv(0)}
-function tuSkip(){G.tu=-1;tuA=0;tuHT=tm;sfx('click');toast('Tutorial übersprungen – die Hilfe findest du unter 🏢 Firma → ❓ Hilfe.');sv(1)}
-function tuUpd(dt){if(!ready||!G||ff||storyOnScreen())return;tuA+=dt;
- try{const key=tuTour?'T'+tuTI:G.tu>=0&&G.tu<TU.length?'U'+G.tu:tuHn?'H'+tuHn.id:'';if(key!=tuKey){if(tuKey&&key)sfx('select');tuKey=key;tuA=0}
+ sfx(it.sf||'select');G.tu++;if(G.tu>=guideSteps().length)tuFin();else sv(0)}
+function tuSkip(){G.tu=-1;G.tutorialPaused=false;tuA=0;tuHT=tm;sfx('click');toast('Tutorial übersprungen. Du kannst es unter Firma → Hilfe erneut starten.');sv(1)}
+function tuUpd(dt){if(!ready||!G||ff||storyOnScreen()||G.tutorialPaused)return;tuA+=dt;
+ const count=guideSteps().length;
+ try{const key=tuTour?'T'+tuTI:G.tu>=0&&G.tu<count?'U'+G.tu:tuHn?'H'+tuHn.id:'';if(key!=tuKey){if(tuKey&&key)sfx('select');tuKey=key;tuA=0}
   if(tuTour)return;
-  if(G.tu>=0&&G.tu<TU.length){
-   tuG=tuGeo();
+  if(G.tu>=0&&G.tu<count){
+   if(!G.guide)tuG=tuGeo();
    const step=tuCur();
    if(step.dn&&step.dn())tuAdv();
    return;
   }
+  if(tuHn?.dn?.()){tuAdv();return}
   tuC+=dt;if(!tuHn&&tuC>.5){tuC=0;if(tm-tuHT>25){const h=HNT.find(x=>!G.th.includes(x.id)&&x.cd());if(h){tuHn=h;tuA=0}}}}
  catch(e){console.error('Tutorial:',e);G.tu=-1;tuTour=0}}
 function tuWrap(t,w,f){c.font=f;const o=[];let l='';for(const wd of String(t).split(' ')){const q=l?l+' '+wd:wd;if(l&&c.measureText(q).width>w){o.push(l);l=wd}else l=q}if(l)o.push(l);return o}
@@ -3106,7 +3205,17 @@ function tuHi(h){let x,y,w,hh;
   const box=h[1]==='warning'?warningBox():view[h[1]];
   ({x,y,w,h:hh}=box);
  }
- else{const b=[...HB].reverse().find(q=>q.id==h[1]);if(!b)return;x=b.x;y=b.y;w=b.w;hh=b.h}
+ else{
+  const hits=[...HB].reverse();
+  let box=hits.find(q=>q.id===h[1]);
+  if(!box&&(h[1].startsWith('pg_')||h[1].startsWith('tl_'))){
+   const group=h[1].startsWith('pg_'),key=group?'group':'shop',id=h[1].slice(3),track=dockTracks[key];
+   const index=group?dockGroups().findIndex(entry=>entry[0]===id):dockModels().indexOf(id);
+   if(track?.max&&index>=0)box=hits.find(q=>q.id===key+(index*track.stride<dockOffsets[key]?'_prev':'_next'));
+  }
+  if(!box)return;
+  ({x,y,w,h:hh}=box);
+ }
  const cx=x+w/2,cy=y+hh/2;
  if(h[0]==='t'&&(cx<0||cx>FW||cy<view.headerBottom||cy>view.dock.y)){const a=Math.atan2(cy-CY,cx-CX),px=Math.max(24,Math.min(FW-24,CX+Math.cos(a)*(FW/2-70))),py=Math.max(view.headerBottom+16,Math.min(view.dock.y-30,CY+Math.sin(a)*(FH/2-70)));
   saveCanvas();c.translate(px,py);c.rotate(a);c.fillStyle='#ffd23f';c.beginPath();c.moveTo(14,0);c.lineTo(-8,-10);c.lineTo(-8,10);c.fill();restoreCanvas();tx('⌂ Ansicht zurücksetzen',px,py+28,10.5,'#fde68a','center',700);return}
@@ -3116,9 +3225,20 @@ function tuHi(h){let x,y,w,hh;
  if(!(h[0]=='u'&&(h[1]=='upg'||h[1]=='del'))){c.fillStyle='#ffd23f';c.beginPath();if(cy<CY){const ay=y+hh+12+bob;c.moveTo(cx,ay);c.lineTo(cx-8,ay+12);c.lineTo(cx+8,ay+12)}else{const ay=y-12-bob;c.moveTo(cx,ay);c.lineTo(cx-8,ay-12);c.lineTo(cx+8,ay-12)}c.closePath();c.fill()}restoreCanvas()}
 function tuDraw(){
  if(window.NOFIN||!ready||ff||!G||storyOnScreen())return;
- if(openMenu())return;
+ if(G.tutorialPaused){
+  if(!openMenu()){
+   const y=view.headerBottom+view.warningHeight+9,x=view.inset;
+   btn(x,y,148,30,toggleTutorial,'#334e66',0,'tresume');tx('Tutorial fortsetzen',x+74,y+20,11.5,'#fff','center',700);
+  }
+  return;
+ }
  const it=tuCur();if(!it)return;
- try{const tour=tuTour>0,iv=!tour&&!it.h,N=tour?TOUR.length:TU.length,ix=tour?tuTI:G.tu;
+ if(openMenu()){
+  if(G.guide?.kind==='build'&&it.id==='orders')tuHi(['u','market_tab_2']);
+  if(G.guide?.kind==='build'&&it.id==='company'&&acO)tuHi(['u',fTab===4?'save':'ft4']);
+  return;
+ }
+ try{const tour=tuTour>0,iv=!tour&&!it.h,N=tour?TOUR.length:guideSteps().length,ix=tour?tuTI:G.tu;
   let hs=[];try{hs=it.hl?it.hl():[]}catch(e){}for(const h of hs)tuHi(h);
   const txt=typeof it.tx=='function'?it.tx():it.tx,W=Math.min(348,FW-2*view.inset),X=(FW-W)/2,P=12;
   const ln=tuWrap(txt,W-2*P,'600 12px system-ui,sans-serif');
@@ -3130,16 +3250,20 @@ function tuDraw(){
   fitText(it.ti,X+P,Y+P+10,W-2*P-48,13.5,'#fff','left',800);tx(iv?(ix+1)+'/'+N:tour?'Tour '+(ix+1)+'/'+N:'💡 Tipp',X+W-P,Y+P+9,10,'#94a3b8','right',700);
   ln.forEach((l,i)=>fitText(l,X+P,Y+P+32+i*15,W-2*P,12,'#cbd5e1','left',600));
   if(bar>=0){const yb=Y+P+26+ln.length*15;rr(X+P,yb,W-2*P,8,4,'#ffffff18');rr(X+P,yb,Math.max(3,(W-2*P)*bar),8,4,'#4ade80')}
-  if(iv){if(ix<N-1){btn(X+P,by,92,24,tuSkip,'#334155',0,'tskip');tx('Überspringen',X+P+46,by+16,11,'#fff','center',700)}rr(X+10,Y+H-5,W-20,3,1.5,'#ffffff18');rr(X+10,Y+H-5,(W-20)*ix/N,3,1.5,'#ffd23f')}
+  if(iv){
+   btn(X+P,by,90,24,tuSkip,'#334155',0,'tskip');tx('Überspringen',X+P+45,by+16,11,'#fff','center',700);
+   btn(X+P+94,by,51,24,toggleTutorial,'#334155',0,'tpause');tx('Pause',X+P+119.5,by+16,11,'#fff','center',700);
+   rr(X+10,Y+H-5,W-20,3,1.5,'#ffffff18');rr(X+10,Y+H-5,(W-20)*ix/N,3,1.5,'#ffd23f');
+  }
   else if(tour){btn(X+P,by,92,24,()=>{tuTour=0;sfx('click')},'#334155',0,'tend');tx('✕ Beenden',X+P+46,by+16,11,'#fff','center',700)}
-  const nx=it.h?'Verstanden':typeof it.nx=='function'?it.nx():it.nx;if(nx){const bw=Math.min(W-2*P-96,181,Math.max(108,nx.length*6.4+22));btn(X+W-P-bw,by,bw,24,tuAdv,'#2f9e6b',0,'tnext');fitText(nx,X+W-P-bw/2,by+16,bw-8,11.5,'#fff','center',800)}
+  const nx=it.h?'Verstanden':typeof it.nx=='function'?it.nx():it.nx;if(nx){const bw=Math.min(W-2*P-(iv?150:96),181,Math.max(108,nx.length*6.4+22));btn(X+W-P-bw,by,bw,24,tuAdv,'#2f9e6b',0,'tnext');fitText(nx,X+W-P-bw/2,by+16,bw-8,11.5,'#fff','center',800)}
   restoreCanvas()}catch(e){restoreCanvas();console.error('Tutorial:',e)}}
 function heTab(X,Y,W,H){tx('Hilfe & Steuerung',X+26,Y+68,15,'#fff','left',800);
  const R=[['Kamera','Ziehen verschiebt die Ansicht, Mausrad oder Pinch zoomt, ⌂ stellt die Standardansicht wieder her.'],['Bauen','Wähle unten ein Objekt und tippe ein freies Hallenfeld an. Maschinen brauchen ihre Produktionshalle, Logistik eine freigeschaltete Halle.'],['Verteiler','Splitter teilen, Fusionatoren vereinen, Kreuzungen kreuzen. Seiten im Fenster auf Eingang, Ausgang oder Aus stellen.'],['Maschine','Antippen: Upgrade, Drehen, Abbauen. „Bewegen“ versetzt Gebäude, „Löschen“ verkauft (50 %) – auch alles auf einmal.'],['Engpass','Roter Rahmen und Meldung oben zeigen, welche Maschine die Linie bremst – und was ein Upgrade bringt.'],['Offline','Bis zu 8 Std. läuft die Fabrik weiter – mit 25 % Effizienz (Forschung: 40 %). Die Bunker-Frist ist sehr großzügig.']];
  R.forEach(([a,b],i)=>{const y=Y+86+i*33;tx(a,X+26,y,11.5,'#7dd3fc','left',800);tuWrap(b,W-140,'600 11px system-ui,sans-serif').forEach((l,j)=>tx(l,X+112,y+j*13,11,'#cbd5e1','left',600))});
- btn(X+26,Y+H-42,168,30,()=>{tuTour=1;tuTI=0;tuA=0;acO=false;mkO=rsO=pnO=false;sfx('click')},'#2f9e6b');tx('▶ Kurztour starten',X+110,Y+H-22,12.5,'#fff','center',800);
+ btn(X+26,Y+H-42,168,30,startTutorial,'#2f9e6b',0,'tutorial_start');tx('▶ Tutorial neu starten',X+110,Y+H-22,12.5,'#fff','center',800);
  btn(X+202,Y+H-42,190,30,()=>{G.th=[];tuHn=null;tuHT=-99;sfx('click');toast('Tipps werden wieder angezeigt, sobald sie passen.');sv(0)},'#334155');tx('💡 Tipps erneut zeigen',X+297,Y+H-22,12,'#fff','center',700);
- tx(G.tu>=0&&G.tu<TU.length?'Einsteiger-Tutorial: Schritt '+(G.tu+1)+' von '+TU.length:'Einsteiger-Tutorial: abgeschlossen',X+W-26,Y+H-22,10.5,'#94a3b8','right',600)}
+ tx(G.tu>=0&&G.tu<guideSteps().length?'Tutorial · Schritt '+(G.tu+1)+' von '+guideSteps().length:'Einsteiger-Tutorial',X+W-26,Y+H-22,10.5,'#94a3b8','right',600)}
 /* ---- Demo-Fabrik für das Vorschaubild (thumbs() ruft mk()/update()/draw() beim Seitenstart auf; kein Speicher, keine Cloud) ---- */
 function demo(){init(null);stQ=[];G.tu=-1;G.th=[];G.hl={gar:1,met:1};L=[];g=[];pg='m';G.rs=['met','wrk','spd1','lag'];G.rp=11;G.xp=1400;G.ac=['first','s100','o1','line','tool','r1','mg1','hall1','lv5'];G.sold=312;setLv();G.emp={...G.emp,p:3,q:2,l:1};G.crew={gar:{p:3,q:2,l:1}};G.mg=[{id:'prod',lv:6,sp:1,x:9,y:4},{id:'qual',lv:3,sp:0,x:12,y:6}];rfx();
  [[7,4,'src',0,3],[8,4,'belt',0],[9,4,'saw',0,4],[10,4,'belt',0],[11,4,'frm',0,3],[12,4,'belt',0],[13,4,'asm',0,3],[14,4,'belt',0],[15,4,'belt',0],[16,4,'belt',1],[16,5,'belt',1],[16,6,'belt',2],[15,6,'pnt',2,3],[14,6,'sto',2],[13,6,'pck',2,2],[12,6,'shp',2],
@@ -3258,7 +3382,7 @@ dragMove(x,y,_player,id,ending=false){
   const dx=x-pdn.lastX,dy=y-pdn.lastY;
   pdn.lastX=x;pdn.lastY=y;
   if(!dx&&!dy)return;
-  cam.x-=dx/cameraZoom();cam.y-=dy/cameraZoom();clampCam();lastCameraMotion=tm;
+  cam.x-=dx/cameraZoom();cam.y-=dy/cameraZoom();clampCam();lastCameraMotion=tm;guideAction('pan');
  }},
 dragCancel(_player,id){
  const wasPinching=releaseTouch(id);
