@@ -44,8 +44,6 @@
     if (!button) return;
     button.hidden = !supported;
     button.disabled = busy || preparing;
-    const test = document.querySelector('[data-o=push-test]');
-    if (test) { test.hidden = !enabled; test.disabled = busy; }
     button.textContent = enabled ? 'Benachrichtigungen ausschalten' : 'Benachrichtigungen einschalten';
     document.querySelector('#push-status').textContent = status || (!supported
       ? 'Systembenachrichtigungen sind hier nicht verfügbar. Auf iPhone und iPad öffne die Seite als Home-Bildschirm-App.'
@@ -216,11 +214,11 @@
         if (friend.val() === true && olAllowed(target.id)) {
           OL.F[target.id] = true;
           olClose();
-          window.directChat.open(target.id);
+          window.directChat.open(target.id, true);
         } else toast('Dieser Chat ist nicht mehr verfügbar.');
       } else if (target.kind === 'group') {
         olClose();
-        await window.groupChat.open(target.id);
+        await window.groupChat.open(target.id, true);
       } else if (!window.gameChat.openNotification(target)) {
         toast('Der Spielchat ist nur in der laufenden Partie verfügbar.');
       }
@@ -263,14 +261,17 @@
     open(event.data.target);
   });
 
-  async function peer(id) {
+  async function peer(id, author, text) {
     const uid = OL.me;
     if (!enabled || !uid || Notification.permission !== 'granted' || !document.hidden) return;
     try {
       const reg = await register();
       if (uid !== OL.me || !enabled) return;
-      await reg.showNotification('Neue Nachricht im Spielchat', {
-        body:'Tippe, um zum Spielchat zu wechseln.',
+      const chars = Array.from(text.replace(/\s+/g,' ').trim());
+      const preview = chars.length>140?chars.slice(0,139).join('')+'…':chars.join('');
+      await reg.showNotification(author ? author+' · Spielchat' : 'Neue Nachricht im Spielchat', {
+        body:preview,
+        actions:Notification.maxActions > 0 ? [{action:'reply',title:'Antworten'}] : [],
         icon:'./icons/icon-192.png',
         tag:uid+':peer:'+id,
         data:{kind:'peer', account:uid, id}
@@ -278,38 +279,8 @@
     } catch {}
   }
 
-  async function test() {
-    if (!enabled || busy) return;
-    busy = true;
-    status = 'Testmitteilung wird gesendet …';
-    render();
-    try {
-      const sub = await (await register()).pushManager.getSubscription();
-      if (!sub) throw Object.assign(Error(),{code:'Device not registered'});
-      await service()({action:'test',subscription:serialize(sub)});
-      status = 'Der Push-Anbieter hat die Testmitteilung angenommen. Schau in die Mitteilungszentrale.';
-    } catch (error) {
-      if (error.code==='Device not registered' || [404,410].includes(error.upstream)) {
-        status = 'Das Geräte-Abo ist abgelaufen. Schalte Benachrichtigungen aus und wieder ein.';
-      } else if (error.code==='Test cooldown') {
-        status = 'Warte zehn Sekunden, bevor du die nächste Testmitteilung sendest.';
-      } else if (error.code==='Push provider') {
-        status = 'Der Push-Anbieter hat die Testmitteilung abgelehnt (HTTP '+error.upstream+').';
-      } else if (error.code==='Push signing') {
-        status = 'Cloudflare konnte die Mitteilung mit dem hinterlegten Push-Schlüssel nicht signieren.';
-      } else if (error.code==='Push encryption') {
-        status = 'Cloudflare konnte die Mitteilung für dieses Geräte-Abo nicht verschlüsseln.';
-      } else if (error.code==='Push provider connection') {
-        status = 'Cloudflare konnte die Testmitteilung nicht an den Push-Anbieter senden.';
-      } else status = setupError(error,'server');
-    } finally {
-      busy = false;
-      render();
-    }
-  }
-
   window.gameNotifications = {
-    render, toggle, logout, peer, dispatch, test,
+    render, toggle, logout, peer, dispatch,
     signedIn() { prepare(); openPending(); },
     signedOut() { config = null; enabled = false; status = ''; render(); }
   };

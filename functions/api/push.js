@@ -89,6 +89,16 @@ function subscriptionFrom(value) {
 
 const digest = async value => b64(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value))));
 
+function shortText(value, limit) {
+  if (typeof value !== 'string') return '';
+  const chars = Array.from(value.replace(/\s+/g,' ').trim());
+  return chars.length>limit?chars.slice(0,limit-1).join('')+'…':chars.join('');
+}
+
+function chatPreview(name, text, channel='') {
+  return {author:shortText(name,40),preview:shortText(text,140),channel:shortText(channel,40)};
+}
+
 async function notification(db, from, {kind,to,source,message,seat}) {
   if (!id.test(to||'') || to===from || !['invite','direct','group','room'].includes(kind)) return null;
   if (kind==='invite') {
@@ -99,7 +109,7 @@ async function notification(db, from, {kind,to,source,message,seat}) {
     const match = (await db(path)).value;
     if (match?.host!==from || (room ? match.status!=='lobby' : match.state!=='invited'||match.guest!==to)) return null;
     const ttl = Math.floor((invite.ts-Date.now())/1000)+(room?300:60);
-    return {ts:invite.ts,ttl,data:{kind,sender:from,id:invite.mid,ts:invite.ts}};
+    return {ts:invite.ts,ttl,data:{kind,sender:from,id:invite.mid,ts:invite.ts,author:shortText(invite.name,40)}};
   }
   if (!id.test(message||'')) return null;
   if (kind==='direct') {
@@ -108,7 +118,7 @@ async function notification(db, from, {kind,to,source,message,seat}) {
       db('directMessages/'+path+'/'+message),db('friends/'+from+'/'+to),db('friends/'+to+'/'+from)
     ]);
     if (entry.value?.author!==from || friend.value!==true || reverse.value!==true) return null;
-    return {ts:entry.value.created,ttl:3600,key:'dm_'+from,data:{kind,id:from}};
+    return {ts:entry.value.created,ttl:3600,key:'dm_'+from,data:{kind,id:from,...chatPreview(entry.value.name,entry.value.text)}};
   }
   if (!id.test(source||'')) return null;
   if (kind==='group') {
@@ -117,14 +127,14 @@ async function notification(db, from, {kind,to,source,message,seat}) {
     if (entry.value?.author!==from || !group.value?.info || group.value.info.closed ||
         !members.some(m=>m.uid===from && m.since<entry.value.created) ||
         !members.some(m=>m.uid===to && m.since<entry.value.created)) return null;
-    return {ts:entry.value.created,ttl:3600,key:'group_'+source,data:{kind,id:source}};
+    return {ts:entry.value.created,ttl:3600,key:'group_'+source,data:{kind,id:source,...chatPreview(entry.value.name,entry.value.text,group.value.info.name)}};
   }
   if (!/^[0-9]$/.test(seat||'')) return null;
   const {value:room} = await db('rooms/'+source);
   const entry = room?.chat?.[seat];
   if (room?.status!=='play' || room.seats?.[seat]?.uid!==from || entry?.uid!==from || entry.id!==message ||
       !Object.values(room.seats).some(p=>p.k==='p' && p.uid===to)) return null;
-  return {ts:entry.ts,ttl:60,data:{kind,id:source}};
+  return {ts:entry.ts,ttl:60,data:{kind,id:source,...chatPreview(room.seats[seat].name,entry.text,'Spielchat')}};
 }
 
 async function send(db, vapid, from, body) {
@@ -170,7 +180,7 @@ async function pushRequest(subscription,vapid,data,ttl,topic) {
   }
   return {
     method:'POST',body,
-    headers:{...headers,ttl:String(ttl),topic,urgency:data.kind==='invite'||data.kind==='test'?'high':'normal',
+    headers:{...headers,ttl:String(ttl),topic,urgency:data.kind==='invite'?'high':'normal',
       'content-encoding':'aes128gcm','content-type':'application/octet-stream'},
     redirect:'manual'
   };
@@ -215,24 +225,10 @@ export async function onRequest({request,env,waitUntil}) {
       return reply({},202);
     }
     const sub = subscriptionFrom(body.subscription);
-    if (!sub || !['add','remove','test'].includes(body.action)) return reply({error:'Subscription'},400);
+    if (!sub || !['add','remove'].includes(body.action)) return reply({error:'Subscription'},400);
     stage = 'Subscription storage';
     const key = await digest(sub.endpoint);
     const path = 'pushSubscriptions/'+uid;
-    if (body.action==='test') {
-      const {value:device} = await db(path+'/'+key);
-      if (!device) return reply({error:'Device not registered'},409);
-      const testPath = 'pushDispatch/'+uid+'/test';
-      const previous = await db(testPath,'GET',undefined,{'X-Firebase-ETag':'true'});
-      const now = Date.now();
-      if (now-previous.value?.sent<10000 ||
-          !(await db(testPath,'PUT',{sent:now},{'If-Match':previous.etag??'null_etag'})).ok) {
-        return reply({error:'Test cooldown'},429);
-      }
-      stage = 'Push provider connection';
-      const code = await deliver(device,{publicKey,privateKey,subject},{kind:'test',id:'test',account:uid},60,'play2gether-test');
-      return code>=200 && code<300?reply({accepted:true}):reply({error:'Push provider',upstream:code},502);
-    }
     if (body.action==='remove') {
       await db(path+'/'+key,'DELETE');
     } else {

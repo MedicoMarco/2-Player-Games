@@ -1,4 +1,4 @@
-const CACHE_NAME = "play2gether-pwa-v18";
+const CACHE_NAME = "play2gether-pwa-v19";
 const APP_ROOT = new URL("./", self.registration.scope).href;
 const NOTIFICATION_SCRIPT = new URL("notifications.js", APP_ROOT).href;
 const FACTORY_ASSETS = new Set([
@@ -72,7 +72,6 @@ self.addEventListener("fetch", event => {
 });
 
 const notificationCopy = {
-  test: ["Play2Gether-Testmitteilung", "Systembenachrichtigungen funktionieren auf diesem Gerät."],
   invite: ["Spieleinladung", "Tippe, um die Einladung anzunehmen."],
   direct: ["Neue Direktnachricht", "Tippe, um den Chat zu öffnen."],
   group: ["Neue Gruppennachricht", "Tippe, um den Gruppenchat zu öffnen."],
@@ -84,12 +83,20 @@ self.addEventListener("push", event => {
   let target;
   try { target = event.data.json(); } catch { return; }
   if (!target || !Object.hasOwn(notificationCopy, target.kind) || target.kind === "peer") return;
-  const [title, body] = notificationCopy[target.kind];
+  const [fallbackTitle, fallbackBody] = notificationCopy[target.kind];
+  const {kind, account, id, sender, ts, author, channel, preview} = target;
+  const isInvite = kind === "invite";
+  let title = fallbackTitle;
+  if (author) title = author + (isInvite ? " lädt dich ein" : channel ? " · " + channel : "");
+  const actions = !isInvite && self.Notification?.maxActions > 0
+    ? [{action: "reply", title: "Antworten"}]
+    : [];
   event.waitUntil(self.registration.showNotification(title, {
-    body,
+    body: preview || fallbackBody,
+    actions,
     icon: new URL("icons/icon-192.png", APP_ROOT).href,
     tag: [target.account, target.kind, target.sender || target.id].join(":"),
-    data: target,
+    data: {kind, account, id, sender, ts},
   }));
 });
 
@@ -110,7 +117,7 @@ function deliverToOpenPage(client, target) {
 self.addEventListener("notificationclick", event => {
   event.notification.close();
   const target = event.notification.data;
-  if (!target || !Object.hasOwn(notificationCopy, target.kind) || target.kind === "test") return;
+  if (!target || !Object.hasOwn(notificationCopy, target.kind)) return;
   event.waitUntil((async () => {
     const app = new URL(APP_ROOT);
     const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });

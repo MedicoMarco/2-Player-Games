@@ -140,7 +140,7 @@
     const entry = {seat, id, uid:author.uid, name:author.name, text, received:performance.now(), life};
     active.entries.push(entry);
     if(!expanded && seat!==active.seat)trigger.dataset.unread = '';
-    if(active.kind==='peer' && seat!==active.seat)window.gameNotifications?.peer(active.ss.mid);
+    if(active.kind==='peer' && seat!==active.seat)window.gameNotifications?.peer(active.ss.mid,author.name,text);
     const previous = bubbles.get(seat);
     if(previous){clearTimeout(previous.timer);previous.node.remove();}
     const node = item(entry,'gc-bubble');
@@ -325,6 +325,8 @@
     if(!active || (target.kind==='room'
       ? active.kind!=='room'||active.code!==target.id
       : active.kind!=='peer'||active.ss.mid!==target.id))return false;
+    window.directChat?.close();
+    olClose();
     toggle(true);
     return true;
   }

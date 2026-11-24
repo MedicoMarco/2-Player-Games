@@ -162,13 +162,13 @@
     }));
   }
   function remove(id,slot,uid){return root().update({[locationOf(id)+'/members/'+slot]:null,[index(uid,id)]:null});}
-  async function open(id){
+  async function open(id,reply=false){
     const uid=OL.me;
     const slot=(await root().child(index(uid,id)).once('value')).val();
     if(uid!==OL.me)return;
     if(slot==null){chat().show(null,'groups');return;}
     const data=(await ref(id).once('value')).val();
-    if(uid===OL.me)chat().show(view({id,slot,data}),'groups');
+    if(uid===OL.me)chat().show(view({id,slot,data}),'groups',reply);
   }
   window.groupChat={attach,open,stop:()=>{managing=null;stop();},render,manage,unread,refreshCounts};
 })();

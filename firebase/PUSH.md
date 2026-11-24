@@ -1,6 +1,6 @@
 # Systembenachrichtigungen mit Cloudflare Pages
 
-Play2Gether nutzt weiterhin Firebase Authentication und Realtime Database im Spark-Tarif. Die Pages Function unter `/api/push` versendet Web Push für neue Spieleinladungen sowie Direkt-, Gruppen- und Spielraumnachrichten. Sie prüft dabei das Firebase-Konto, die in der Datenbank gespeicherte Nachricht oder Einladung und die Rechte des Empfängers. Die Systemmeldung enthält keinen Nachrichtentext.
+Play2Gether nutzt weiterhin Firebase Authentication und Realtime Database im Spark-Tarif. Die Pages Function unter `/api/push` versendet Web Push für neue Spieleinladungen sowie Direkt-, Gruppen- und Spielraumnachrichten. Sie prüft dabei das Firebase-Konto, die in der Datenbank gespeicherte Nachricht oder Einladung und die Rechte des Empfängers. Chatmeldungen zeigen den Absender und eine gekürzte Nachrichtenvorschau. Ein Tipp auf die Meldung oder die Aktion „Antworten“ (je nach Browser) öffnet das Eingabefeld im Chat.
 
 ## Einmalig im Browser einrichten
 

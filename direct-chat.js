@@ -258,14 +258,17 @@
     el('[data-mute]').textContent=pref(s.key).muted?'Vorschau einschalten':'Stummschalten';
     el('[data-pin]').textContent=pref(s.key).pinned?'Von oben lösen':'Oben anheften';
   }
-  function open(peer) {
+  function open(peer, reply=false) {
     if (!OL.me) { olOpen(); return; }
     const [a,b] = [OL.me,peer].sort();
     const active=peer && OL.F[peer] && olAllowed(peer);
-    show(active?{peer,a,b,key:keyOf(peer),uid:OL.me,ref:OL.db.ref('directMessages/'+a+'/'+b)}:null, 'private');
+    show(active?{peer,a,b,key:keyOf(peer),uid:OL.me,ref:OL.db.ref('directMessages/'+a+'/'+b)}:null, 'private', reply);
   }
-  function show(target,tab=indexTab){
-    if(target && session?.key===target.key && session.since===target.since)return;
+  function show(target,tab=indexTab,reply=false){
+    if(target && session?.key===target.key && session.since===target.since){
+      if(reply)input.focus();
+      return;
+    }
     stop();hideAlert();indexTab=tab;
     if(!dialog.open){returnFocus=document.activeElement===document.body?launcher:document.activeElement;dialog.showModal();}
     const active=!!target;
@@ -283,7 +286,7 @@
     drawActions(s);
     updateComposer();
     const loading=document.createElement('p');loading.className='dm-empty';loading.textContent='Verlauf wird geladen …';feed.append(loading);
-    feed.setAttribute('aria-busy','true');older.hidden=true;el('[data-back]').focus();
+    feed.setAttribute('aria-busy','true');older.hidden=true;(reply?input:el('[data-back]')).focus();
     page(s, null);
   }
   function page(s, before) {
