@@ -1,0 +1,11 @@
+#ov .poker-setup{width:min(590px,100%);gap:.5rem}
+.poker-setup .lusetup>.seg{flex-wrap:wrap;justify-content:center}
+.poker-setup .poker-seats{max-height:33vh;overflow:auto;padding:.2rem}
+.poker-setup .poker-seats .seg{flex-shrink:0}
+.poker-controls{position:absolute;z-index:2;left:5%;right:5%;bottom:3%;display:flex;align-items:center;justify-content:center;gap:clamp(.24rem,1vw,.8rem);font-size:clamp(.72rem,2vw,1rem)}
+.poker-controls[hidden],.poker-controls button[hidden]{display:none}
+.poker-controls .btn{box-shadow:none;padding:.57em .88em;border:1px solid #ead8ab7a;border-radius:.7em;background:#153f38;color:#fff5dd;font-weight:750;white-space:nowrap}
+.poker-controls .btn[data-poker=call],.poker-controls .btn[data-poker=next]{background:#efd099;color:#2e2118}
+.poker-controls .btn:disabled{opacity:.44;cursor:default}
+.poker-announcement{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+@media(max-width:480px){.poker-controls{bottom:1%}.poker-controls .btn{padding:.4em .55em}}

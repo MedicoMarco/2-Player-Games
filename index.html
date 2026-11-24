@@ -294,6 +294,7 @@ body.onl #rs,body.onl-guest #rs{display:none}
 #legal .lg-body a{color:var(--b)}#legal .lg-body p,#legal .lg-body ul,#legal .lg-body ol{margin:.5em 0}
 </style>
 <link rel="stylesheet" href="./direct-chat.css?v=2">
+<link rel="stylesheet" href="./poker.css">
 <link rel="stylesheet" href="./game-chat.css">
 <link rel="stylesheet" href="./chat-moderation.css">
 </head><body>
@@ -558,6 +559,8 @@ Deutschland</p>
 <script src="./factory-empire/transport.js?v=6"></script>
 <script src="./factory-empire/layout.js?v=13"></script>
 <script src="./factory-empire/game.js?v=13"></script>
+<script src="./poker.js"></script>
+<script src="./poker-table.js"></script>
 <script>
 const $=s=>document.querySelector(s),W=800,H=480,cl=(v,a,b)=>Math.max(a,Math.min(b,v)),rnd=(a,b)=>a+Math.random()*(b-a),now=()=>performance.now();
 let S={vm:'auto',cpu:0,d:1,t:5,snd:1,anim:1,theme:'auto',ori:'a',side:0,st:{},fav:[],rec:[],cat:'all',ach:{},pl:0,sk:[0,0]},B='#3b82f6',R='#ef4444';
@@ -3644,7 +3647,7 @@ GAMES.push({id:'ludo',n:'Mensch ärgere dich nicht',ic:'\ud83c\udfb2',d:'Würfel
 RULES.ludo='Jeder hat vier Figuren (in den Spieleinstellungen auch nur zwei für kürzere Runden). Mit einer 6 kommt eine Figur aufs Startfeld; nach jeder 6 würfelst du nochmal. Ohne Figur auf dem Feld hast du drei Versuche. Wer auf ein besetztes Feld zieht, schmeißt die Figur raus – das ist freiwillig, du darfst den anderen auch verschonen (Computer schlagen meistens). Bei einer 6 darfst du wählen: rauskommen oder mit einer Figur ziehen. Rauskommen geht nicht, solange eine eigene Figur auf dem Startfeld steht. Im Zielhaus wird nicht gesprungen, du brauchst die genaue Augenzahl. Wer zuerst alle vier Figuren im Ziel hat, gewinnt.';
 ICON.maumau=GI(`<rect x="6" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(-12 16 24)"/><rect x="20" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(10 30 24)"/><path d="M31 17c-3-4-8 0-5 5l5 5 5-5c3-5-2-9-5-5z" fill="${Rd}" stroke="none" transform="rotate(10 30 24)"/>`);
 NM.maumau=['Mau-Mau','Das Kartenspiel für 2–10 Spieler, auch online.'];
-const ROOMG=['ludo','maumau','fabrik'];
+const ROOMG=['ludo','maumau','poker','fabrik'];
 /* ===== Karten-Bibliothek (für alle Kartenspiele) =====
    Karte = Zahl 0..51: Farbe = id/13 (0 Pik, 1 Herz, 2 Karo, 3 Kreuz), Rang = id%13 (0 = 2 ... 8 = 10, 9 = Bube, 10 = Dame, 11 = König, 12 = Ass).
    cdSprite() zeichnet jede Karte einmal vektorscharf in ein Bild, drawCard() stempelt sie in beliebiger Größe (Rückseite: id -1). */
@@ -4088,7 +4091,7 @@ function mmMk(){
 <div class=lurow><b>Computer-Gegner</b><div class=seg>${sg('mn',[1,2,3,4,5,6,7,8,9].map(v=>[v,v]),M.n)}</div></div>
 <div class=lurow><b>Stärke</b><div class=seg>${sg('diff',[[0,'Einfach'],[1,'Normal'],[2,'Schwer'],[3,'Adaptiv']],S.d)}</div></div>
 <div class=lurow><b>„Mau“ rufen</b><div class=seg>${sg('mauopt',[[1,'Pflicht'],[0,'Aus']],M.mau)}</div></div></div>
-<div><button class=btn data-lu=go>Spiel starten</button></div>
+<div><button class=btn data-lu=go>Spiel starten</button> <button class=mini data-lu=poker>Poker spielen</button></div>
 <div class=luon><b>🌐 Online</b><button class=btn data-lu=create>Raum erstellen</button><input id=lucode maxlength=20 placeholder="RAUMCODE" autocomplete=off autocapitalize=characters><button class="btn r" data-lu=join>Beitreten</button></div>
 <p class=luhint>Passende Farbe oder Zahl legen. 6: Richtungswechsel · 7: nächster zieht 2 (mit einer 7 weitergeben) und ist danach trotzdem noch voll dran · 8: nächster setzt aus · Bube: Farbe wünschen · 15 s pro Zug · Nach dem Legen der vorletzten Karte „Mau“, nach der letzten „Mau Mau“ rufen (3 s Zeit)! Gespielt wird bis zum letzten Platz.</p></div>`
   }
@@ -4243,7 +4246,8 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
   /* ----- Klicks in den Overlays ----- */
   function luClick(b){
     const a=b.dataset.lu,v=b.dataset.v,s=b.dataset.s;
-    if(a=='mn'){S.mm.n=+v;save();showOv(setupHTML())}
+    if(a=='poker'&&mode==='setup'){api.leave();start('poker')}
+    else if(a=='mn'){S.mm.n=+v;save();showOv(setupHTML())}
     else if(a=='diff'){S.d=+v;save();showOv(setupHTML())}
     else if(a=='mauopt'){S.mm.mau=+v;save();showOv(setupHTML())}
     else if(a=='go'||a=='again')startLocal();
@@ -4496,6 +4500,10 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
 }
 GAMES.push({id:'maumau',n:'Mau-Mau',ic:'🃏',d:'Das Kartenspiel für 2–10 Spieler, auch online.',cat:'Karten',h:'Karte antippen zum Ausspielen · Stapel antippen zum Ziehen · nach der vorletzten Karte „Mau!“, nach der letzten „Mau Mau!“ rufen · 15 s pro Zug',sub:'2–10 Spieler · Computer · Online',mk:mmMk});
 RULES.maumau='Gespielt wird mit 52 Karten (2 bis Ass), jeder bekommt 7. Du legst eine Karte, die zur obersten in Farbe oder Zahl passt – wer nichts hat, zieht eine Karte und darf sie sofort legen, wenn sie passt. 7: Der Nächste muss 2 Karten ziehen, kann aber mit einer eigenen 7 weitergeben (dann +2 mehr). Wer keine 7 hat, muss selbst vom Stapel ziehen – die Ulti-Energie aller gelegten Siebenen entlädt sich dann auf ihn. Danach ist er trotzdem noch mit einem vollen Zug dran: eine passende Karte legen oder, wenn keine passt, noch eine Karte ziehen. 6: Richtungswechsel (zu zweit darfst du nochmal). 8: Der Nächste setzt aus. Bube: darf (außer auf einen Buben) immer gelegt werden, du wünschst dir eine Farbe – auch als letzte Karte. Das Ass ist eine ganz normale Karte. Zeitlimit: Du hast 15 Sekunden pro Zug; ab 10 Sekunden erscheint die Uhr, bei 3 Sekunden blinkt sie rot. Wer zu langsam ist, bekommt eine Strafkarte und der Nächste ist dran. Erst die Karte legen, dann rufen: Bleibt dir nur noch eine Karte, musst du innerhalb von 3 Sekunden „Mau!“ rufen (sonst 1 Strafkarte), nach der letzten Karte „Mau Mau!“ (sonst 2 Strafkarten und du bist noch nicht fertig). Es wird bis zum letzten Platz gespielt: Wer keine Karten mehr hat, ist fertig und schaut zu (oder verlässt die Gruppe); wer zuerst fertig wird, gewinnt. Nach dem ersten Sieger hat jeder, der noch spielt, einen kleinen „Aufgeben“-Knopf (an- und ausschaltbar). Haben alle noch Spielenden aufgegeben, endet die Runde und der Endstand erscheint. Ab 5 Spielern werden mehrere Kartensätze gemischt. Online: Nach der Runde bleiben nur diejenigen in der Gruppe, die „Bereit fürs nächste Spiel“ wählen; alle anderen verlassen den Raum.';
+
+GAMES.push({id:'poker',n:'Poker',ic:'♠',d:'Texas Hold’em mit Spielchips für 2–10 Spieler.',cat:'Karten',
+  h:'Zwei eigene Karten · Fünf Gemeinschaftskarten · Blinds 5/10',sub:'2–10 Spieler · Computer · Online',mk:window.createPokerGame});
+RULES.poker='Texas Hold’em mit Spielchips. Jeder beginnt mit 500 Chips und erhält in jeder Hand zwei eigene Karten. Die fünf Gemeinschaftskarten erscheinen als Flop (drei Karten), Turn und River. Die beste Kombination aus fünf eigenen und gemeinsamen Karten gewinnt. Bei Gleichstand wird der Pot geteilt. Die Pflicht-Einsätze betragen 5 und 10 Chips. Du kannst schieben, mitgehen, erhöhen oder aussteigen. Gesetzt und erhöht wird vor und am Flop in 10er-Schritten, danach in 20er-Schritten, bis zu viermal je Setzrunde. Wer weniger Chips hat als zum Mitgehen nötig, geht all-in und spielt nur um den entsprechenden Teil des Pots. Nach 25 Sekunden wird automatisch geschoben oder ausgestiegen. Wer als letzter noch Chips hat, gewinnt das Spiel.';
 
 GAMES.forEach(g=>{const m=NM[g.id];if(m){g.n=m[0];g.d=m[1]}g.ic=ICON[g.id]||g.ic});
 const revised={
@@ -5124,7 +5132,7 @@ function olCards(){
   let h='';
   if(OL.out)h+=`<div class=olinv><b>Herausforderung an ${olEsc(olNameOf(OL.out.uid))}</b><span>${olEsc(olGameName(OL.out.gid))}${goalOf(OL.out.gid,OL.out.t)?' · '+goalOf(OL.out.gid,OL.out.t):''} – warte auf Antwort…</span><div class=row><button class="btn g" data-o=cx>Abbrechen</button></div></div>`;
   if(OL.sess&&!OL.sess.live)h+=`<div class=olinv><b>Verbinde mit ${olEsc(OL.sess.names[OL.sess.role?0:1])}…</b><span>${olEsc(olGameName(OL.sess.gid))}</span><div class=row><button class="btn g" data-o=lv>Abbrechen</button></div></div>`;
-  for(const u in OL.INV){if(!olAllowed(u))continue;const v=OL.INV[u];if(!olInviteValid(v))continue;if(olIsRoom(v)){h+=`<div class=olinv><b>${olEsc(v.name)} lädt dich zu „${v.game=='maumau'?'Mau-Mau':'Mensch ärgere dich nicht'}“ ein!</b><span>Online-Raum ${olEsc(String(v.mid).slice(5))}</span><div class=row><button class=btn data-o=acc data-u=${u}>Beitreten</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`;continue}h+=`<div class=olinv><b>${olEsc(v.name)} fordert dich heraus!</b><span>${olEsc(olGameName(v.game))}${goalOf(v.game,+v.t||5)?' · '+goalOf(v.game,+v.t||5):''}</span><div class=row><button class=btn data-o=acc data-u=${u}>Annehmen</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`}
+  for(const u in OL.INV){if(!olAllowed(u))continue;const v=OL.INV[u];if(!olInviteValid(v))continue;if(olIsRoom(v)){h+=`<div class=olinv><b>${olEsc(v.name)} lädt dich zu „${olEsc(olGameName(v.game))}“ ein!</b><span>Online-Raum ${olEsc(String(v.mid).slice(5))}</span><div class=row><button class=btn data-o=acc data-u=${u}>Beitreten</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`;continue}h+=`<div class=olinv><b>${olEsc(v.name)} fordert dich heraus!</b><span>${olEsc(olGameName(v.game))}${goalOf(v.game,+v.t||5)?' · '+goalOf(v.game,+v.t||5):''}</span><div class=row><button class=btn data-o=acc data-u=${u}>Annehmen</button><button class="btn g" data-o=dec data-u=${u}>Ablehnen</button><button class="btn g" data-o=block data-u=${u}>Blockieren</button></div></div>`}
   $('#oli').innerHTML=h;
 }
 function olInvites(){
@@ -5195,9 +5203,9 @@ async function olAccept(u){
   }catch(e){toast(olMsg(e))}
 }
 
-/* Einladung in einen Mensch-ärgere-dich-nicht-Raum annehmen */
+/* Einladung in einen Online-Raum annehmen */
 async function olJoinRoom(code,gid){
-  gid=gid=='maumau'?'maumau':'ludo';
+  if(!['ludo','maumau','poker'].includes(gid))return false;
   if(ON||OL.sess){toast('Beende zuerst dein aktuelles Online-Spiel.');return}
   if(!(cur&&gdef&&gdef.id==gid&&cur.canJoin&&cur.canJoin())){
     if(cur&&gdef&&gdef.id==gid&&cur.canJoin&&!cur.canJoin()){toast('Du bist schon in einem Raum.');return}

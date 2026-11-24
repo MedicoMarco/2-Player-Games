@@ -1,6 +1,7 @@
-const CACHE_NAME = "play2gether-pwa-v21";
+const CACHE_NAME = "play2gether-pwa-v22";
 const APP_ROOT = new URL("./", self.registration.scope).href;
-const NOTIFICATION_SCRIPT = new URL("notifications.js", APP_ROOT).href;
+const APP_ASSETS = new Set(["notifications.js", "poker.js", "poker-table.js", "poker.css"]
+  .map(name => new URL(name, APP_ROOT).href));
 const FACTORY_ASSETS = new Set([
   "catalog.js?v=12",
   "audio.js",
@@ -16,7 +17,7 @@ const FACTORY_ASSETS = new Set([
 self.addEventListener("install", event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    const files = [APP_ROOT, NOTIFICATION_SCRIPT, ...FACTORY_ASSETS].map(url => new Request(url, { cache: "reload" }));
+    const files = [APP_ROOT, ...APP_ASSETS, ...FACTORY_ASSETS].map(url => new Request(url, { cache: "reload" }));
     await cache.addAll(files);
     await self.skipWaiting();
   })());
@@ -39,7 +40,7 @@ self.addEventListener("fetch", event => {
   if (url.origin !== self.location.origin) return;
 
   const navigation = request.mode === "navigate";
-  if (!navigation && url.href !== NOTIFICATION_SCRIPT && !FACTORY_ASSETS.has(url.href)) return;
+  if (!navigation && !APP_ASSETS.has(url.href) && !FACTORY_ASSETS.has(url.href)) return;
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
