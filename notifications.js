@@ -2,7 +2,26 @@
   const supported = 'serviceWorker' in navigator && 'Notification' in window && 'PushManager' in window;
   const storageKey = '2pg-push-account';
   let registration, config, enabled = false, busy = false, preparing = false, status = '', pending = null, opening = false;
-  const service = () => firebase.app().functions('europe-west1').httpsCallable('gamePushSubscription', {timeout: 12000});
+  const endpoint = 'https://2-player-games.pages.dev/api/push';
+  const service = () => async body => {
+    const user = OL.auth?.currentUser;
+    if (!user) throw Error('Sign-in required');
+    const response = await fetch(endpoint,{
+      method:'POST',
+      headers:{Authorization:'Bearer '+await user.getIdToken(),'Content-Type':'application/json'},
+      body:JSON.stringify(body),signal:AbortSignal.timeout(12000)
+    });
+    if (!response.ok) throw Error('Push service unavailable');
+    return {data:await response.json()};
+  };
+
+  async function dispatch(event, recipients) {
+    const uid = OL.me;
+    const unique = [...new Set(recipients)].filter(to=>to && to!==uid);
+    for (let index=0;index<unique.length && OL.me===uid;index+=4) {
+      await Promise.allSettled(unique.slice(index,index+4).map(to=>service()({action:'send',...event,to})));
+    }
+  }
   const owner = () => {
     try { return localStorage.getItem(storageKey); } catch { return null; }
   };
@@ -231,7 +250,7 @@
   }
 
   window.gameNotifications = {
-    render, toggle, logout, peer,
+    render, toggle, logout, peer, dispatch,
     signedIn() { prepare(); openPending(); },
     signedOut() { config = null; enabled = false; status = ''; render(); }
   };

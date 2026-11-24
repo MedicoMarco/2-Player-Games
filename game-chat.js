@@ -283,6 +283,10 @@
         id=room.ref.push().key;
         status.textContent='Warte auf Bestätigung von Firebase …';
         await room.ref.child('chat/'+room.seat).set({uid,text,ts:olTS(),id});
+        if(OL.me===uid)window.gameNotifications?.dispatch(
+          {kind:'room',source:room.code,seat:room.seat,message:id},
+          Object.values(room.names).map(player=>player.uid)
+        );
       }else{
         const channel=room.ss.ctl;
         if(channel?.readyState!=='open')throw Error('offline');

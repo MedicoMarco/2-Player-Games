@@ -452,6 +452,15 @@
     updateComposer();
     try{
       await OL.db.ref().update({[path]:message,['dmThrottle/'+s.uid]:{a:s.group?'group':s.a,b:s.group||s.b,id,ts}});
+      if(!s.edit && OL.me===s.uid && window.gameNotifications){
+        if(s.group){
+          OL.db.ref('groups/'+s.group+'/members').once('value').then(snapshot=>{
+            if(OL.me!==s.uid)return;
+            const recipients=Object.values(snapshot.val()||{}).map(member=>member.uid);
+            window.gameNotifications.dispatch({kind:'group',source:s.group,message:id},recipients);
+          }).catch(()=>{});
+        }else window.gameNotifications.dispatch({kind:'direct',message:id},[s.peer]);
+      }
     }finally{
       account.pending=null;
       if(identity===account)updateComposer();

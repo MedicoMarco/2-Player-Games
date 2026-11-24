@@ -5116,7 +5116,8 @@ async function olAddName(){
 const olIsRoom=v=>!!v&&/^room:/.test(String(v.mid||''));
 function olWriteInvite(to,invite){
   const me=OL.me;
-  return OL.db.ref().update({['invites/'+to+'/'+me]:invite,['expiry/invites/'+to+'/'+me]:invite.ts});
+  return OL.db.ref().update({['invites/'+to+'/'+me]:invite,['expiry/invites/'+to+'/'+me]:invite.ts})
+    .then(()=>{if(OL.me===me)window.gameNotifications?.dispatch({kind:'invite',message:invite.mid},[to])});
 }
 
 function olCards(){
