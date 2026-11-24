@@ -561,6 +561,8 @@ Deutschland</p>
 <script src="./factory-empire/game.js?v=13"></script>
 <script src="./poker.js"></script>
 <script src="./poker-table.js"></script>
+<script src="./blackjack.js"></script>
+<script src="./blackjack-table.js"></script>
 <script>
 const $=s=>document.querySelector(s),W=800,H=480,cl=(v,a,b)=>Math.max(a,Math.min(b,v)),rnd=(a,b)=>a+Math.random()*(b-a),now=()=>performance.now();
 let S={vm:'auto',cpu:0,d:1,t:5,snd:1,anim:1,theme:'auto',ori:'a',side:0,st:{},fav:[],rec:[],cat:'all',ach:{},pl:0,sk:[0,0]},B='#3b82f6',R='#ef4444';
@@ -3647,7 +3649,7 @@ GAMES.push({id:'ludo',n:'Mensch ärgere dich nicht',ic:'\ud83c\udfb2',d:'Würfel
 RULES.ludo='Jeder hat vier Figuren (in den Spieleinstellungen auch nur zwei für kürzere Runden). Mit einer 6 kommt eine Figur aufs Startfeld; nach jeder 6 würfelst du nochmal. Ohne Figur auf dem Feld hast du drei Versuche. Wer auf ein besetztes Feld zieht, schmeißt die Figur raus – das ist freiwillig, du darfst den anderen auch verschonen (Computer schlagen meistens). Bei einer 6 darfst du wählen: rauskommen oder mit einer Figur ziehen. Rauskommen geht nicht, solange eine eigene Figur auf dem Startfeld steht. Im Zielhaus wird nicht gesprungen, du brauchst die genaue Augenzahl. Wer zuerst alle vier Figuren im Ziel hat, gewinnt.';
 ICON.maumau=GI(`<rect x="6" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(-12 16 24)"/><rect x="20" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(10 30 24)"/><path d="M31 17c-3-4-8 0-5 5l5 5 5-5c3-5-2-9-5-5z" fill="${Rd}" stroke="none" transform="rotate(10 30 24)"/>`);
 NM.maumau=['Mau-Mau','Das Kartenspiel für 2–10 Spieler, auch online.'];
-const ROOMG=['ludo','maumau','poker','fabrik'];
+const ROOMG=['ludo','maumau','poker','blackjack','fabrik'];
 /* ===== Karten-Bibliothek (für alle Kartenspiele) =====
    Karte = Zahl 0..51: Farbe = id/13 (0 Pik, 1 Herz, 2 Karo, 3 Kreuz), Rang = id%13 (0 = 2 ... 8 = 10, 9 = Bube, 10 = Dame, 11 = König, 12 = Ass).
    cdSprite() zeichnet jede Karte einmal vektorscharf in ein Bild, drawCard() stempelt sie in beliebiger Größe (Rückseite: id -1). */
@@ -4504,6 +4506,10 @@ RULES.maumau='Gespielt wird mit 52 Karten (2 bis Ass), jeder bekommt 7. Du legst
 GAMES.push({id:'poker',n:'Poker',ic:'♠',d:'Texas Hold’em mit Spielchips für 2–10 Spieler.',cat:'Karten',
   h:'Zwei eigene Karten · Fünf Gemeinschaftskarten · Blinds 5/10',sub:'2–10 Spieler · Computer · Online',mk:window.createPokerGame});
 RULES.poker='Texas Hold’em mit Spielchips. Jeder beginnt mit 500 Chips und erhält in jeder Hand zwei eigene Karten. Die fünf Gemeinschaftskarten erscheinen als Flop (drei Karten), Turn und River. Die beste Kombination aus fünf eigenen und gemeinsamen Karten gewinnt. Bei Gleichstand wird der Pot geteilt. Die Pflicht-Einsätze betragen 5 und 10 Chips. Du kannst schieben, mitgehen, erhöhen oder aussteigen. Gesetzt und erhöht wird vor und am Flop in 10er-Schritten, danach in 20er-Schritten, bis zu viermal je Setzrunde. Wer weniger Chips hat als zum Mitgehen nötig, geht all-in und spielt nur um den entsprechenden Teil des Pots. Nach 25 Sekunden wird automatisch geschoben oder ausgestiegen. Wer als letzter noch Chips hat, gewinnt das Spiel.';
+
+GAMES.push({id:'blackjack',n:'Blackjack',ic:'♣',d:'Mit denselben Karten wie Mau-Mau gegen den Dealer.',cat:'Karten',
+  h:'Komme möglichst nah an 21 · Dealer hält ab 17 · Mit Spielchips',sub:'1–10 Plätze · Computer · Lokal',mk:window.createBlackjackGame});
+RULES.blackjack='Setze 10, 20 oder 50 Spielchips. Ziel ist, näher an 21 zu kommen als der Dealer. Zahlen zählen ihren Wert, Bilder 10 und Ass zählt 1 oder 11. Du kannst ziehen oder halten. Mit den ersten zwei Karten kannst du deinen Einsatz verdoppeln und bekommst genau eine weitere Karte. Karten mit demselben Wert darfst du einmal teilen. Nach dem Teilen von Assen bekommt jede Hand nur eine Karte. Ein Ass mit einer Zehnerkarte in der ursprünglichen Hand ist Blackjack und zahlt 3:2. Bei Gleichstand erhältst du deinen Einsatz zurück. Über 21 verlierst du. Der Dealer zieht bis 16 und hält ab 17, auch bei einer weichen 17 mit Ass. Jeder Platz spielt für sich gegen den Dealer.';
 
 GAMES.forEach(g=>{const m=NM[g.id];if(m){g.n=m[0];g.d=m[1]}g.ic=ICON[g.id]||g.ic});
 const revised={

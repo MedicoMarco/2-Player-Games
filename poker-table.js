@@ -12,8 +12,8 @@
     function mountControls() {
       if(controls)return;
       controls=document.createElement('div');
-      controls.className='poker-controls';
-      controls.innerHTML='<span class="poker-announcement" role="status"></span><button class="btn" data-poker="fold">Aussteigen</button><button class="btn" data-poker="call">Check</button><button class="btn" data-poker="raise">Setzen</button><button class="btn" data-poker="next">Nächste Hand</button>';
+      controls.className='card-table-controls';
+      controls.innerHTML='<span class="card-table-announcement" role="status"></span><button class="btn" data-poker="fold">Aussteigen</button><button class="btn" data-poker="call">Check</button><button class="btn" data-poker="raise">Setzen</button><button class="btn" data-poker="next">Nächste Hand</button>';
       controls.addEventListener('click', event=>{
         const action=event.target.closest('[data-poker]')?.dataset.poker;
         if(action==='next')nextHand();
