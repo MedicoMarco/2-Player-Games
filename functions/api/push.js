@@ -1,4 +1,4 @@
-import { buildPushPayload } from '@block65/webcrypto-web-push';
+import { encryptNotification, vapidHeaders } from '@block65/webcrypto-web-push';
 
 const project = 'play2gether-c4e05';
 const firebaseWebKey = 'AIzaSyAxc-cOxcn5cz18KVpnmby3znZgkTGQ8oc';
@@ -153,14 +153,35 @@ async function send(db, vapid, from, body) {
   }
 }
 
+async function pushRequest(subscription,vapid,data,ttl,topic) {
+  let headers;
+  try {
+    ({headers} = await vapidHeaders(subscription,vapid));
+  } catch (error) {
+    console.error('Push signing failed',error.name);
+    throw Object.assign(Error(),{code:'Push signing'});
+  }
+  let body;
+  try {
+    body = await encryptNotification(subscription,encoder.encode(JSON.stringify(data)),{pad:false});
+  } catch (error) {
+    console.error('Push encryption failed',error.name);
+    throw Object.assign(Error(),{code:'Push encryption'});
+  }
+  return {
+    method:'POST',body,
+    headers:{...headers,ttl:String(ttl),topic,urgency:data.kind==='invite'||data.kind==='test'?'high':'normal',
+      'content-encoding':'aes128gcm','content-type':'application/octet-stream'},
+    redirect:'manual'
+  };
+}
+
 async function deliver(device,vapid,data,ttl,topic) {
   const subscription = subscriptionFrom(device);
   if (!subscription) return 400;
-  const payload = await buildPushPayload({data:JSON.stringify(data),options:{
-    ttl,topic,urgency:data.kind==='invite'||data.kind==='test'?'high':'normal'
-  }},subscription,vapid);
-  const response = await fetch(subscription.endpoint,{...payload,redirect:'error'});
-  if (response.body) await response.body.cancel();
+  const options = await pushRequest(subscription,vapid,data,ttl,topic);
+  const response = await fetch(subscription.endpoint,options);
+  response.body?.cancel().catch(()=>{});
   return response.status;
 }
 
@@ -173,6 +194,20 @@ export async function onRequest({request,env,waitUntil}) {
   const reply = (value,status=200) => new Response(JSON.stringify(value),{headers,status});
   if (!allowed) return reply({error:'Origin'},403);
   if (request.method==='OPTIONS') return new Response(null,{headers,status:204});
+  if (request.method==='GET' && new URL(request.url).searchParams.has('push-crypto-check')) {
+    try {
+      const [publicKey,privateKey,subject] = String(env.PLAY2GETHER_PUSH_VAPID||'').split(',').map(part=>part.trim());
+      const pair = await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
+      const p256dh = b64(new Uint8Array(await crypto.subtle.exportKey('raw',pair.publicKey)));
+      const auth = b64(crypto.getRandomValues(new Uint8Array(16)));
+      const endpoint = 'https://web.push.apple.com/';
+      await pushRequest({endpoint,keys:{p256dh,auth}},{publicKey,privateKey,subject},{kind:'test'},60,'probe');
+      const result = await fetch(endpoint,{method:'HEAD',redirect:'manual'});
+      return reply({crypto:'ready',provider:result.status});
+    } catch(error) {
+      return reply({error:error.code||'Push provider connection',type:error.name},503);
+    }
+  }
   if (request.method!=='POST') return reply({error:'Method'},405);
   let stage = 'Request';
   try {
@@ -228,7 +263,7 @@ export async function onRequest({request,env,waitUntil}) {
     return reply({});
   } catch (error) {
     const databaseError = error.code?.startsWith('Database ');
-    const code = databaseError?error.code:stage;
+    const code = databaseError || ['Push signing','Push encryption'].includes(error.code)?error.code:stage;
     console.error('Push setup failed',code,error.upstream||'');
     return reply({error:code,...(databaseError&&error.upstream?{upstream:error.upstream}:{})},503);
   }

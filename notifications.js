@@ -295,6 +295,10 @@
         status = 'Warte zehn Sekunden, bevor du die nächste Testmitteilung sendest.';
       } else if (error.code==='Push provider') {
         status = 'Der Push-Anbieter hat die Testmitteilung abgelehnt (HTTP '+error.upstream+').';
+      } else if (error.code==='Push signing') {
+        status = 'Cloudflare konnte die Mitteilung mit dem hinterlegten Push-Schlüssel nicht signieren.';
+      } else if (error.code==='Push encryption') {
+        status = 'Cloudflare konnte die Mitteilung für dieses Geräte-Abo nicht verschlüsseln.';
       } else if (error.code==='Push provider connection') {
         status = 'Cloudflare konnte die Testmitteilung nicht an den Push-Anbieter senden.';
       } else status = setupError(error,'server');
