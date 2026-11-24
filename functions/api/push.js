@@ -167,8 +167,12 @@ export async function onRequest({request,env,waitUntil}) {
     try { token = await databaseToken(env); }
     catch { return reply({error:'Firebase setup'},503); }
     try {
-      const result = await databaseClient(token)('pushSubscriptions/setup-check','GET',undefined,{'X-Firebase-ETag':'true'});
-      return reply({firebase:'ready',etag:!!result.etag});
+      const db = databaseClient(token);
+      const path = 'operations/pushSetupCheck';
+      const result = await db(path,'GET',undefined,{'X-Firebase-ETag':'true'});
+      const written = await db(path,'PUT',{checked:true},{'If-Match':result.etag??'null_etag'});
+      if (written.ok) await db(path,'DELETE');
+      return reply({firebase:'ready',write:written.ok});
     } catch (error) {
       return reply({error:error.code||'Database response',upstream:error.upstream},503);
     }
