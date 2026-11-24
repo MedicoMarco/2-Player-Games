@@ -63,7 +63,7 @@ Object.assign(MD,{
  sorter:{n:'Sortieranlage',s:'Sortieranl.',c:1750,w:0,k:'#307e83',g:'u',belt:[1.5,6],size:[2,1],
   sortStation:true,art:'chp',ac:'#9af0df',unlock:()=>RH('spd3'),
   need:'Vollautomatisierung erforschen',d:'Leitet eine Warenfamilie nach rechts und die übrigen Waren geradeaus.'},
- mobile:{n:'Systemintegrator',s:'Mobilwerk',c:38000,w:28,k:'#3b8196',g:'t',a:'prt',
+ mobile:{n:'Systemintegrator',s:'Mobilwerk',c:38000,w:28,k:'#3b8196',g:'t',a:'hit',
   r:[[50,1],[43,2],[38,1],[30,3]],o:51,dp:9,art:'mod',ac:'#b4f0e2',size:[3,2]},
  fitting:{n:'Beschlagpresse',s:'Beschläge',c:1550,w:8,k:'#5f7185',g:'m',a:'met',r:[[46,1],[16,1]],o:48,dp:3,art:'prs',ac:'#b2c8e1'},
  servo:{n:'Servoantrieb-Montage',s:'Servo',c:3700,w:10,k:'#327d68',g:'e',a:'elk',r:[[29,1],[19,2],[8,1]],o:49,dp:5,art:'mot',ac:'#73e5b7',unlock:()=>RH('spd3'),need:'Vollautomatisierung erforschen'},

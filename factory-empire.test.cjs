@@ -250,8 +250,8 @@ function responsiveSize(width,height,rotated=false){
 }
 const viewports=[
  [320,568],[390,844],[430,932],[568,320],[844,390],[768,1024],[1024,768],
- [1280,800],[1920,1080],[2560,1080],[3440,1440],[367,612],[367,611],
- [844,390,true]
+ [820,1180],[1180,820],[1280,650],[1366,768],[1920,1080],[2541,1300],[2560,1080],[3440,1440],[367,612],[367,611],
+ [844,390,true],[320,256],[640,256]
 ];
 for(const [width,height,rotated] of viewports){
  const toEvent=responsiveSize(width,height,rotated);
@@ -265,6 +265,21 @@ for(const [width,height,rotated] of viewports){
   assert.equal(view.width,width,label);
   assert.equal(view.height,height,label);
   assert(view.status.x>=50&&view.status.y>=8&&view.status.y+view.status.h<=view.headerBottom,label);
+  assert(view.status.h>=34&&view.status.h<=60,label+' header size');
+  if(width>=1280&&height>=650){
+   assert(view.status.h>=50&&view.machines.h>=66,label+' desktop targets');
+   assert(view.dock.w>=1000,label+' desktop dock');
+  }
+  if(Math.min(width,height)>=640&&width<=1180){
+   assert(view.status.h>=46&&view.machines.h>=60,label+' tablet targets');
+  }
+  if(width<=430&&height>=550){
+   assert(view.status.h>=39&&view.status.h<=40&&view.shortcuts[0].h===39&&view.machines.h>=50,label+' phone targets');
+  }
+  assert(view.navigation.every(box=>box.h===view.status.h),label+' header alignment');
+  assert(view.dock.w<=Math.min(1260,width-2*view.inset),label+' dock width');
+  assert.equal(view.dock.x,(width-view.dock.w)/2,label+' centered dock');
+  assert(view.dock.h<=150&&view.dock.y>view.headerBottom,label+' compact dock');
   for(const hit of HB){
    assert(hit.x>=-.001&&hit.x+hit.w<=width+.001,label+' '+hit.id);
    assert(hit.y>=-.001&&hit.y+hit.h<=height+.001,label+' '+hit.id);
@@ -515,17 +530,29 @@ const telemetrySave=save();
 d=load(telemetrySave.o,telemetrySave);
 assert.equal(d.currentStats(d.cell(9,8)).output,workingRate);
 
-const careerFixture={m:15e6,xp:50000,pr:3,sp:6,hl:{gar:3,bnk:1}};
+const careerFixture={m:15e6,xp:50000,pr:3,sp:6,hl:{gar:3,hit:1,bnk:1}};
 d=load(starter,careerFixture);
 const portSite=d.REGIONS.find(site=>site.id==='port');
-assert(portSite.open());
+assert(!portSite.open());
 d.buyHall(d.hallOf('prt'));
-assert.equal(d.hlv('prt'),1);
-assert(d.place(120,18,'mobile',1));
+assert.equal(d.hlv('prt'),0);
+assert(!d.place(120,18,'mobile',1));
+assert(d.place(20,46,'mobile',1));
+assert.equal(d.cell(21,48).t,'mobile');
+
+const earlyPortObjects=[
+ [120,18,'mobile',1,5,-1,[1,2,1,3],51,0,0,{large:true}],
+ [119,22,'sto',0,1,-1,0,-1,[51]]
+];
+d=load(earlyPortObjects,{...careerFixture,site:'port',hl:{...careerFixture.hl,prt:1}});
+assert(d.switchSite(portSite));
 const portSave=save();
 d=load(portSave.o,portSave);
 assert.equal(d.hlv('prt'),1);
 assert.equal(d.cell(121,20).t,'mobile');
+assert.equal(d.cell(121,20).lv,5);
+assert.deepEqual(Array.from(d.cell(119,22).q),[51]);
+assert.equal(portSave.site,'port');
 
 d=load([[7,6,'saw',0,20,-1,[25],-1,0,0],[8,6,'shp',0,1]]);
 ticks(360);
@@ -819,7 +846,7 @@ nativeTarget.createLinearGradient=(x0,y0,x1,y1)=>{
  return {addColorStop(){}};
 };
 nativeTarget.fillText=(label)=>{
- if(String(label)==='Geld')drawnHeader=true;
+ if(String(label).startsWith('💰 '))drawnHeader=true;
  if(String(label).includes('GARAGE')){
   if(breakWorld){breakWorld=false;throw Error('A world drawing operation failed')}
   drawnHallTitles++;

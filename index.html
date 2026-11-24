@@ -89,8 +89,8 @@ body.playing.fab.rotg .stage{width:100cqh;height:100cqw;transform:rotate(90deg)}
 body.playing.fab #cv{position:absolute;inset:0;width:100%;height:100%;aspect-ratio:auto;background:#14181e}
 body.playing.fab #ov{box-shadow:none;justify-content:flex-start;justify-content:safe center;padding:56px 12px 12px}
 body.playing.fab #back,body.fab #rs{display:none!important}
-body.playing.fab #factory-back{position:absolute;z-index:6;left:8px;top:8px;width:48px;height:48px;display:grid;place-items:center;padding:0;background:#0b0f14;color:#fff;border:1px solid #ffffff40;border-radius:10px;box-shadow:none}
-#factory-back svg{width:25px;height:25px}
+body.playing.fab #factory-back{position:absolute;z-index:6;left:8px;top:8px;width:var(--factory-header-height,34px);height:var(--factory-header-height,34px);display:grid;place-items:center;padding:0;background:#0b0f14;color:#fff;border:1px solid #ffffff40;border-radius:10px;box-shadow:none}
+#factory-back svg{width:60%;height:60%}
 body.playing #back:active,body.playing #rs:active{transform:scale(.93);box-shadow:0 0 0 3px var(--tf,transparent)}
 body.playing #back{left:calc(env(safe-area-inset-left,0px) + 8px)}
 body.playing #rs{right:calc(env(safe-area-inset-right,0px) + 8px)}
@@ -548,15 +548,15 @@ Deutschland</p>
 <div id="legal" hidden><div class="lg-box" role="dialog" aria-modal="true" aria-labelledby="lg-t"><div class="lg-head"><h2 id="lg-t"></h2><button type="button" id="lg-x" aria-label="Schließen">✕</button></div><div class="lg-body" id="lg-b"></div></div></div>
 <div id="toast"></div><div id="sp" aria-hidden="true"><div class="spc" role="dialog" aria-modal="true" aria-labelledby="spt"><div class="olh"><h2 id="spt">Einstellungen</h2><button id="spx" aria-label="Schließen">✕</button></div><div class="seg" id="spn" role="tablist"></div><div id="spv"></div></div></div><div id="olp"></div><div id="oli"></div><div class="w" id="game"><div class="bar"><button class="btn r" id="back" aria-label="Zurück zum Menü" title="Menü"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h4.5v-6h4v6h4.5V10"/></svg></button><b id="gt"></b><span id="cs"></span><button class="btn" id="rs" aria-label="Neu starten" title="Neu starten">↻</button></div>
 <div class="stage"><button type="button" id="factory-back" aria-label="Zurück zum Menü" title="Menü"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h4.5v-6h4v6h4.5V10"/></svg></button><canvas id="cv" width="800" height="480"></canvas><video id="gv" autoplay muted playsinline></video><canvas id="gc" width="800" height="480"></canvas><div class="ov" id="ov"></div></div><p id="hint" style="text-align:center;color:var(--mu);font-size:14px"></p></div>
-<script src="./factory-empire/catalog.js?v=6"></script>
+<script src="./factory-empire/catalog.js?v=12"></script>
 <script src="./factory-empire/audio.js"></script>
 <script src="./factory-empire/grid.js"></script>
 <script src="./factory-empire/runtime.js"></script>
 <script src="./factory-empire/telemetry.js"></script>
 <script src="./factory-empire/drawing.js?v=6"></script>
 <script src="./factory-empire/transport.js?v=6"></script>
-<script src="./factory-empire/layout.js?v=9"></script>
-<script src="./factory-empire/game.js?v=9"></script>
+<script src="./factory-empire/layout.js?v=13"></script>
+<script src="./factory-empire/game.js?v=13"></script>
 <script>
 const $=s=>document.querySelector(s),W=800,H=480,cl=(v,a,b)=>Math.max(a,Math.min(b,v)),rnd=(a,b)=>a+Math.random()*(b-a),now=()=>performance.now();
 let S={vm:'auto',cpu:0,d:1,t:5,snd:1,anim:1,theme:'auto',ori:'a',side:0,st:{},fav:[],rec:[],cat:'all',ach:{},pl:0,sk:[0,0]},B='#3b82f6',R='#ef4444';
