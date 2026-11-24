@@ -15,7 +15,8 @@ function clearBelt(o){
 const sortingGroups=[['h','Holz'],['m','Metall'],['v','Versorgung'],['e','Elektronik'],['n','Energie'],['f','Fahrzeuge'],['t','Hightech'],['b','Bunkermodule'],['u','Haushaltswaren']];
 function beltDirections(o){
  if(MD[o.t]?.sortStation){
-  return [o.sortRule>=0&&MD[PR[o.it]]?.g==sortingGroups[o.sortRule]?.[0]?(o.r+1)%4:o.r];
+  const producer=MD[PR[o.it]];
+  return [o.sortRule>=0&&(producer?.goodsGroup??producer?.g)===sortingGroups[o.sortRule]?.[0]?(o.r+1)%4:o.r];
  }
  if(o.t=='sort')return [o.it==o.sortRule?(o.r+1)%4:o.r];
  if(o.t!='smart')return [o.r];

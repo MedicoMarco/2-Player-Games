@@ -83,13 +83,5 @@ function dg(s){const it=ITEMS[s],k=it.cl||'#999',a=it.sh;c.lineWidth=1;c.strokeS
  else if(a=='door'){c.fillRect(-8,-8,16,16);c.strokeRect(-8,-8,16,16);c.fillStyle='#ffd23f';c.fillRect(-8,-2,16,4);c.fillStyle='#10151c';c.beginPath();c.arc(0,0,2.4,0,PI*2);c.fill()}
  else if(a=='mod'){c.fillRect(-9,-7,18,14);c.strokeRect(-9,-7,18,14);c.fillStyle='#ffffff55';c.fillRect(-7,-5,6,10);c.fillRect(1,-5,6,4)}
  else{c.fillRect(-7,-7,14,14);c.strokeRect(-7,-7,14,14)}}
-function industrialFloor(x,y,w,tile){
- const lineY=y+tile*1.3;
- c.fillStyle='#34415319';c.fillRect(x+tile,lineY-tile*.32,w-2*tile,tile*.64);
- saveCanvas();
- c.strokeStyle='#fcf6d9';c.globalAlpha=.54;c.lineWidth=2;c.setLineDash([8,11]);
- c.beginPath();c.moveTo(x+tile,lineY);c.lineTo(x+w-tile,lineY);c.stroke();
- restoreCanvas();
-}
- return {rr,tx,sh,di,dart,industrialFloor};
+ return {rr,tx,sh,di,dart};
 }

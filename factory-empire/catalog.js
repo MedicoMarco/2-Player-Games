@@ -58,9 +58,9 @@ const MD={src:{n:"Holzlager",s:"Holz",c:40,w:4,k:'#8a5a2b',g:'h',a:'gar',o:0,rc:
  shp:{n:'Versand',s:'Versand',c:30,w:1,k:'#3b9b63',g:'l'},sto:{n:'Zwischenlager',s:'Lager',c:250,w:0,k:'#6b7a8f',g:'l'}};
 
 Object.assign(MD,{
- furniture:{n:'Möbelmontage',s:'Möbelbau',c:2150,w:8,k:'#9a7648',g:'u',a:'gar',r:[[15,1],[48,1]],o:52,dp:5,
+ furniture:{n:'Möbelmontage',s:'Möbelbau',c:2150,w:8,k:'#9a7648',g:'h',goodsGroup:'u',a:'gar',r:[[15,1],[48,1]],o:52,dp:5,
   art:'arm',ac:'#ecd7aa'},
- sorter:{n:'Sortieranlage',s:'Sortieranl.',c:1750,w:0,k:'#307e83',g:'u',belt:[1.5,6],size:[2,1],
+ sorter:{n:'Sortieranlage',s:'Sortieranl.',c:1750,w:0,k:'#307e83',g:'l',belt:[1.5,6],previousSize:[2,1],
   sortStation:true,art:'chp',ac:'#9af0df',unlock:()=>RH('spd3'),
   need:'Vollautomatisierung erforschen',d:'Leitet eine Warenfamilie nach rechts und die übrigen Waren geradeaus.'},
  mobile:{n:'Systemintegrator',s:'Mobilwerk',c:38000,w:28,k:'#3b8196',g:'t',a:'hit',
@@ -75,7 +75,7 @@ Object.assign(MD,{
  tunnel:{n:'Unterirdisches Transportband',s:'Tunnel',c:98,w:0,k:'#665745',g:'l',belt:[2,5],unlock:()=>RH('bel2'),need:'Magnetbänder erforschen'},
  depot:{n:'Zwischenlager',s:'Lager',c:950,w:0,k:'#8d7141',g:'u',storage:true,legacyOnly:true},
  drill:{n:'Bohrmaschine',s:'Bohren',c:370,w:5,k:'#526f8b',g:'h',a:'gar',r:[[1,1]],o:46,dp:2,art:'prs',ac:'#a4dded'},
- label:{n:'Etikettiermaschine',s:'Etikett',c:1250,w:6,k:'#7766ad',g:'u',a:'gar',r:[[5,1]],o:47,dp:6,art:'pk',ac:'#d9ccfc'},
+ label:{n:'Etikettiermaschine',s:'Etikett',c:1250,w:6,k:'#7766ad',g:'h',goodsGroup:'u',a:'gar',r:[[5,1]],o:47,dp:6,art:'pk',ac:'#d9ccfc'},
  grid:{n:'Kleines Kraftwerk',s:'Strom',c:720,w:0,k:'#736235',g:'u',supply:true,legacyOnly:true,art:'mot',ac:'#ffe088'},
  loadgrid:{n:'Lastverteiler',s:'Lastverteiler',c:4900,w:0,k:'#5f738d',g:'u',distribution:true,legacyOnly:true,art:'chp',ac:'#bce0ff'},
  hub:{n:'Energiezentrale',s:'Zentrale',c:7200,w:0,k:'#6f6093',g:'u',supply:true,legacyOnly:true,art:'mot',ac:'#e3c5ff'},
@@ -86,14 +86,11 @@ Object.assign(MD,{
  kre:{n:'Kreuzung',s:'Kreuzung',c:90,w:0,k:'#6b7a8f',g:'l',j:2,d:'Zwei Bänder kreuzen sich, ohne sich zu vermischen: Waren fahren immer geradeaus durch.'},
  prj:{n:'Bunker-Rampe',s:'Bunker',c:800,w:0,k:'#b89b2e',g:'l',d:'Liefert Waren für die aktuelle Bunker-Phase ab. Nimmt nur an, was die Quests gerade brauchen – bringt kein Geld, aber das Überleben.'}});
 const jpre=(t,r)=>{const m=[0,0,0,0];if(t=='spl'){m[(r+2)%4]=1;m[r]=2;m[(r+1)%4]=2;m[(r+3)%4]=2}else if(t=='fus'){m[r]=2;m[(r+1)%4]=1;m[(r+2)%4]=1;m[(r+3)%4]=1}return m};
-MD.hub.size=[2,2];
-MD.sme.size=MD.wal.size=MD.aut.size=MD.kom.size=[2,1];
-MD.rea.size=MD.lkw.size=[2,2];
+MD.sme.previousSize=MD.wal.previousSize=[2,1];
+MD.rea.previousSize=MD.hub.previousSize=[2,2];
+MD.aut.size=MD.kom.size=[2,1];
+for(const machine of Object.values(MD))if(machine.r?.length>3&&!machine.size)machine.size=[2,2];
 const PR={},CT={},DS={};for(const t in MD){const m=MD[t];if(m.o!=null)PR[m.o]=t;for(const a of m.r||[])(CT[a[0]]=CT[a[0]]||[]).push(t)}
 for(const t in MD){const st=new Set(),q=[t];while(q.length){const o=MD[q.pop()].o;if(o==null)continue;for(const y of CT[o]||[])if(!st.has(y)){st.add(y);q.push(y)}}DS[t]=st}
-const MP=[[0.2,420,0,400],[0.3,540,1.3,300],[0.25,660,2.6,240],[0.3,480,3.9,200],[0.35,720,5.2,160],[0.35,600,6.5,140],[0.2,540,7.8,400],[0.3,780,9.1,260],[0.3,600,10.4,240],[0.35,840,11.7,120],[0.2,480,13,400],[0.3,660,14.3,220],[0.3,720,15.6,160],[0.35,780,16.9,90],[0.3,660,0.2,325],[0.25,600,1.5,234],[0.2,540,2.8,247],[0.35,480,4.1,159],[0.3,420,5.4,123],[0.25,900,6.7,200],[0.2,840,8,139],[0.35,780,9.3,400],[0.3,720,10.6,372],[0.25,660,11.9,214],[0.2,600,13.2,400],[0.35,540,14.5,346],[0.3,480,15.8,252],[0.25,420,17.1,165],[0.2,900,0.4,228],[0.35,840,1.7,168],[0.3,780,3,143],[0.25,720,4.3,87],[0.2,660,5.6,52],[0.35,600,6.9,232],[0.3,540,8.2,132],[0.25,480,9.5,100],[0.2,420,10.8,143],[0.35,900,12.1,79],[0.3,840,13.4,61],[0.25,780,14.7,69],[0.2,720,16,100],[0.35,660,17.3,75],[0.3,600,0.6,64],[0.25,540,1.9,59],[0.2,480,3.2,56],[0.35,420,4.5,48]];
-
-MP.push([.28,540,2.4,260],[.3,720,7.2,125],[.3,740,2.8,130],[.28,860,.8,98],[.32,940,5.6,48],[.28,1080,6.1,30],[.32,660,3,118]);
-
- return {ITEMS,MD,PR,DS,jpre,MP};
+ return {ITEMS,MD,PR,DS,jpre};
 }

@@ -8,6 +8,12 @@ const FactoryLayout=(()=>{
   const width=(box.w-gap*(count-1))/count;
   return Array.from({length:count},(_,i)=>({...box,x:box.x+i*(width+gap),w:width}));
  }
+ function dockTrack(box,count,buttonWidth){
+  const stride=buttonWidth+gap,total=Math.max(0,count*stride-gap);
+  const arrows=total>box.w?Math.min(42,box.w*.16):0;
+  const clip={...box,w:Math.min(total,box.w-(arrows?2*(arrows+gap):0))};
+  return {box:{...box,w:arrows?box.w:clip.w},clip,arrows,buttonWidth,stride,max:total-clip.w};
+ }
 
  function create(width,height){
   const available=width-inset*2;
@@ -23,34 +29,32 @@ const FactoryLayout=(()=>{
   const statusW=Math.min(344*labelScale+46*desktop,together?available-homeEnd-navW-gap:available-homeEnd);
   const status={x:inset+homeEnd,y:inset,w:statusW,h:navHeight};
   const navY=together?inset:status.y+status.h+gap;
-  const navigation=row({x:together?width-inset-navW:inset,y:navY,w:navW,h:navHeight},6);
+  const navigation=row({x:together?width-inset-navW:inset,y:navY,w:navW,h:navHeight},7);
   const headerBottom=Math.max(status.y+status.h,navigation[0].y+navigation[0].h)+gap;
-  const dockWidth=Math.min(available,850+260*desktop+150*largeDesktop),dockX=(width-dockWidth)/2;
-  const categoryColumns=Math.min(10,Math.max(1,Math.floor((dockWidth+gap)/54)));
-  const categoryRows=Math.ceil(10/categoryColumns);
-  const combineTools=dockWidth>=500;
-  const categoryHeight=Math.min(26,Math.max(20,height*.05))-(categoryRows>1?4:0)+5*tablet+5*desktop+4*largeDesktop;
-  const toolHeight=Math.min(combineTools?54:46,Math.max(39,height*.105))+6*tablet+8*desktop+10*largeDesktop+(combineTools?0:4*touchRoom);
-  const shortcutHeight=combineTools?toolHeight:29+10*touchRoom;
-  const dockY=height-inset-categoryRows*(categoryHeight+gap)-toolHeight-(combineTools?0:shortcutHeight+gap);
-  const dock={x:dockX,y:dockY,w:dockWidth,h:height-inset-dockY};
-  const categories=Array.from({length:categoryRows},(_,i)=>row(
-   {x:dockX,y:dockY+i*(categoryHeight+gap),w:dockWidth,h:categoryHeight},
-   Math.min(categoryColumns,10-i*categoryColumns)
-  )).flat();
-  const toolY=dockY+categoryRows*(categoryHeight+gap);
-  const shortcutW=combineTools?Math.min(323*labelScale,dockWidth*.43):dockWidth;
-  const shortcuts=row({x:dockX,y:toolY,w:shortcutW,h:shortcutHeight},5);
+  const dockRoom=clamp((height-295)/285,1),combineTools=available>=690;
+  const categoryHeight=32+10*dockRoom,toolHeight=60+22*dockRoom;
+  const shortcutHeight=combineTools?toolHeight:44+18*dockRoom;
+  const toolGap=10,rowGap=9;
+  const dockY=height-inset-categoryHeight-rowGap-toolHeight-(combineTools?0:shortcutHeight+toolGap);
+  const dock={x:inset,y:dockY,w:available,h:height-inset-dockY};
+  const categories={x:inset,y:dockY,w:available,h:categoryHeight};
+  const toolY=dockY+categoryHeight+rowGap,shortcutW=Math.min(87*5+4*gap,available);
+  const shortcuts=row({x:inset,y:toolY,w:shortcutW,h:shortcutHeight},5);
   const machines=combineTools
-   ?{x:dockX+shortcutW+gap,y:toolY,w:dockWidth-shortcutW-gap,h:toolHeight}
-   :{x:dockX,y:toolY+shortcutHeight+gap,w:dockWidth,h:toolHeight};
+   ?{x:inset+shortcutW+toolGap,y:toolY,w:available-shortcutW-toolGap,h:toolHeight}
+   :{x:inset,y:toolY+shortcutHeight+toolGap,w:available,h:toolHeight};
+  const dockLabelScale=1+.08*tablet+.16*desktop,machineWidth=96+12*desktop,categoryWidth=86+12*desktop;
   const cameraSize=34+6*touchRoom+4*tablet+5*desktop+5*largeDesktop;
-  const camera=row({x:width-inset-3*cameraSize-2*gap,y:dockY-cameraSize-gap,w:3*cameraSize+2*gap,h:cameraSize},3);
+  const cameraW=3*cameraSize+2*gap,cameraY=dockY-cameraSize-rowGap;
+  const cameraInHeader=!together&&cameraY<headerBottom;
+  const cameraX=cameraInHeader?status.x:inset;
+  if(cameraInHeader){status.x+=cameraW+gap;status.w=Math.min(status.w,width-inset-status.x)}
+  const camera=row({x:cameraX,y:cameraInHeader?inset:cameraY,w:cameraW,h:cameraInHeader?navHeight:cameraSize},3);
   const worldScale=Math.min(1,width/640,height/480);
   const panelScale=1.07+.10*tablet+.30*desktop+.20*largeDesktop;
   const warningHeight=24*labelScale;
   return {width,height,cx:width/2,cy:height/2+10,worldScale,labelScale,panelScale,warningHeight,status,navigation,headerBottom,
-   dock,categories,shortcuts,machines,camera,wide:combineTools,inset};
+   dock,categories,shortcuts,machines,camera,dockLabelScale,machineWidth,categoryWidth,wide:combineTools,inset};
  }
 
  function point(event,canvas,width,height,rotated=false){
@@ -75,8 +79,8 @@ const FactoryLayout=(()=>{
   const y=side?area.y:area.y+Math.max(0,(area.h-controls-h)/2);
   const clip={x,y:y+controls,w,h};
   const maxX=Math.max(0,bounds.w*scale-w),maxY=Math.max(0,bounds.h*scale-h);
-  return {bar:{x,y,w,h:controls},clip,scale,maxX,maxY};
+  return {bar:{x,y,w,h:controls},clip,scale,maxX:maxX<.001?0:maxX,maxY:maxY<.001?0:maxY};
  }
 
- return {create,point,panel,row,contains,clamp};
+ return {create,point,panel,row,dockTrack,contains,clamp};
 })();
