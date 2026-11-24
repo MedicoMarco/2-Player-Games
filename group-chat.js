@@ -37,10 +37,13 @@
           g.data=data;
           const target=view(g);
           if(!target){g.summary?.stop();g.summary=null;revoked(id);render();return;}
+          const current=chat().current();
+          if(current?.group===id && current.since!==target.since)revoked(id);
+          if(g.summary && g.since!==target.since){g.summary.stop();g.summary=null;}
           if(chat().current()?.group===id){chat().current().name=target.name;chat().sync();}
           if(!g.summary){
+            g.since=target.since;
             g.summary=chat().watchSummary(target.ref.orderByChild('created'),target.key,
-              ()=>{render();chat().badge();},
               m=>chat().notify(target.key,g.data?.info?.name+' · '+m.name,m,text=>chat().save(target,text)),
               ()=>chat().hideAlert(target.key),target.since);
           }
@@ -66,7 +69,7 @@
     if(button)button.disabled=true;
     chat().status('');
     return Promise.resolve().then(async()=>{
-      if((await OL.db.ref('.info/connected').once('value')).val()!==true)throw Error('Keine Verbindung. Bitte erneut versuchen.');
+      if(!chat().isOnline())throw Error('Keine Verbindung. Bitte erneut versuchen.');
       await action();
     }).then(after).catch(e=>{chat().status(e.code?'Die Änderung wurde abgelehnt. Prüfe deine Berechtigung und versuche es erneut.':e.message);}).finally(()=>{if(button)button.disabled=false;});
   }

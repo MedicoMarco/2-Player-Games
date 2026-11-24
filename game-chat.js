@@ -26,7 +26,7 @@
   const input = chat.querySelector('input');
   const send = form.querySelector('button');
   const status = chat.querySelector('[role=status]');
-  const bubbles = new Map();
+  const bubbles = new Map(), pendingRooms = new Set();
   let active = null, expanded = false, historyLimit = 40;
 
   function stop(){
@@ -38,7 +38,7 @@
     layer.replaceChildren();
     feed.replaceChildren();
     input.value = '';
-    input.readOnly = false;
+    input.readOnly = send.disabled = false;
     status.textContent = '';
     trigger.hidden = chat.hidden = true;
     trigger.setAttribute('aria-expanded', 'false');
@@ -65,15 +65,16 @@
     const round = snapshot.rn ?? 0;
     if(!sameRoom || active.round !== round) {
       start({kind:'room', code:LUN.code, ref:LUN.ref, seat:me, names, round, tableSize});
-      for (const [seat,message] of Object.entries(data.chat || {})) active.seen.set(seat, message.ts);
+      for (const [seat,message] of Object.entries(data.chat || {})) active.seen.set(seat,message.id || message.ts);
       layout();
       return;
     }
     const changed = tableSize !== active.tableSize || people.length !== Object.keys(active.names).length;
     active.names = names;active.tableSize=tableSize;
     for(const [seat,message] of Object.entries(data.chat || {}).sort((a,b)=>a[1].ts-b[1].ts)){
-      if(names[seat]?.uid !== message.uid || active.seen.get(seat) === message.ts)continue;
-      active.seen.set(seat,message.ts);
+      const id=message.id || message.ts;
+      if(names[seat]?.uid !== message.uid || active.seen.get(seat)===id)continue;
+      active.seen.set(seat,id);
       if(seat !== active.seat)receive(seat,message.text,message.id);
     }
     if(changed)layout();
@@ -184,7 +185,7 @@
       }
       return row;
     }));
-    if(expanded && rows.length<active.entries.length){
+    if(expanded && rows.length<visible.length){
       const older=document.createElement('button');
       older.type='button';older.className='btn g gc-older';older.textContent='Ältere Nachrichten';
       older.onclick=()=>{historyLimit+=40;drawFeed(true);};
@@ -267,12 +268,20 @@
     const room=active, text=input.value.trim();
     if(!room || !valid(text) || input.readOnly)return;
     if(performance.now()-room.lastSent < cooldown){status.textContent='Warte kurz, bevor du erneut sendest.';return;}
+    const uid=OL.me;
+    const pendingKey=room.kind==='room'?[room.code,room.seat,uid].join('/'):null;
+    if(pendingRooms.has(pendingKey)){status.textContent='Eine Nachricht wartet noch auf Bestätigung.';return;}
+    if(pendingKey)pendingRooms.add(pendingKey);
     input.readOnly=send.disabled=true;
     status.textContent='';
+    let id;
     try{
       if(room.kind==='room'){
-        if((await OL.db.ref('.info/connected').once('value')).val()!==true || room!==active)throw Error('offline');
-        await room.ref.child('chat/'+room.seat).set({uid:OL.me,text,ts:olTS(),id:room.ref.push().key});
+        const connected=await OL.db.ref('.info/connected').once('value');
+        if(connected.val()!==true || room!==active || uid!==OL.me)throw Error('offline');
+        id=room.ref.push().key;
+        status.textContent='Warte auf Bestätigung von Firebase …';
+        await room.ref.child('chat/'+room.seat).set({uid,text,ts:olTS(),id});
       }else{
         const channel=room.ss.ctl;
         if(channel?.readyState!=='open')throw Error('offline');
@@ -280,12 +289,16 @@
       }
       if(room===active){
         room.lastSent=performance.now();
-        receive(room.seat,text);
+        receive(room.seat,text,id);
         input.value='';
+        status.textContent='';
       }
-    }catch{
-      if(room===active)status.textContent='Nachricht konnte nicht gesendet werden.';
+    }catch(error){
+      if(room===active)status.textContent=error.message==='offline'
+        ?'Keine Verbindung. Versuche es erneut, sobald du wieder online bist.'
+        :'Nachricht konnte nicht gesendet werden. Dein Text ist noch im Eingabefeld.';
     }finally{
+      if(pendingKey)pendingRooms.delete(pendingKey);
       if(room===active)input.readOnly=send.disabled=false;
     }
   };

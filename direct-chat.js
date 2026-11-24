@@ -9,7 +9,8 @@
   const composer = thread.querySelector('form');
   const input = el('textarea'), status = el('[data-status]'), older = el('[data-older]');
   let session = null, identity = null, preferences = {}, indexTab = 'private', alertKey = null, alertTimer, returnFocus;
-  const watched = new Map(), alert = document.createElement('aside');
+  const watched = new Map(), summaries = new Map(), alert = document.createElement('aside');
+  let summaryFrame = 0;
   alert.id = 'dm-alert'; alert.hidden = true;
   alert.innerHTML = '<header><strong></strong><button type="button" class="btn g" data-dismiss aria-label="Schließen">×</button></header><p></p><form><input aria-label="Direktantwort" maxlength="1000" placeholder="Direkt antworten"><button class="btn">Senden</button></form><small role="status"></small>';
   document.body.append(alert);
@@ -25,17 +26,33 @@
   function setPref(key,field,value){
     return OL.db.ref(['chatPreferences',OL.me,key,field].join('/')).set(value);
   }
-  function markSeen(key,ts){if(ts > (pref(key).seen || 0))setPref(key,'seen',ts).catch(()=>{});}
+  function markSeen(key,ts){
+    const account=identity;
+    if(!account?.online || ts<=Math.max(pref(key).seen||0,account.seen.get(key)||0))return;
+    account.seen.set(key,ts);
+    setPref(key,'seen',ts).catch(()=>{}).finally(()=>{
+      if(account.seen.get(key)===ts)account.seen.delete(key);
+    });
+  }
   function visibleIncoming(m){return m && m.author!==OL.me && !OL.BL[m.author];}
-  function watchSummary(base,key,onUpdate,onMessage,onDenied,since=0){
+  function updateSummaries(){
+    if(summaryFrame)return;
+    summaryFrame=requestAnimationFrame(()=>{
+      summaryFrame=0;
+      drawIndex();
+      window.groupChat?.render();
+      badge();
+    });
+  }
+  function watchSummary(base,key,onMessage,onDenied,since=0){
     const preview=(since?base.startAt(since+0.5):base).limitToLast(1);
-    let ready=false, stopped=false, recent=null, countQuery=null, countListener=null, lower=null;
-    const summary={latest:null, ready:()=>ready, refresh, unread, stop};
+    let ready=false, previewListener=null, recent=null, countQuery=null, countListener=null, lower=null, newestSeen=null;
+    const summary={latest:null, ready:()=>ready, refresh, unread, pause, resume, read, stop};
     function detachCount(){
       countQuery?.off('value',countListener);countQuery=null;countListener=null;lower=null;recent=null;
     }
     function refresh(){
-      if(stopped)return;
+      if(!previewListener)return;
       const boundary=Math.max(since,pref(key).seen || 0);
       if(!identity?.ready || !summary.latest || summary.latest.created<=boundary){detachCount();return;}
       if(lower===boundary)return;
@@ -43,9 +60,9 @@
       const q=base.startAt(boundary+0.5).limitToLast(50);
       countQuery=q;countListener=snap=>{
         if(countQuery!==q)return;
-        recent=[];snap.forEach(m=>{recent.push(m.val());});onUpdate();
+        recent=[];snap.forEach(m=>{recent.push(m.val());});updateSummaries();
       };
-      q.on('value',countListener,()=>{if(countQuery===q){detachCount();onUpdate();}});
+      q.on('value',countListener,()=>{if(countQuery===q){detachCount();updateSummaries();}});
     }
     function unread(){
       const seen=pref(key).seen || 0;
@@ -53,23 +70,52 @@
       const count=rows.filter(m=>visibleIncoming(m)&&m.created>seen).length;
       return {count,more:recent?.length===50 && recent[0].created>seen};
     }
-    function receive(snap){
-      if(stopped)return;
+    function read(rows,notify){
       const previous=summary.latest;
-      summary.latest=null;snap.forEach(m=>{summary.latest={id:m.key,...m.val()};});
+      const last=rows.at(-1);
+      summary.latest=last?{id:last.id,...last.value}:null;
+      if(!notify)recent=rows.map(row=>row.value);
       const m=summary.latest;
-      if(ready && visibleIncoming(m) && m.created>(pref(key).seen||0) && m.id!==previous?.id && (!previous||m.created>=previous.created))onMessage(m);
-      if(alertKey===key && m?.id!==previous?.id && (!m || m.created<(previous?.created||0)))hideAlert();
-      ready=true;refresh();onUpdate();
+      const after=(a,b)=>a && (!b || a.created>b.created || a.created===b.created && a.id>b.id);
+      if(visibleIncoming(m) && m.id!==newestSeen?.id && after(m,newestSeen)){
+        newestSeen=m;
+        if(notify && ready && after(m,previous) && m.created>(pref(key).seen||0))onMessage(m);
+      }
+      if(alertKey===key && m?.id!==previous?.id && (!m || after(previous,m)))hideAlert();
+      ready=true;refresh();updateSummaries();
     }
-    function stop(){stopped=true;preview.off('value',receive);detachCount();}
-    preview.on('value',receive,()=>{if(!stopped){summary.latest=null;ready=true;detachCount();hideAlert(key);onDenied?.();onUpdate();}});
+    function pause(){
+      if(previewListener)preview.off('value',previewListener);
+      previewListener=null;
+      detachCount();
+    }
+    function resume(){
+      if(previewListener)return;
+      const receive=snap=>{
+        if(previewListener!==receive)return;
+        const rows=[];
+        snap.forEach(m=>{rows.push({id:m.key,value:m.val()});});
+        read(rows,true);
+      };
+      previewListener=receive;
+      preview.on('value',receive,()=>{
+        if(previewListener!==receive)return;
+        pause();summary.latest=null;ready=true;hideAlert(key);onDenied?.();updateSummaries();
+      });
+    }
+    function stop(){pause();if(summaries.get(key)===summary)summaries.delete(key);}
+    summaries.set(key,summary);
+    if(session?.key===key)summary.read(session.pages[0]?.rows||[],false);
+    else resume();
     return summary;
   }
   function stopIdentity(){
     watched.forEach(w=>w.stop());watched.clear();
-    identity?.ref.off('value',identity.fn);
     window.groupChat?.stop();
+    if(identity){
+      identity.ref.off('value',identity.fn);
+      identity.connection.off('value',identity.connected);
+    }
     identity=null;preferences={};hideAlert();badge();
   }
   function attach(){
@@ -84,17 +130,27 @@
         watched.forEach(w=>w.refresh());window.groupChat?.refreshCounts?.();
         sync();badge();
       };
-      identity={uid,ref,fn,ready:false};ref.on('value',fn);
+      const connection=OL.db.ref('.info/connected');
+      const account={uid,ref,fn,connection,ready:false,online:false,seen:new Map(),pending:null};
+      account.connected=snap=>{
+        if(identity!==account)return;
+        account.online=snap.val()===true;
+        updateComposer();
+        if(account.online)markCurrentSeen();
+      };
+      identity=account;
+      connection.on('value',account.connected);
+      ref.on('value',fn);
       window.groupChat?.attach();
     }
-    const peers=Object.keys(OL.F).filter(olAllowed);
-    for(const [peer,w] of watched)if(!peers.includes(peer)){
+    const peers=new Set(Object.keys(OL.F).filter(olAllowed));
+    for(const [peer,w] of watched)if(!peers.has(peer)){
       w.stop();watched.delete(peer);hideAlert(keyOf(peer));
     }
     for(const peer of peers){
       if(watched.has(peer))continue;
       const [a,b]=[OL.me,peer].sort(),q=OL.db.ref('directMessages/'+a+'/'+b).orderByChild('created');
-      watched.set(peer,watchSummary(q,keyOf(peer),()=>{drawIndex();badge();},m=>notify(peer,m)));
+      watched.set(peer,watchSummary(q,keyOf(peer),m=>notify(peer,m)));
     }
     badge();
   }
@@ -116,14 +172,16 @@
       e.preventDefault();const text=field.value.trim();
       if(send.disabled || !text || text.length>1000)return;
       send.disabled=true;
+      const feedback=alert.querySelector('small');
+      feedback.textContent='Warte auf Bestätigung von Firebase …';
       try{await reply(text); if(alert.generation===generation){markSeen(key,m.created);hideAlert();}}
-      catch{if(alert.generation===generation)alert.querySelector('small').textContent='Antwort konnte nicht gesendet werden. Bitte kurz warten.';}
+      catch(error){if(alert.generation===generation)feedback.textContent=sendError(error);}
       finally{if(alert.generation===generation)send.disabled=false;}
     };
   }
   function notify(peer,m){
-    const [a,b]=[OL.me,peer].sort(), ref=OL.db.ref('directMessages/'+a+'/'+b);
-    showAlert(keyOf(peer),olNameOf(peer),m,text=>save({a,b,uid:OL.me,ref},text));
+    const uid=OL.me, [a,b]=[uid,peer].sort(), ref=OL.db.ref('directMessages/'+a+'/'+b);
+    showAlert(keyOf(peer),olNameOf(peer),m,text=>save({a,b,uid,ref},text));
   }
   const launcher=document.querySelector('#dm-launch');
   const unread=peer=>watched.get(peer)?.unread() || {count:0,more:false};
@@ -167,11 +225,14 @@
     return b;
   }
   function stop() {
-    if (session) {
-      session.pages.forEach(p => p.query.off('value', p.listen));
-      session.connection.off('value', session.connected);
+    const previous=session;
+    session=null;
+    if(previous){
+      cancelAnimationFrame(previous.frame);
+      previous.pages.forEach(p => p.query.off('value',p.listen));
+      summaries.get(previous.key)?.resume();
     }
-    session = null; input.readOnly=false;
+    input.readOnly=false;
     el('[data-reply]').hidden=true;el('[data-latest]').hidden=true;el('[data-length]').hidden=true; feed.replaceChildren(); input.value = ''; status.textContent = '';
     el('[data-cancel]').hidden = true; el('[data-send]').textContent = 'Senden';
   }
@@ -189,7 +250,7 @@
     if (session?.peer && (!OL.F[session.peer] || !olAllowed(session.peer))) {
       open(); status.textContent = 'Diese Unterhaltung ist gesperrt.'; return;
     }
-    if(session){el('h2').textContent=session.peer?olNameOf(session.peer):session.name;drawActions(session);if(session.group)render(session);return;}
+    if(session){el('h2').textContent=session.peer?olNameOf(session.peer):session.name;drawActions(session);if(session.group)queueRender(session);return;}
     if(indexTab==='groups')window.groupChat?.render();
     else drawIndex();
   }
@@ -204,6 +265,7 @@
     show(active?{peer,a,b,key:keyOf(peer),uid:OL.me,ref:OL.db.ref('directMessages/'+a+'/'+b)}:null, 'private');
   }
   function show(target,tab=indexTab){
+    if(target && session?.key===target.key && session.since===target.since)return;
     stop();hideAlert();indexTab=tab;
     if(!dialog.open){returnFocus=document.activeElement===document.body?launcher:document.activeElement;dialog.showModal();}
     const active=!!target;
@@ -215,15 +277,11 @@
     thread.hidden=!active;el('[data-back]').hidden=!active;
     el('h2').textContent=target?(target.peer?olNameOf(target.peer):target.name):'Chats';
     if(!target){sync();(tab==='groups'?el('[data-groups]'):el('[data-search]')).focus();return;}
-    const s=session={...target,pages:[],bubbles:new Map(),connection:OL.db.ref('.info/connected')};
+    const s=session={...target,pages:[],bubbles:new Map(),frame:0,depth:1};
+    summaries.get(s.key)?.pause();
     el('[data-block]').hidden=!s.peer;el('[data-manage]').hidden=!s.group;
     drawActions(s);
-    s.connected = snap => {
-      if (session !== s) return;
-      s.online = snap.val() === true; el('[data-send]').disabled = !s.online || !!s.sending;
-      status.textContent = s.online ? '' : 'Verbindung wird hergestellt. Dein Entwurf bleibt hier.';
-    };
-    s.connection.on('value',s.connected);
+    updateComposer();
     const loading=document.createElement('p');loading.className='dm-empty';loading.textContent='Verlauf wird geladen …';feed.append(loading);
     feed.setAttribute('aria-busy','true');older.hidden=true;el('[data-back]').focus();
     page(s, null);
@@ -243,17 +301,28 @@
       if (loaded && p === s.pages[0]) {
         for (const row of p.rows) if (!previous.has(row.id) && row.value.author !== s.uid) row.fresh = true;
       }
-      const i = s.pages.indexOf(p), next = s.pages[i+1];
-      if (next && next.before.id !== p.rows[0]?.id) {
-        const depth = s.pages.length;
-        s.pages.splice(i+1).forEach(x => x.query.off('value',x.listen));
-        s.depth = Math.max(s.depth || 0, depth);
-      }
-      if (s.depth > s.pages.length && p === s.pages.at(-1) && p.rows.length === 50) page(s,p.rows[0]);
-      render(s);
+      if(p===s.pages[0])summaries.get(s.key)?.read(p.rows,false);
+      queueRender(s);
     };
     p.query.on('value',p.listen,() => {
-      if (session === s) {show(null); status.textContent = 'Der Zugriff auf diesen Verlauf wurde verweigert.';}
+      if (session === s && s.pages.includes(p)) {show(null); status.textContent = 'Der Zugriff auf diesen Verlauf wurde verweigert.';}
+    });
+  }
+  function queueRender(s){
+    if(s.frame)return;
+    s.frame=requestAnimationFrame(()=>{
+      s.frame=0;
+      if(session!==s)return;
+      for(let i=1;i<s.pages.length;i++){
+        const boundary=s.pages[i-1].rows[0];
+        const before=s.pages[i].before;
+        if(before.id===boundary?.id && before.value.created===boundary.value.created)continue;
+        s.pages.splice(i).forEach(p=>p.query.off('value',p.listen));
+        break;
+      }
+      const last=s.pages.at(-1);
+      if(s.depth>s.pages.length && last.rows.length===50)page(s,last.rows[0]);
+      render(s);
     });
   }
   function resetEdit(s) {
@@ -262,8 +331,9 @@
   const nearBottom=()=>feed.scrollHeight-feed.scrollTop-feed.clientHeight<70;
   function markCurrentSeen(){
     if(!session || !nearBottom() || document.visibilityState!=='visible')return;
-    const m=session.pages[0]?.rows.at(-1)?.value;
-    if(m)markSeen(session.key,m.created);
+    const row=session.pages[0]?.rows.findLast(({id,value})=>
+      id!==identity?.pending?.id && (!session.group || !OL.BL[value.author]));
+    if(row)markSeen(session.key,row.value.created);
     el('[data-latest]').hidden=true;
   }
   function render(s) {
@@ -272,7 +342,15 @@
     const nearEnd = nearBottom();
     const anchor = [...feed.children].find(n=>n.offsetTop+n.offsetHeight >= feed.scrollTop);
     const offset = anchor ? anchor.offsetTop-feed.scrollTop : 0;
-    const rows = s.pages.slice().reverse().flatMap(p=>p.rows).filter(row=>!s.group||!OL.BL[row.value.author]);
+    const seen=new Set(), rows=[];
+    for(const page of s.pages){
+      for(let i=page.rows.length-1;i>=0;i--){
+        const row=page.rows[i];
+        if(seen.has(row.id) || s.group && OL.BL[row.value.author])continue;
+        seen.add(row.id);rows.push(row);
+      }
+    }
+    rows.reverse();
     const next=new Map();let cursor=feed.firstChild;
     for (const {id,value:m,fresh} of rows) {
       const existing=s.bubbles.get(id);
@@ -314,7 +392,7 @@
     const found=anchor && [...feed.children].find(n=>n.dataset.id===anchor.dataset.id);
     if (found && (!nearEnd || s.loadingOlder)) feed.scrollTop = found.offsetTop-offset;
     else if(nearEnd) feed.scrollTop=feed.scrollHeight;
-    s.loadingOlder=false;
+    if(s.pages.at(-1)?.loaded)s.loadingOlder=false;
     if(nearEnd)markCurrentSeen();
     else if(rows.at(-1)?.value.created>(pref(s.key).seen||0))el('[data-latest]').hidden=false;
   }
@@ -322,27 +400,62 @@
   input.addEventListener('input',updateLength);
   feed.addEventListener('scroll',markCurrentSeen);
   el('[data-latest]').onclick=()=>{feed.scrollTop=feed.scrollHeight;markCurrentSeen();};
-  older.onclick = ()=>{if(!session)return; const last=session.pages.at(-1); if(last.rows.length===50){older.hidden=true;session.loadingOlder=true;page(session,last.rows[0]);}};
+  older.onclick = ()=>{
+    if(!session)return;
+    const last=session.pages.at(-1);
+    if(last.rows.length!==50)return;
+    older.hidden=true;
+    session.loadingOlder=true;
+    session.depth=session.pages.length+1;
+    page(session,last.rows[0]);
+  };
+  function updateComposer(){
+    const s=session;
+    if(!s)return;
+    const online=identity?.online===true, pending=identity?.pending;
+    el('[data-send]').disabled=!online||!!pending||!!s.sending;
+    input.readOnly=!!s.sending;
+    const notice=pending
+      ? online?'Warte auf Bestätigung von Firebase …':'Versand ausstehend. Er wird bei Wiederverbindung fortgesetzt.'
+      : online?'':'Keine Verbindung. Dein Entwurf bleibt in diesem Chat.';
+    if(notice || status.textContent===s.connectionNotice)status.textContent=notice;
+    s.connectionNotice=notice;
+  }
+  function sendError(error){
+    if(error.message==='offline')return 'Keine Verbindung. Sobald du wieder online bist, kannst du erneut senden.';
+    if(error.message==='pending')return 'Eine Nachricht wartet noch auf Bestätigung. Bitte warte kurz.';
+    if(/permission.denied/i.test(error.code||''))return 'Versand abgelehnt. Prüfe deinen Chat-Zugriff und warte mindestens zwei Sekunden zwischen Nachrichten.';
+    return 'Nachricht konnte nicht gesendet werden. Dein Text ist noch im Eingabefeld.';
+  }
   composer.onsubmit = async e => {
     e.preventDefault();
     const s=session, text=input.value.trim();
-    if(!s || s.sending || !s.online || !text || text.length>1000)return;
+    if(!s || s.sending || identity?.pending || !identity?.online || !text || text.length>1000)return;
     const outgoing=s.reply && text.length<995?'› '+s.reply.text.slice(0,Math.min(90,997-text.length))+'\n'+text:text;
 
-    s.sending=true; el('[data-send]').disabled=true; input.readOnly=true; status.textContent='Wird gespeichert …';
+    s.sending=true;
     try {
       await save(s,outgoing.length<=1000?outgoing:text);
-      if(session===s){resetEdit(s);status.textContent='Gespeichert.';}
-    }catch {if(session===s)status.textContent='Speichern fehlgeschlagen. Prüfe die Verbindung und warte zwischen Nachrichten zwei Sekunden.';}
-    finally {s.sending=false;if(session===s){input.readOnly=false;el('[data-send]').disabled=!s.online;}}
+      if(session===s){resetEdit(s);status.textContent='Gespeichert.';markCurrentSeen();}
+    }catch(error){if(session===s)status.textContent=sendError(error);}
+    finally {s.sending=false;updateComposer();}
   };
   input.onkeydown=e=>{if(e.key==='Enter' && !e.shiftKey && !e.isComposing){e.preventDefault();composer.requestSubmit();}};
   async function save(s,text){
+    const account=identity;
+    if(!account?.online || account.uid!==s.uid || s.uid!==OL.me || OL.deleting)throw Error('offline');
+    if(account.pending)throw Error('pending');
     const id=s.edit?.id || s.ref.push().key, ts=olTS();
     const message={author:s.uid,name:OL.name,text,created:s.edit?.m.created ?? ts,changed:ts};
-    const db=OL.db;
-    if(s.uid!==OL.me || (await db.ref('.info/connected').once('value')).val()!==true || OL.me!==s.uid)throw Error('Offline');
-    await db.ref().update({[s.group?'groupMessages/'+s.group+'/'+id:'directMessages/'+s.a+'/'+s.b+'/'+id]:message,['dmThrottle/'+s.uid]:{a:s.group?'group':s.a,b:s.group||s.b,id,ts}});
+    const path=s.group?'groupMessages/'+s.group+'/'+id:'directMessages/'+s.a+'/'+s.b+'/'+id;
+    account.pending={id};
+    updateComposer();
+    try{
+      await OL.db.ref().update({[path]:message,['dmThrottle/'+s.uid]:{a:s.group?'group':s.a,b:s.group||s.b,id,ts}});
+    }finally{
+      account.pending=null;
+      if(identity===account)updateComposer();
+    }
   }
   el('[data-search]').oninput=drawIndex;
   alert.addEventListener('keydown',e=>e.stopPropagation());
@@ -362,6 +475,7 @@
   dialog.oncancel=e=>{e.preventDefault();close();};
   document.querySelector('#dm-launch').onclick=()=>open();
   window.directChat={open,close,sync,logout,show,row,groupKey,pref,markSeen,badge,notify:showAlert,hideAlert,save,dialog,watchSummary,hasUnread,
+    isOnline:()=>identity?.online===true,
     current:()=>session,
     isGroupIndex:()=>dialog.open && !session && indexTab==='groups',
     status:text=>{status.textContent=text;},

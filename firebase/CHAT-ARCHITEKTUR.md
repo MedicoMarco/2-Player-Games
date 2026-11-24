@@ -34,6 +34,14 @@ Gruppen verwenden `groups`, `groupIndex`, `groupInvitations`, `groupMessages` un
 
 Website-Dateien gemeinsam über GitHub Pages bereitstellen und die vollständige `database.rules.json` in Firebase veröffentlichen.
 
+## Abfragen und Versand
+
+Direkt- und Gruppenchats laden je Seite bis zu 50 Nachrichten. Der Cursor kombiniert Sendezeit und Nachrichten-ID, damit auch mehrere Nachrichten im selben Millisekundenintervall sauber seitenweise geladen werden. Die Seiten eines geöffneten Chats bleiben live und werden beim Wechsel oder Schließen abgemeldet. Solange ein Chat geöffnet ist, liefert seine neueste Seite auch die Daten für Vorschau und Ungelesen-Zähler. Für alle anderen berechtigten Unterhaltungen bleibt die Vorschau auf eine Nachricht begrenzt. Ein zusätzlicher Abruf für Ungelesen-Zähler läuft nur bei Bedarf und ist ebenfalls auf 50 Einträge begrenzt.
+
+Ein ausstehender Firebase-Versand setzt die Nachricht mit einer festen ID und Serverzeit gemeinsam mit dem Sendezeitlimit. Bis Firebase den Vorgang bestätigt oder ablehnt, bleibt weiterer Chatversand desselben Kontos in diesem Tab gesperrt. Offline kann man einen Entwurf im geöffneten Chat weiter bearbeiten. Ist ein Schreibvorgang bereits ausstehend, synchronisiert ihn Firebase bei Wiederverbindung im selben Tab. Die Website legt beim Wiederverbinden keine zweite Nachricht an. Ein Neuladen oder Schließen des Browser-Tabs kann einen noch unbestätigten Versand unterbrechen.
+
+Firebase Spark erlaubt für die Realtime Database laut [Firebase-Preisliste](https://firebase.google.com/pricing#realtime-database) 100 gleichzeitige Verbindungen, 1 GB Speicher und 10 GB Downloads pro Monat. Diese Limits gelten gemeinsam für bestehende Online-Spiele, Präsenz und Chats. Begrenzte Seiten senken den Download, gespeicherte Direkt- und Gruppennachrichten belegen weiterhin Speicher. Die tatsächliche Nutzung lässt sich in der Firebase-Konsole im Bereich Realtime Database → Nutzung prüfen.
+
 ## Aktiver Privatchat nach der neuen Chatbeschreibung
 
 Die Website nutzt für freie Privatchats die Pfade `directMessages/{uidA}/{uidB}/{id}`, `dmThrottle/{uid}` und `dmReports/{uidA}/{uidB}/{id}/{melder}`. Die Website sortiert die UIDs für einen gemeinsamen Verlauf. Die Datenbank prüft beide Freundschaften und Blockierlisten. Zwischen Schreib- oder Bearbeitungsvorgängen liegen mindestens zwei Sekunden je Konto. Beide Freunde können die letzten 50 Einträge und ältere Seiten abrufen. Ein Meldedatensatz hält die gemeldete Textfassung fest. Berechtigte Moderatoren werden über `chatV1/control/moderators/{uid} = true` durch den Betreiber verwaltet. Meldungen werden im geschützten Menüpunkt Moderation bearbeitet. Verlauf und Meldungen brauchen bei einer Kontolöschung eine separate Bereinigung durch den Betreiber.
