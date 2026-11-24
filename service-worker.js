@@ -1,4 +1,4 @@
-const CACHE_NAME = "play2gether-pwa-v17";
+const CACHE_NAME = "play2gether-pwa-v18";
 const APP_ROOT = new URL("./", self.registration.scope).href;
 const NOTIFICATION_SCRIPT = new URL("notifications.js", APP_ROOT).href;
 const FACTORY_ASSETS = new Set([
@@ -72,6 +72,7 @@ self.addEventListener("fetch", event => {
 });
 
 const notificationCopy = {
+  test: ["Play2Gether-Testmitteilung", "Systembenachrichtigungen funktionieren auf diesem Gerät."],
   invite: ["Spieleinladung", "Tippe, um die Einladung anzunehmen."],
   direct: ["Neue Direktnachricht", "Tippe, um den Chat zu öffnen."],
   group: ["Neue Gruppennachricht", "Tippe, um den Gruppenchat zu öffnen."],
@@ -109,7 +110,7 @@ function deliverToOpenPage(client, target) {
 self.addEventListener("notificationclick", event => {
   event.notification.close();
   const target = event.notification.data;
-  if (!target || !Object.hasOwn(notificationCopy, target.kind)) return;
+  if (!target || !Object.hasOwn(notificationCopy, target.kind) || target.kind === "test") return;
   event.waitUntil((async () => {
     const app = new URL(APP_ROOT);
     const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });

@@ -44,6 +44,8 @@
     if (!button) return;
     button.hidden = !supported;
     button.disabled = busy || preparing;
+    const test = document.querySelector('[data-o=push-test]');
+    if (test) { test.hidden = !enabled; test.disabled = busy; }
     button.textContent = enabled ? 'Benachrichtigungen ausschalten' : 'Benachrichtigungen einschalten';
     document.querySelector('#push-status').textContent = status || (!supported
       ? 'Systembenachrichtigungen sind hier nicht verfügbar. Auf iPhone und iPad öffne die Seite als Home-Bildschirm-App.'
@@ -276,8 +278,34 @@
     } catch {}
   }
 
+  async function test() {
+    if (!enabled || busy) return;
+    busy = true;
+    status = 'Testmitteilung wird gesendet …';
+    render();
+    try {
+      const sub = await (await register()).pushManager.getSubscription();
+      if (!sub) throw Object.assign(Error(),{code:'Device not registered'});
+      await service()({action:'test',subscription:serialize(sub)});
+      status = 'Der Push-Anbieter hat die Testmitteilung angenommen. Schau in die Mitteilungszentrale.';
+    } catch (error) {
+      if (error.code==='Device not registered' || [404,410].includes(error.upstream)) {
+        status = 'Das Geräte-Abo ist abgelaufen. Schalte Benachrichtigungen aus und wieder ein.';
+      } else if (error.code==='Test cooldown') {
+        status = 'Warte zehn Sekunden, bevor du die nächste Testmitteilung sendest.';
+      } else if (error.code==='Push provider') {
+        status = 'Der Push-Anbieter hat die Testmitteilung abgelehnt (HTTP '+error.upstream+').';
+      } else if (error.code==='Push provider connection') {
+        status = 'Cloudflare konnte die Testmitteilung nicht an den Push-Anbieter senden.';
+      } else status = setupError(error,'server');
+    } finally {
+      busy = false;
+      render();
+    }
+  }
+
   window.gameNotifications = {
-    render, toggle, logout, peer, dispatch,
+    render, toggle, logout, peer, dispatch, test,
     signedIn() { prepare(); openPending(); },
     signedOut() { config = null; enabled = false; status = ''; render(); }
   };

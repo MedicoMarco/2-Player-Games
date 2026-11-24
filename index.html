@@ -4974,7 +4974,7 @@ ${lg?'':'<p>Merke dir das Passwort gut – es gibt keine Zurücksetzen-Funktion.
     const s=OL.stats||{};
     h=`<div class=olme><span class="dot on"></span><b>${olEsc(OL.name)}</b><span style="color:var(--mu);font-size:13px">${s.w||0} Siege · ${s.l||0} Niederlagen · ${s.d||0} Remis</span><button class="btn g" data-o=out style="margin-left:auto;padding:5px 10px;font-size:13px;background:var(--bg);color:var(--tx)">Abmelden</button></div>
 <div style="font-size:12px;color:var(--mu)">☁ Erfolge, Siege, Highscores, Farben und Favoriten werden automatisch in deinem Konto gespeichert.</div>
-<div><button class="btn g" data-o=push hidden>Benachrichtigungen einschalten</button><p class=luhint id=push-status role=status></p></div>
+<div><button class="btn g" data-o=push hidden>Benachrichtigungen einschalten</button> <button class="btn g" data-o=push-test hidden>Testmitteilung senden</button><p class=luhint id=push-status role=status></p></div>
 <div class=seg id=olt></div><div id=oll style="display:flex;flex-direction:column;gap:8px"></div>
 <div style="display:flex;gap:8px"><input id=olf placeholder="Freund per Benutzername hinzufügen" maxlength=16 autocapitalize=off spellcheck=false><button class=btn data-o=addf style="white-space:nowrap">Hinzufügen</button></div>
 <div class=olerr id=olm style="color:var(--mu)"></div><button class="btn r" data-o=delete-open style="align-self:flex-start">Account löschen</button>`;
@@ -5224,6 +5224,7 @@ document.addEventListener('click',e=>{
   else if(o=='go')olAuth(OL.mode,($('#olu')||{}).value,($('#olw')||{}).value);
   else if(o=='out')olLogout();
   else if(o=='push')window.gameNotifications?.toggle();
+  else if(o=='push-test')window.gameNotifications?.test();
   else if(o=='tab'){OL.tab=b.dataset.v;olUpd()}
   else if(o=='req')olReq(u);
   else if(o=='af')olAccFr(u);

@@ -142,17 +142,26 @@ async function send(db, vapid, from, body) {
   const marker = 'pushDispatch/'+to+'/'+topic;
   const previous = await db(marker,'GET',undefined,{'X-Firebase-ETag':'true'});
   if (previous.value?.ts>=note.ts || (kind==='invite' && Date.now()-previous.value?.sent<15000)) return;
-  if (!(await db(marker,'PUT',{ts:note.ts,sent:Date.now()},{'If-Match':previous.etag})).ok) return;
+  if (!(await db(marker,'PUT',{ts:note.ts,sent:Date.now()},{'If-Match':previous.etag??'null_etag'})).ok) return;
   const devices = Object.entries(subscriptions.value).sort(([,a],[,b])=>b.updated-a.updated).slice(0,8);
-  await Promise.allSettled(devices.map(async ([key, device])=>{
-    const subscription = subscriptionFrom(device);
-    if (!subscription) return;
-    const payload = await buildPushPayload({data:JSON.stringify({...note.data,account:to}),options:{
-      ttl:note.ttl,topic,urgency:kind==='invite'?'high':'normal'
-    }},subscription,vapid);
-    const response = await fetch(subscription.endpoint,{...payload,redirect:'error'});
-    if (response.status===404 || response.status===410) await db('pushSubscriptions/'+to+'/'+key,'DELETE');
-  }));
+  for (let i=0;i<devices.length;i+=4) {
+    await Promise.allSettled(devices.slice(i,i+4).map(async ([key,device])=>{
+      const code = await deliver(device,vapid,{...note.data,account:to},note.ttl,topic);
+      if (code===404 || code===410) await db('pushSubscriptions/'+to+'/'+key,'DELETE');
+      if (code<200 || code>=300) console.warn('Push provider rejected delivery',code);
+    }));
+  }
+}
+
+async function deliver(device,vapid,data,ttl,topic) {
+  const subscription = subscriptionFrom(device);
+  if (!subscription) return 400;
+  const payload = await buildPushPayload({data:JSON.stringify(data),options:{
+    ttl,topic,urgency:data.kind==='invite'||data.kind==='test'?'high':'normal'
+  }},subscription,vapid);
+  const response = await fetch(subscription.endpoint,{...payload,redirect:'error'});
+  if (response.body) await response.body.cancel();
+  return response.status;
 }
 
 export async function onRequest({request,env,waitUntil}) {
@@ -173,7 +182,7 @@ export async function onRequest({request,env,waitUntil}) {
     stage = 'Authentication service';
     const uid = await authenticate(request);
     if (!uid) return reply({error:'Authentication'},401);
-    const [publicKey,privateKey,subject] = String(env.PLAY2GETHER_PUSH_VAPID||'').split(',');
+    const [publicKey,privateKey,subject] = String(env.PLAY2GETHER_PUSH_VAPID||'').split(',').map(part=>part.trim());
     if (!publicKey || !privateKey || !subject || !env.PLAY2GETHER_FIREBASE_SERVICE_ACCOUNT) return reply({error:'Push setup'},503);
     if (body.action==='key') return reply({key:publicKey});
     let token;
@@ -185,10 +194,24 @@ export async function onRequest({request,env,waitUntil}) {
       return reply({},202);
     }
     const sub = subscriptionFrom(body.subscription);
-    if (!sub || !['add','remove'].includes(body.action)) return reply({error:'Subscription'},400);
+    if (!sub || !['add','remove','test'].includes(body.action)) return reply({error:'Subscription'},400);
     stage = 'Subscription storage';
     const key = await digest(sub.endpoint);
     const path = 'pushSubscriptions/'+uid;
+    if (body.action==='test') {
+      const {value:device} = await db(path+'/'+key);
+      if (!device) return reply({error:'Device not registered'},409);
+      const testPath = 'pushDispatch/'+uid+'/test';
+      const previous = await db(testPath,'GET',undefined,{'X-Firebase-ETag':'true'});
+      const now = Date.now();
+      if (now-previous.value?.sent<10000 ||
+          !(await db(testPath,'PUT',{sent:now},{'If-Match':previous.etag??'null_etag'})).ok) {
+        return reply({error:'Test cooldown'},429);
+      }
+      stage = 'Push provider connection';
+      const code = await deliver(device,{publicKey,privateKey,subject},{kind:'test',id:'test',account:uid},60,'play2gether-test');
+      return code>=200 && code<300?reply({accepted:true}):reply({error:'Push provider',upstream:code},502);
+    }
     if (body.action==='remove') {
       await db(path+'/'+key,'DELETE');
     } else {
