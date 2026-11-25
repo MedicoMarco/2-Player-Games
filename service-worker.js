@@ -1,4 +1,4 @@
-const CACHE_NAME = "play2gether-pwa-v42";
+const CACHE_NAME = "play2gether-pwa-v43";
 const APP_ROOT = new URL("./", self.registration.scope).href;
 const APP_ASSETS = new Set(["notifications.js", "poker.js", "card-chip-picker.js", "poker-table.js?v=3", "poker.css?v=2", "blackjack.js?v=2", "blackjack-online.js", "blackjack-table.js?v=2", "direct-chat.js?v=3", "direct-chat.css?v=2", "group-chat.js?v=2", "game-chat.js?v=2", "game-chat.css"]
   .map(name => new URL(name, APP_ROOT).href));
@@ -12,14 +12,13 @@ const FACTORY_ASSETS = new Set([
   "yard.js?v=1",
   "runtime.js?v=3",
   "telemetry.js",
-  "drawing.js?v=8",
-  "icons.js?v=1",
-  "equipment.js?v=1",
+  "drawing.js?v=9",
+  "equipment.js?v=2",
   "transport.js?v=10",
   "layout.js?v=18",
   "terrain.js?v=12",
   "world.js?v=7",
-  "game.js?v=30",
+  "game.js?v=31",
 ].map(name => new URL("factory-empire/" + name, APP_ROOT).href));
 
 self.addEventListener("install", event => {

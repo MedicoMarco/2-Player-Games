@@ -1546,14 +1546,14 @@ nativeTarget.createLinearGradient=(x0,y0,x1,y1)=>{
  return {addColorStop(){}};
 };
 nativeTarget.fillText=(label)=>{
- if(String(label).endsWith(' €'))drawnHeader=true;
+ if(String(label).startsWith('💰 '))drawnHeader=true;
  if(String(label).includes('GARAGE')){
   if(breakWorld){breakWorld=false;throw Error('A world drawing operation failed')}
   drawnHallTitles++;
  }
 };
 nativeTarget.roundRect=(x,y,w,h)=>{
- if(x===-11&&y===-6&&w===22&&h===12)drawnBeltIcon=true;
+ if(x===-15&&y===-7&&w===30&&h===14)drawnBeltIcon=true;
 };
 scope.cv.width=800;scope.cv.height=480;
 const contextBefore={...transform};
