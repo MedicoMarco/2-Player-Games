@@ -126,6 +126,7 @@
     row.dataset.seat = entry.seat;
     const author = document.createElement('strong');
     author.textContent = entry.name;
+    if(entry.seat!==active.seat)author.append(olChatDot(entry.uid));
     const text = document.createElement('span');
     text.textContent = entry.text;
     row.append(author,text);
@@ -177,7 +178,7 @@
           const pending=bubbles.get(entry.seat);if(pending){clearTimeout(pending.timer);pending.node.remove();bubbles.delete(entry.seat);}
           drawFeed();
         };
-        if(muted)row.querySelector('span').textContent='Nachricht ausgeblendet';
+        if(muted)row.querySelector(':scope > span').textContent='Nachricht ausgeblendet';
         if(!muted)actions.append(report);actions.append(mute,makeBlock(entry));row.append(actions);
       }
       if(!expanded){

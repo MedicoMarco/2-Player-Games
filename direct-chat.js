@@ -239,10 +239,10 @@
     for(const [control,value] of [[launcher,count],[el('[data-private]'),n],[el('[data-groups]'),g]])control.dataset.count=value>99?'99+':value||'';
     launcher.setAttribute('aria-label',count?'Chats, '+count+' ungelesene Unterhaltungen':'Chats');
   }
-  function row(name,preview,m,key,unread,open){
+  function row(name,preview,m,key,unread,open,peer){
     const b=button('',open), avatar=document.createElement('span'), body=document.createElement('span'), title=document.createElement('strong'), sub=document.createElement('small'), side=document.createElement('span');
     b.className='dm-row';b.dataset.chatKey=key;avatar.className='dm-avatar';avatar.textContent=name.slice(0,2).toUpperCase();
-    title.textContent=name;sub.textContent=preview;body.append(title,sub);
+    title.textContent=name;if(peer)title.append(olChatDot(peer));sub.textContent=preview;body.append(title,sub);
     side.className='dm-row-side';side.textContent=(pref(key).pinned?'📌 ':'')+(pref(key).muted?'🔕 ':'')+(m?formattedTime(m.created):'');
     if(hasUnread(unread)){
       const count=document.createElement('span');count.className='dm-count';
@@ -262,7 +262,7 @@
     const peers=[...watched.keys()].filter(p=>olNameOf(p).toLocaleLowerCase().includes(term));
     peers.sort((a,b)=>Number(!!pref(keyOf(b)).pinned)-Number(!!pref(keyOf(a)).pinned)||(latest(b)?.created||0)-(latest(a)?.created||0)||olNameOf(a).localeCompare(olNameOf(b)));
     const focused=list.contains(document.activeElement)?document.activeElement.dataset.chatKey:null;
-    list.replaceChildren(...peers.map(p=>row(olNameOf(p),latest(p)?.text || (watched.get(p)?.ready()?'Unterhaltung starten':'Lädt …'),latest(p),keyOf(p),unread(p),()=>open(p))));
+    list.replaceChildren(...peers.map(p=>row(olNameOf(p),latest(p)?.text || (watched.get(p)?.ready()?'Unterhaltung starten':'Lädt …'),latest(p),keyOf(p),unread(p),()=>open(p),p)));
     if(!peers.length){const empty=document.createElement('p');empty.className='dm-empty';empty.textContent=term?'Keine passenden Chats.':OL.blocksReady?'Hier erscheinen deine bestätigten Freunde.':'Kontakte werden geladen …';list.append(empty);}
     if(focused)Array.from(list.children).find(row=>row.dataset.chatKey===focused)?.focus({preventScroll:true});
   }
@@ -298,9 +298,14 @@
     if (session?.peer && (!OL.F[session.peer] || !olAllowed(session.peer))) {
       open(); status.textContent = 'Diese Unterhaltung ist gesperrt.'; return;
     }
-    if(session){el('h2').textContent=session.peer?olNameOf(session.peer):session.name;drawActions(session);if(session.group)queueRender(session);return;}
+    if(session){drawTitle(session);drawActions(session);if(session.group)queueRender(session);return;}
     if(indexTab==='groups')window.groupChat?.render();
     else drawIndex();
+  }
+  function drawTitle(target){
+    const title=el('h2');
+    title.textContent=target?(target.peer?olNameOf(target.peer):target.name):'Chats';
+    if(target?.peer)title.append(olChatDot(target.peer));
   }
   function drawActions(s){
     el('[data-mute]').textContent=pref(s.key).muted?'Vorschau einschalten':'Stummschalten';
@@ -326,7 +331,7 @@
     el('[data-private]').setAttribute('aria-pressed',String(tab==='private'));
     el('[data-groups]').setAttribute('aria-pressed',String(tab==='groups'));
     thread.hidden=!active;el('[data-back]').hidden=!active;
-    el('h2').textContent=target?(target.peer?olNameOf(target.peer):target.name):'Chats';
+    drawTitle(target);
     if(!target){sync();(tab==='groups'?el('[data-groups]'):el('[data-search]')).focus();return;}
     const s=session={...target,pages:[],bubbles:new Map(),frame:0,depth:1};
     s.receiptTimer=setInterval(()=>pollReceipts(s),8000);
@@ -435,7 +440,7 @@
       meta.className='dm-message-meta';
       if(!mine && s.group){
         const name=document.createElement('strong');
-        name.className='dm-message-author';name.textContent=m.name;bubble.append(name);
+        name.className='dm-message-author';name.textContent=m.name;name.append(olChatDot(m.author));bubble.append(name);
       }
       meta.append(time);
       if(m.changed!==m.created)meta.append(' · bearbeitet');

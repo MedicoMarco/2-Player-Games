@@ -205,7 +205,6 @@
       Object.assign(LUN,{code,ref,seat,role,left:0,g:api,actN:0,inv:{},room:null});
       mode='lobby';mySeat=seat;privateHand=null;
       window.luFr=refreshFriends;
-      olSetGame('poker');
       ref.on('value', value=>{
         if(LUN.ref!==ref||LUN.left)return;
         const room=value.val();

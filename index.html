@@ -158,6 +158,8 @@ h2.pt{margin:22px 0 6px;font-size:20px}
 .olrow .btn{padding:5px 10px;font-size:13px;box-shadow:2px 2px 0 var(--hs)}
 .olrow .btn.g{background:var(--bg);color:var(--tx)}
 .dot{width:11px;height:11px;border-radius:50%;background:#9ca3af;flex:none;border:2px solid var(--ln)}
+.chat-presence{display:inline-block;width:8px;height:8px;margin-inline-start:.4em;border-radius:50%;background:#22c55e;vertical-align:middle;flex:none}
+.chat-presence[hidden]{display:none}
 .dot.on{background:#22c55e}.dot.busy{background:#f59e0b}
 .olerr{color:var(--r);font-weight:600;font-size:14px;min-height:20px}
 .olme{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -568,7 +570,7 @@ Deutschland</p>
 <script src="./factory-empire/world.js?v=7"></script>
 <script src="./factory-empire/game.js?v=26"></script>
 <script src="./poker.js"></script>
-<script src="./poker-table.js"></script>
+<script src="./poker-table.js?v=2"></script>
 <script src="./blackjack.js"></script>
 <script src="./blackjack-table.js"></script>
 <script>
@@ -3303,7 +3305,6 @@ function luCleanup(){
     }
   }
   if(Object.keys(changes).length)db.ref().update(changes).catch(()=>{});
-  olSetGame(null);
 }
 
 const luSeatsOf=room=>[0,1,2,3].map(i=>(room&&room.seats&&room.seats[i])||{k:'off'});
@@ -3418,7 +3419,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     LUN.ref.update({status:'play'}).catch(e=>toast(luErr(e)));
     ovHide();onSnap(JSON.parse(JSON.stringify(st)),null);
     LUN.ref.child('snap').set(JSON.stringify({snap:st,ev:null}));
-    host.start();olSetGame('ludo');
+    host.start();
     try{for(const u in LUN.inv)OL.db.ref('invites/'+u+'/'+OL.me).remove()}catch(e){}LUN.inv={}
   }
   async function create(){
@@ -3428,7 +3429,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
       await luCreate(code,{host:OL.me,hn:OL.name,ts:olTS(),status:'lobby',game:'ludo',cfg,seats:{0:{k:'p',uid:OL.me,name:OL.name},1:{k:'open'},2:{k:'open'},3:{k:'open'}}});
     }catch(e){toast(luErr(e));return}
     LUN.code=code;LUN.role='host';LUN.seat=0;LUN.ref=ref;LUN.left=0;LUN.g=api;LUN.lastAct={};
-    mode='lobby';listen();olSetGame('ludo')
+    mode='lobby';listen()
   }
   async function join(codeArg){
     const code=String(codeArg||(($('#lucode')||{}).value)||'').trim().toUpperCase();
@@ -3440,7 +3441,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
       if(!claim)return false;
       const {ref,seat}=claim;
       LUN.code=code;LUN.role='guest';LUN.seat=seat;LUN.ref=ref;LUN.left=0;LUN.g=api;LUN.actN=0;
-      mode='lobby';listen();olSetGame('ludo');
+      mode='lobby';listen();
       return true
     }catch(e){toast(luErr(e));return false}
   }
@@ -4176,7 +4177,6 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
     mode='host';my=LUN.seat;LUN.lastAct={};
     LUN.ref.update({status:'play'}).catch(e=>toast(luErr(e)));
     launch(mmNew(sp,nm,{d:cfg.d,mau:cfg.mau},1,0),hostEmit);
-    olSetGame('maumau');
     try{for(const u in LUN.inv)OL.db.ref('invites/'+u+'/'+OL.me).remove()}catch(e){}LUN.inv={}
   }
   /* Revanche: alle, die zugestimmt haben (plus Computer-Plätze), spielen weiter; die anderen fliegen aus dem Raum */
@@ -4200,7 +4200,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
       await luCreate(code,{host:OL.me,hn:OL.name,ts:olTS(),status:'lobby',game:'maumau',cfg,seats:Object.fromEntries(MMS.map(i=>[i,i?{k:i<4?'open':'off'}:{k:'p',uid:OL.me,name:OL.name}]))});
     }catch(e){toast(luErr(e));return}
     LUN.code=code;LUN.role='host';LUN.seat=0;LUN.ref=ref;LUN.left=0;LUN.g=api;LUN.lastAct={};
-    mode='lobby';listen();olSetGame('maumau')
+    mode='lobby';listen()
   }
   async function join(codeArg){
     const code=String(codeArg||(($('#lucode')||{}).value)||'').trim().toUpperCase();
@@ -4212,7 +4212,7 @@ ${isHost?`<div><button class=btn data-lu=start ${ok?'':'disabled'}>Spiel starten
       if(!claim)return false;
       const {ref,seat}=claim;
       LUN.code=code;LUN.role='guest';LUN.seat=seat;LUN.ref=ref;LUN.left=0;LUN.g=api;LUN.actN=0;
-      mode='lobby';listen();olSetGame('maumau');
+      mode='lobby';listen();
       return true
     }catch(e){toast(luErr(e));return false}
   }
@@ -4540,7 +4540,7 @@ const cs=()=>{if(!cup){$('#cs').textContent='';return}const v=cup.i+(over?0:1);$
 const cupAll=()=>GAMES.filter(g=>!ROOMG.includes(g.id)).map(g=>g.id),newCup=(pool,n)=>({n,i:0,w:[0,0],pool:pool.length?pool:cupAll(),bag:[],last:null});
 function cupNext(){const c=cup;if(!c.bag.length){const b=c.pool.slice().sort(()=>Math.random()-.5);if(b.length>1&&b[b.length-1]==c.last){const t=b[0];b[0]=b[b.length-1];b[b.length-1]=t}c.bag=b}c.last=c.bag.pop();return c.last}
 const cupInfo=()=>'Cup: '+S.t+' zufällige Spiele, jederzeit beendbar · Haken wählt die Spiele ('+sel.size+')';
-function start(id,sk){gdef=GAMES.find(g=>g.id==id);AD.lo=0;if(S.cpu===2&&(!gdef.solo||cup))S.cpu=1;clearInput();if(!ON)n1=S.cpu===1&&typeof OL!='undefined'&&OL.name?OL.name:'Spieler 1';S.rec=[id,...S.rec.filter(x=>x!=id)].slice(0,4);save();window.RX='';over=0;PA=[];TBw=-1;if(!ON)$('#ov').style.display='none';setView();cur=gdef.mk();$('#menu').style.display='none';$('#game').style.display='block';fsOn();setView();$('#gt').textContent=gdef.n;$('#hint').textContent=gdef.h+(isSolo()?' · Solo: spiele auf Highscore':S.cpu?' (gegen Computer: du bist Spieler 1)':'');cs();intro();if(sk)go()}
+function start(id,sk){gdef=GAMES.find(g=>g.id==id);AD.lo=0;if(S.cpu===2&&(!gdef.solo||cup))S.cpu=1;clearInput();if(!ON)n1=S.cpu===1&&typeof OL!='undefined'&&OL.name?OL.name:'Spieler 1';S.rec=[id,...S.rec.filter(x=>x!=id)].slice(0,4);save();window.RX='';over=0;PA=[];TBw=-1;if(!ON)$('#ov').style.display='none';setView();cur=gdef.mk();$('#menu').style.display='none';$('#game').style.display='block';fsOn();setView();$('#gt').textContent=gdef.n;$('#hint').textContent=gdef.h+(isSolo()?' · Solo: spiele auf Highscore':S.cpu?' (gegen Computer: du bist Spieler 1)':'');cs();intro();olUpdateGame();if(sk)go()}
 function showOv(h){const o=$('#ov');o.innerHTML=h;o.style.display='flex';ON&&ON.role==0&&ON.send&&ON.send({o:h})}
 const bd=(id,f)=>{const e=$('#'+id);if(e)e.onclick=f};
 $('#ov').addEventListener('click',e=>{const b=e.target.closest('[data-lu]');if(b&&cur&&cur.luClick)cur.luClick(b)});
@@ -4556,7 +4556,7 @@ function cupEnd(){const a=cup.w;showOv(`<div class=kick>Cup beendet</div><h2>${a
 /* Scrollposition der Spielliste merken, damit man nach dem Spiel wieder dort landet, wo man hineingegangen ist */
 let MENUY=0;
 addEventListener('scroll',()=>{const m=document.getElementById('menu'),g=document.getElementById('game');if(!document.body.classList.contains('playing')&&m&&m.style.display!='none'&&(!g||g.style.display=='none'))MENUY=window.scrollY||0},{passive:true});
-function toMenu(){clearInput();if(ON&&ON.leave){ON.leave();return}$('#ov').style.display='none';fsOff();if(cur&&cur.leave)cur.leave();cur=null;TBw=9;pageTurn(9);setView(1);cup=null;$('#game').style.display='none';$('#menu').style.display='block';menu();const y=MENUY,go=()=>{try{window.scrollTo(0,y)}catch(e){}};go();requestAnimationFrame(go);setTimeout(go,120)}
+function toMenu(){clearInput();if(ON&&ON.leave){ON.leave();return}$('#ov').style.display='none';fsOff();if(cur&&cur.leave)cur.leave();cur=null;olUpdateGame();TBw=9;pageTurn(9);setView(1);cup=null;$('#game').style.display='none';$('#menu').style.display='block';menu();const y=MENUY,go=()=>{try{window.scrollTo(0,y)}catch(e){}};go();requestAnimationFrame(go);setTimeout(go,120)}
 const sel=new Set(GAMES.map(g=>g.id));ROOMG.forEach(x=>sel.delete(x));S.lu=S.lu||{sp:['h','c','c','c'],force:1,all:1,np:4};S.mm=S.mm||{n:3,mau:1};
 function seg(id,key,o,cb){const el=$('#'+id);el.innerHTML='';o.forEach(([v,l])=>{const b=document.createElement('button');b.textContent=l;b.className=S[key]==v?'on':'';b.onclick=()=>{S[key]=v;save();(cb||menu)()};el.append(b)})}
 function menu(){tabs();seg('sm','cpu',[[0,'2 Spieler'],[1,'Gegen Computer'],[2,'Solo']]);seg('sd','d',[[0,'Einfach'],[1,'Normal'],[2,'Schwer'],[3,'Adaptiv']]);seg('st','t',[[3,'Ziel 3'],[5,'Ziel 5'],[7,'Ziel 7']]);
@@ -4788,7 +4788,7 @@ async function olIn(u){
   try{progMerge(p&&p.progress);OL.pready=1;progPush(1)}catch(e){OL.pready=0}
   try{localStorage.setItem('2pg_ol','1')}catch(e){}
   try{OL.BL=(await OL.db.ref('blocked/'+u.uid).once('value')).val()||{};OL.blocksReady=true}catch(e){OL.blocksReady=false;toast('Blockierliste konnte nicht geladen werden. Online-Kontakte sind vorübergehend gesperrt.')}
-  olPresence();olListen();olRender();olBadge();window.chatModeration?.sync();window.gameNotifications?.signedIn();
+  olUpdateGame();olPresence();olListen();olRender();olBadge();window.chatModeration?.sync();window.gameNotifications?.signedIn();
 }
 function olGone(){
   window.gameNotifications?.signedOut();
@@ -4814,7 +4814,14 @@ function olPresence(){
   const touch=()=>{
     if(!valid()||!session?.ready)return Promise.resolve();
     const [row,lease]=paths(session.id),ts=olTS();
-    return db.ref().update({[row]:{name:OL.name,ts,g:OL.game||null},[lease]:ts});
+    const game=OL.game;
+    const write=g=>db.ref().update({[row]:{name:OL.name,ts,g},[lease]:ts});
+    const current=session;
+    return write(game).catch(error=>{
+      // Preserve the online indicator while older database rules are still active.
+      if((game==='fabrik'||game==='blackjack')&&error.code==='PERMISSION_DENIED'&&valid()&&session===current&&OL.game===game)return write(null);
+      throw error;
+    });
   };
   const pulse=()=>{
     if(!valid()||!session?.ready)return;
@@ -4850,9 +4857,24 @@ function olPresence(){
   offset.on('value',skew);
   connected.on('value',changed);
 }
-function olSetGame(g){
-  OL.game=g||null;
+function olUpdateGame(){
+  const game=OL.sess?.cur||OL.sess?.gid||(cur&&gdef?.id)||null;
+  if(OL.game===game)return;
+  OL.game=game;
   OL.presence?.touch().catch(()=>{});
+}
+function olPaintChatDot(dot){
+  dot.hidden=!(OL.F[dot.dataset.chatPresence]&&olAllowed(dot.dataset.chatPresence)&&OL.P[dot.dataset.chatPresence]);
+}
+function olChatDot(uid){
+  const dot=document.createElement('span');
+  dot.className='chat-presence';
+  dot.dataset.chatPresence=uid||'';
+  dot.title='Online';
+  dot.setAttribute('role','img');
+  dot.setAttribute('aria-label','Online');
+  olPaintChatDot(dot);
+  return dot;
 }
 function olPeerPresence(data){
   const tabs=Object.values(data?.tabs||{}).filter(v=>Number(v?.ts)>olNow()-PRESENCE_IDLE).sort((a,b)=>b.ts-a.ts);
@@ -5007,6 +5029,7 @@ ${lg?'':'<p>Merke dir das Passwort gut – es gibt keine Zurücksetzen-Funktion.
 
 function olUpd(){
   window.directChat?.sync();
+  document.querySelectorAll('.chat-presence').forEach(olPaintChatDot);
   if(!OL.open||!OL.me||OL.view!='main')return;
   const box=$('#oll'),tb=$('#olt');if(!box||!tb)return;
   const me=OL.me,online=Object.keys(OL.P).filter(u=>u!=me&&olAllowed(u)),fr=Object.keys(OL.F).filter(olAllowed),rq=Object.keys(OL.RQ).filter(olAllowed);
@@ -5304,7 +5327,7 @@ function olNew(role,mid,gid,names,t){
     else if(st=='disconnected'){clearTimeout(ss.dc);ss.dc=setTimeout(()=>{if(OL.sess===ss&&ss.pc.connectionState!='connected')ss.live?olOppLeft('Die Verbindung wurde unterbrochen.'):olLeave('Verbindung fehlgeschlagen.')},30000)}
   };
   ss.to=setTimeout(()=>{if(OL.sess===ss&&!ss.live)olLeave('Verbindung fehlgeschlagen. Möglicherweise blockiert das Netzwerk direkte Verbindungen (TURN-Server nötig).')},25000);
-  olSetGame(gid);olClose();olCards();
+  olUpdateGame();olClose();olCards();
   return ss;
 }
 
@@ -5345,7 +5368,7 @@ function olRound(){
   if(ss.gid!='cup')cup=null;if(ss.gid=='cup'){if(!cup)cup=newCup(cupAll(),ss.t);const nx=ss.nxt&&cup.pool.includes(ss.nxt)?ss.nxt:null;ss.nxt=null;if(nx)cup.last=nx;ss.cur=nx||cupNext();ON.send({g:ss.cur})}else ss.cur=ss.gid;
   gdef=GAMES.find(g=>g.id==ss.cur);window.RX='';over=0;PA=[];TBw=-1;setView();cur=gdef.mk();
    if(ss.cur==='racing')ON.send({worldVariant:cur.worldVariant});
-  $('#menu').style.display='none';$('#game').style.display='block';fsOn();$('#gt').textContent=gdef.n;$('#hint').textContent='';cs();
+  $('#menu').style.display='none';$('#game').style.display='block';fsOn();$('#gt').textContent=gdef.n;$('#hint').textContent='';cs();olUpdateGame();
   idle=1;t0=now();let n=3;
   const tick=()=>{
     if(OL.sess!==ss)return;
@@ -5420,7 +5443,7 @@ function olGuestMsg(m){if(m.tn){TNS=m.tn;return}if(m.ch){CHS=m.ch;return}
   const ss=OL.sess;if(!ss||!ss.role)return;
   if(Object.hasOwn(m,'chat')){window.gameChat?.receivePeer(ss,m.chat);return;}
   if(m.tw!==undefined)pageTurn(m.tw);
-  else if(m.g!==undefined){ss.cur=m.g;ss.worldVariant=undefined;$('#gt').textContent=olGameName(m.g)}
+  else if(m.g!==undefined){ss.cur=m.g;ss.worldVariant=undefined;$('#gt').textContent=olGameName(m.g);olUpdateGame()}
   else if((ss.cur||ss.gid)==='racing'&&[0,1,2].includes(m.worldVariant))ss.worldVariant=m.worldVariant;
   else if(m.o!==undefined){if(m.o===null)$('#ov').style.display='none';else showOv(m.o)}
   else if(m.s)snd(...m.s);
@@ -5447,7 +5470,7 @@ function olLeave(msg){
   n1='Spieler 1';over=0;idle=0;
   document.body.classList.remove('onl','onl-guest');
   const v=$('#gv');try{v.srcObject=null}catch(e){}
-  olSetGame(null);olCards();
+  olUpdateGame();olCards();
   if($('#game').style.display!='none'||cur)toMenu();
   else{fsOff();menu()}
   if(msg)toast(msg.replace(/<[^>]+>/g,''));
@@ -5513,9 +5536,9 @@ addEventListener('keydown',e=>{if(e.key=='Escape'&&!box.hidden){e.stopPropagatio
 const fromHash=()=>{const k=location.hash.slice(1);if(T[k])open(k)};addEventListener('hashchange',fromHash);fromHash();
 })();
 </script>
-<script src="./group-chat.js"></script>
-<script src="./direct-chat.js?v=2"></script>
-<script src="./game-chat.js"></script>
+<script src="./group-chat.js?v=2"></script>
+<script src="./direct-chat.js?v=3"></script>
+<script src="./game-chat.js?v=2"></script>
 <script src="./chat-moderation.js"></script>
 <script src="./notifications.js"></script>
 </body></html>

@@ -133,7 +133,8 @@
     section.replaceChildren(back,item('h3',info.name+' · '+Object.keys(g.data.members).length+'/30'));
     const roster=document.createElement('ul');roster.className='dm-members';
     for(const [slot,m] of Object.entries(g.data.members)){
-      const row=item('li','');row.append(item('strong',m.name),item('small',m.uid===info.owner?'Inhaber':m.role==='admin'?'Admin':'Mitglied'));
+      const row=item('li',''), name=item('strong',m.name);
+      name.append(olChatDot(m.uid));row.append(name,item('small',m.uid===info.owner?'Inhaber':m.role==='admin'?'Admin':'Mitglied'));
       if(admin&&m.uid!==OL.me&&m.uid!==info.owner){
         const memberRef=ref(g.id).child('members/'+slot);
         if(m.role==='member')row.append(button('Zum Admin machen',()=>run(()=>memberRef.child('role').set('admin'))));

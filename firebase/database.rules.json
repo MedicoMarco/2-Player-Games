@@ -162,7 +162,7 @@
               ".validate": "newData.isNumber() && newData.val() === now"
             },
             "g": {
-              ".validate": "newData.isString() && newData.val().matches(/^(tennis|pong|hockey|snakes|sumo|ttt|react|tug|curling|blocks|target|spot|spinner|clash|memory|chess|pool|mini|micro|ice|racing|bball|elf|volley|cup)$/) || newData.val() === 'ludo' || newData.val() === 'maumau' || newData.val() === 'poker'"
+              ".validate": "newData.isString() && newData.val().matches(/^(tennis|pong|hockey|snakes|sumo|ttt|react|tug|curling|blocks|target|spot|spinner|clash|memory|chess|pool|mini|micro|ice|racing|bball|elf|volley|cup|ludo|maumau|poker|blackjack|fabrik)$/)"
             },
             "$other": {
               ".validate": false
