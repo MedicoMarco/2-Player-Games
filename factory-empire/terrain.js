@@ -301,6 +301,48 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
    }
   }
  }
+ function paintDreimacsHead(){
+  const skin=c.createLinearGradient(-.25,.17,.14,-.25);
+  skin.addColorStop(0,'#9e6359');skin.addColorStop(.38,'#d4957e');
+  skin.addColorStop(.67,'#e9b39a');skin.addColorStop(1,'#be8371');
+  c.beginPath();
+  c.moveTo(-.014,-.374);
+  c.quadraticCurveTo(.044,-.285,.133,-.167);
+  c.bezierCurveTo(.219,-.06,.291,.069,.268,.156);
+  c.quadraticCurveTo(.208,.247,-.029,.237);
+  c.quadraticCurveTo(-.249,.237,-.285,.14);
+  c.bezierCurveTo(-.293,.046,-.186,-.114,-.014,-.374);
+  c.closePath();c.fillStyle=skin;c.fill();
+  c.strokeStyle='#734d42';c.lineWidth=.014;c.stroke();
+
+  // Soft cheek shadows and the highlights along the narrow forehead and long nose.
+  oval(-.202,.096,.059,.095,'#9c595557',.37);
+  oval(.189,.102,.052,.084,'#a25d5570',-.48);
+  oval(-.123,.087,.074,.046,'#edaa9880',-.62);
+  oval(.122,.071,.061,.044,'#f2b59a68',.54);
+  line([[-.025,-.302],[-.041,-.224],[-.057,-.177]],.016,'#eac1a47a');
+  line([[-.032,-.112],[-.041,-.014],[-.039,.056],[-.056,.087]],.02,'#9d5f55a1');
+  line([[-.013,-.115],[.001,-.025],[.008,.046],[.021,.068]],.022,'#f4bd9db8');
+
+  for(const side of [-1,1]){
+   const eye=side*.09,tilt=side*.13;
+   oval(eye,-.025,.057,.068,'#8b514966',tilt);
+   line([[eye-side*.049,-.07],[eye-side*.02,-.092],[eye+side*.02,-.097],[eye+side*.052,-.08]],.017,'#6b433b');
+   oval(eye,-.016,.033,.046,'#f2dbce',tilt);
+   line([[eye-.03,-.024],[eye-.014,-.052],[eye+.013,-.052],[eye+.03,-.026]],.011,'#633e38');
+   oval(eye+.002,-.011,.021,.032,'#78584e',tilt);
+   oval(eye+.002,-.011,.012,.023,'#241c20',tilt);
+   oval(eye-.004,-.024,.007,.008,'#fff2dd',0);
+   line([[side*.035,.069],[side*.085,.093],[side*.145,.121]],.015,'#7947478c');
+  }
+  oval(-.022,.072,.015,.009,'#7c4841',-.25);
+  oval(.030,.074,.014,.009,'#8b5147',.23);
+  oval(.003,.143,.118,.032,'#884b53',.03);
+  polygon([[-.109,.135],[-.039,.117],[.006,.123],[.045,.115],[.117,.145],[.026,.151],[-.047,.148]],'#653a46');
+  line([[-.047,.139],[-.006,.143],[.037,.141]],.009,'#ebc9b6');
+  oval(.012,.164,.066,.012,'#d8928f',.05);
+  oval(-.005,.196,.079,.017,'#edb09866',-.025);
+ }
  function paintLakeFish(x,y,time){
   const phase=time*.52;
   withState(()=>{
@@ -309,25 +351,26 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
    withState(()=>{
     c.rotate(Math.atan2(Math.cos(phase)*.62,-Math.sin(phase)*1.15));
     const wag=Math.sin(time*6)*.055;
-    polygon([[-.24,0],[-.51,-.15+wag],[-.46,.15+wag]],'#bd8759');
-    oval(-.13,0,.26,.14,'#ddb079',0);
+    polygon([[-.23,0],[-.54,-.17+wag],[-.49,.004+wag],[-.51,.16+wag]],'#b3764e');
+    line([[-.48,-.116+wag],[-.32,-.032]],.014,'#e6b577');
+    line([[-.47,.096+wag],[-.32,.028]],.012,'#d8a266');
+    oval(-.137,.025,.282,.153,'#28546172',0);
+    const scales=c.createLinearGradient(0,-.15,0,.14);
+    scales.addColorStop(0,'#9f6448');scales.addColorStop(.48,'#db9d62');scales.addColorStop(1,'#e8c698');
+    oval(-.135,0,.279,.14,scales,0);
+    polygon([[-.276,-.078],[-.212,-.193],[-.093,-.112]],'#b87a56');
+    oval(-.236,.069,.093,.033,'#a76c4d',-.35);
+    for(const fin of [-.3,-.24,-.18,-.12]){
+     line([[fin-.023,-.025],[fin+.012,0],[fin-.008,.026]],.009,'#965f435f');
+    }
     c.translate(.24,0);
     c.rotate(Math.PI/2);
-    polygon([[0,-.32],[.23,.18],[-.23,.18]],'#8e5347');
-    polygon([[0,-.30],[.211,.16],[-.211,.16]],'#d49982');
-    polygon([[0,-.27],[.09,.058],[0,.105],[-.05,.045]],'#e6af97');
-    for(const eye of [-.066,.066]){
-     oval(eye,-.035,.044,.017,'#92594e',eye<0?-.24:.24);
-     oval(eye,.005,.028,.039,'#efe0d3',0);
-     oval(eye,.012,.017,.025,'#382824',0);
-    }
-    oval(0,.115,.091,.023,'#864754',0);
-    oval(0,.104,.059,.009,'#efc0ac',0);
+    paintDreimacsHead();
    });
-   rr(-.58,-.84,1.16,.26,.025,'#101014bc');
+   rr(-.58,-.96,1.16,.26,.025,'#101014bc');
    c.font='700 .18px monospace';c.textAlign='center';c.textBaseline='middle';
-   c.fillStyle='#131319';c.fillText('Dreimacs',.018,-.692);
-   c.fillStyle='#fff';c.fillText('Dreimacs',0,-.71);
+   c.fillStyle='#131319';c.fillText('Dreimacs',.018,-.812);
+   c.fillStyle='#fff';c.fillText('Dreimacs',0,-.83);
   });
  }
  function paintRoads(drives,visible,detail){
