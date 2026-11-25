@@ -1,5 +1,5 @@
 /* ===== Factory Empire ===== */
-const fabrik=()=>{
+const fabrik=({preview=false}={})=>{
 const canvasScope=createFactoryCanvasScope(c);
 const {save:saveCanvas,restore:restoreCanvas,withState:withCanvasState}=canvasScope;
 const TS=48,TICK=.125,DAYSEC=300,DAYS=1500,BELT=.25,RRC=1920,DX=[1,0,-1,0],DY=[0,1,0,-1],PI=Math.PI;
@@ -1051,7 +1051,7 @@ function snapshot(){
  };
 }
 function sv(force){
- if(!ready)return;
+ if(!ready||preview)return;
  const data=JSON.parse(JSON.stringify(snapshot()));
  cloud.localSaved=writeLocal(cloud.localKey||(cloud.migrationBlocked?KEY+'.compatible':KEY),data);
  if(!cloud.localSaved){
@@ -2136,6 +2136,26 @@ function ordersPanel(X,Y,W){
  });
  tx('Die Prämie kommt zum normalen Stückpreis hinzu. Offene Aufträge lassen sich alle vier Minuten tauschen.',X+18,Y+308,11,'#94a3b8');
 }
+function openChapterPreview(){
+ const options=[
+  [1,'Projekt ARCHE'],
+  ...Object.entries(chapters).map(([level,chapter])=>[Number(level),chapter.title])
+ ];
+ showOv(`<div class="fe-offline-report">
+  <div class="kick">Factory Empire</div><h2>Testmodus</h2>
+  <p>Wähle ein Kapitel. Jedes Kapitel startet mit einer neuen, temporären Testfabrik.</p>
+  <div class="row">${options.map(([level,title])=>`<button class="btn" id="fe-preview-${level}">Kapitel ${level} · ${title}</button>`).join('')}</div>
+ </div>`);
+ for(const [level] of options)bd('fe-preview-'+level,()=>{
+  const chapter=chapters[level],site=chapter?.site||'main',region=REGIONS.find(entry=>entry.id===site);
+  const done=Object.fromEntries(Object.keys(FactoryStory.scenes).map(id=>[id,true]));
+  applySave({v:latestLayout,yardRows:[2,2],ts:Date.now(),m:500000,site,
+   sp:chapter?PH.length:0,campaign:{level,stage:0},tu:-1,tutorialAward:true,
+   hl:{gar:1,...(region?.hall?{[region.hall]:1}:{})},story:{version:1,done}});
+  $('#ov').style.display='none';
+  if(region?.hall)focusWorld(hrect(hallOf(region.hall)));
+ });
+}
 function campaignTab(X,Y,W){
  tx('Kampagne',X+18,Y+67,17,'#e2edf6','left',800);
  const current=campaignChapter(),project=chapters[current];
@@ -2150,6 +2170,10 @@ function campaignTab(X,Y,W){
  }
  btn(X+16,Y+257,180,33,()=>{closeP2();projectView=current;bkO=true},'#334e66',0,'campaign_open');
  tx('Zum Projekt',X+106,Y+279,12,'#fff','center',700);
+ if(preview){
+  btn(X+210,Y+257,180,33,openChapterPreview,'#75603a',0,'chapter_preview');
+  tx('Testmodus · Kapitel wählen',X+300,Y+279,12,'#fff','center',700);
+ }
 }
 function storyArchive(X,Y,W){
  tx('Story-Archiv',X+18,Y+65,17,'#e2edf6','left',800);
@@ -3672,8 +3696,8 @@ const audio=createFactoryAudio({
  time:()=>tm,
  frame:()=>({cam:{...cam,z:cameraZoom()},CX,CY,FW,FH,L,TS}),
  mood:()=>{const count=HL.filter(h=>hlv(h.id)>0).length;return legacyIndustry('foundings')>0||count>=5?3:count>=3?2:count>=2?1:0},
- cloudRef:()=>stillSignedIn()&&cloud.base!=null?OL.db.ref('users/'+cloud.uid+'/factoryAudio'):null,
- writeLocal,toast,isBelt,tme
+ cloudRef:()=>!preview&&stillSignedIn()&&cloud.base!=null?OL.db.ref('users/'+cloud.uid+'/factoryAudio'):null,
+ writeLocal:preview?()=>false:writeLocal,toast,isBelt,tme
 });
 const {audG,audLoad,audSave,audApply,audStop,audioStart,sfx,MS,SFX,MOODS,audMach,musFill,musTick,mshot,aud,audCloudSync}=audio;
 const AS=audio.settings;
@@ -3707,7 +3731,7 @@ function drawFrame(){
  withCanvasState(()=>{
   if(cv.width>0&&cv.height>0)c.setTransform(cv.width/FW,0,0,cv.height/FH,0,0);
   c.fillStyle='#14181e';c.fillRect(0,0,FW,FH);
-  if(!ready){tx('Lade deine Fabrik …',FW/2,FH/2,22,'#cbd5e1','center',700);return}
+  if(!ready){tx(preview?'Testmodus':'Lade deine Fabrik …',FW/2,FH/2,22,'#cbd5e1','center',700);return}
 
   if(ff){drawLayer('Offline-Fortschritt',drawOfflineProgress);return}
   if(storyOnScreen()){drawLayer('Filmszene',drawStory);return}
@@ -3722,7 +3746,7 @@ function drawFrame(){
 
 /* ---- Schnittstelle zum Spiel-Rahmen ---- */
 return{
-boot(){tuTour=0;tuHn=null;tuG=null;tuKey='';audLoad();audioStart();document.addEventListener('pointerdown',audG);document.addEventListener('keydown',audG);document.addEventListener('visibilitychange',onHide);addEventListener('pagehide',onHide);addEventListener('blur',resetCameraInput);cv.addEventListener('wheel',wh,{passive:false});cv.addEventListener('mousemove',mm);cv.addEventListener('mouseleave',ml)},
+boot(){tuTour=0;tuHn=null;tuG=null;tuKey='';if(!preview)audLoad();audioStart();document.addEventListener('pointerdown',audG);document.addEventListener('keydown',audG);document.addEventListener('visibilitychange',onHide);addEventListener('pagehide',onHide);addEventListener('blur',resetCameraInput);cv.addEventListener('wheel',wh,{passive:false});cv.addEventListener('mousemove',mm);cv.addEventListener('mouseleave',ml)},
 leave(){sv(1);audStop();document.removeEventListener('pointerdown',audG);document.removeEventListener('keydown',audG);document.removeEventListener('visibilitychange',onHide);removeEventListener('pagehide',onHide);removeEventListener('blur',resetCameraInput);cv.removeEventListener('wheel',wh);cv.removeEventListener('mousemove',mm);cv.removeEventListener('mouseleave',ml);resetCameraInput()},
 click(x,y,_player,id,pointerType){
  if(!ready||ff||!Number.isFinite(x)||!Number.isFinite(y))return;
@@ -3805,6 +3829,10 @@ dragEnd(x,y,_player,id){
 },
 update(dt){
  if(!ready){
+  if(preview){
+   if(!ld){ld=1;openChapterPreview();}
+   return;
+  }
   if(window.NOFIN){KEY='2pg_fe_demo';demo();return}
   wt+=dt;
   if(!ld){

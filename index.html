@@ -569,7 +569,7 @@ Deutschland</p>
 <script src="./factory-empire/layout.js?v=18"></script>
 <script src="./factory-empire/terrain.js?v=12"></script>
 <script src="./factory-empire/world.js?v=7"></script>
-<script src="./factory-empire/game.js?v=28"></script>
+<script src="./factory-empire/game.js?v=29"></script>
 <script src="./poker.js"></script>
 <script src="./card-chip-picker.js"></script>
 <script src="./poker-table.js?v=3"></script>
@@ -4543,7 +4543,8 @@ const cs=()=>{if(!cup){$('#cs').textContent='';return}const v=cup.i+(over?0:1);$
 const cupAll=()=>GAMES.filter(g=>!ROOMG.includes(g.id)).map(g=>g.id),newCup=(pool,n)=>({n,i:0,w:[0,0],pool:pool.length?pool:cupAll(),bag:[],last:null});
 function cupNext(){const c=cup;if(!c.bag.length){const b=c.pool.slice().sort(()=>Math.random()-.5);if(b.length>1&&b[b.length-1]==c.last){const t=b[0];b[0]=b[b.length-1];b[b.length-1]=t}c.bag=b}c.last=c.bag.pop();return c.last}
 const cupInfo=()=>'Cup: '+S.t+' zufällige Spiele, jederzeit beendbar · Haken wählt die Spiele ('+sel.size+')';
-function start(id,sk){gdef=GAMES.find(g=>g.id==id);AD.lo=0;if(S.cpu===2&&(!gdef.solo||cup))S.cpu=1;clearInput();if(!ON)n1=S.cpu===1&&typeof OL!='undefined'&&OL.name?OL.name:'Spieler 1';S.rec=[id,...S.rec.filter(x=>x!=id)].slice(0,4);save();window.RX='';over=0;PA=[];TBw=-1;if(!ON)$('#ov').style.display='none';setView();cur=gdef.mk();$('#menu').style.display='none';$('#game').style.display='block';fsOn();setView();$('#gt').textContent=gdef.n;$('#hint').textContent=gdef.h+(isSolo()?' · Solo: spiele auf Highscore':S.cpu?' (gegen Computer: du bist Spieler 1)':'');cs();intro();olUpdateGame();if(sk)go()}
+let factoryPreviewEnabled=false;
+function start(id,sk){gdef=GAMES.find(g=>g.id==id);AD.lo=0;if(S.cpu===2&&(!gdef.solo||cup))S.cpu=1;clearInput();if(!ON)n1=S.cpu===1&&typeof OL!='undefined'&&OL.name?OL.name:'Spieler 1';S.rec=[id,...S.rec.filter(x=>x!=id)].slice(0,4);save();window.RX='';over=0;PA=[];TBw=-1;if(!ON)$('#ov').style.display='none';setView();cur=id==='fabrik'&&factoryPreviewEnabled?gdef.mk({preview:true}):gdef.mk();$('#menu').style.display='none';$('#game').style.display='block';fsOn();setView();$('#gt').textContent=gdef.n;$('#hint').textContent=gdef.h+(isSolo()?' · Solo: spiele auf Highscore':S.cpu?' (gegen Computer: du bist Spieler 1)':'');cs();intro();olUpdateGame();if(sk)go()}
 function showOv(h){const o=$('#ov');o.innerHTML=h;o.style.display='flex';ON&&ON.role==0&&ON.send&&ON.send({o:h})}
 const bd=(id,f)=>{const e=$('#'+id);if(e)e.onclick=f};
 $('#ov').addEventListener('click',e=>{const b=e.target.closest('[data-lu]');if(b&&cur&&cur.luClick)cur.luClick(b)});
@@ -5643,4 +5644,18 @@ const fromHash=()=>{const k=location.hash.slice(1);if(T[k])open(k)};addEventList
 <script src="./game-chat.js?v=2"></script>
 <script src="./chat-moderation.js"></script>
 <script src="./notifications.js"></script>
+<script>
+(async()=>{
+ const code=/^#factory-test=([A-Za-z0-9_-]{32})$/.exec(location.hash)?.[1];
+ if(!code||!globalThis.crypto?.subtle)return;
+ const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(code)));
+ if(Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('')!=='22e0e68f19242e14e4f9d3e97fca832245612ae212a416ce7ad7f08befd8166f')return;
+ factoryPreviewEnabled=true;
+ const button=document.createElement('button');
+ button.type='button';button.className='btn';
+ button.textContent='Factory Empire · Testmodus';
+ button.onclick=()=>start('fabrik');
+ document.querySelector('#menu').prepend(button);
+})().catch(()=>{});
+</script>
 </body></html>
