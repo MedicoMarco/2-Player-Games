@@ -36,7 +36,7 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
  ];
  const lakes=[
   {x:-11.1,y:32.4,shore:[[-19,25],[-14,22],[-8,22.6],[-3.61,25.5],[-3.6,29.3],[-2.75,33.2],[-4.7,37.9],[-10,41.4],[-15.3,40.1],[-21,37.8],[-23.2,31.9],[-21.9,27.3]]},
-  {x:122.3,y:56.2,shore:[[113.4,48.6],[117.6,48.2],[124.9,49.05],[131.3,52.95],[132.8,57.5],[130.9,62.2],[126.8,65],[120.7,66],[114.3,62.8],[112.1,56.7]]},
+  {x:122.3,y:56.2,fish:true,shore:[[113.4,48.6],[117.6,48.2],[124.9,49.05],[131.3,52.95],[132.8,57.5],[130.9,62.2],[126.8,65],[120.7,66],[114.3,62.8],[112.1,56.7]]},
   {x:12.9,y:69.9,shore:[[9.5,68.1],[12,66.5],[15,67.12],[16.4,69.9],[14.5,72.4],[10.8,71.8]]},
   {x:8.5,y:-7.1,shore:[[3.9,-8.25],[6.26,-11.6],[9.4,-12],[14.5,-9.6],[14.2,-6.8],[11.3,-4.4],[8.65,-4.7],[5.7,-4.75]]}
  ];
@@ -286,19 +286,36 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
     c.setLineDash([]);c.lineDashOffset=0;
    }
   }
-  for(const {x,y,shore} of lakes){
+  for(const {x,y,shore,fish} of lakes){
    if(!visible(x-14,y-13,28,26))continue;
    shape(shore,'#b8ab7d');
    shape(shore.map(([a,b])=>[x+(a-x)*.951,y+(b-y)*.95]),'#5e9999');
    const water=c.createLinearGradient(x-7,y-8,x+4,y+9);
    water.addColorStop(0,'#326c78');water.addColorStop(.55,'#397b85');water.addColorStop(1,'#589197');
    shape(shore.map(([a,b])=>[x+(a-x)*.87,y+(b-y)*.88]),water);
+   if(fish&&detail)paintLakeFish(x,y,time);
    if(detail)for(let i=0;i<15;i++){
     const u=x+(hash(i,x|0,8)-.5)*7,v=y+(hash(i,y|0,9)-.5)*6,d=1+Math.sin(time*.45+i)*.3;
     if(!visible(u,v,1.5,.1))continue;
     line([[u,v],[u+d,v-.07],[u+d*1.37,v]],.027,'#c7e4dc6b');
    }
   }
+ }
+ function paintLakeFish(x,y,time){
+  const phase=time*.52;
+  withState(()=>{
+   c.translate(x+Math.cos(phase)*1.15,y+Math.sin(phase)*.62);
+   c.rotate(Math.atan2(Math.cos(phase)*.62,-Math.sin(phase)*1.15));
+   const wag=Math.sin(time*6)*.055;
+   polygon([[-.18,0],[-.37,-.12+wag],[-.33,.11+wag]],'#bd8759');
+   oval(-.035,0,.19,.105,'#ddb079',0);
+   polygon([[.03,-.105],[.255,0],[.065,.096]],'#e2b183');
+   polygon([[-.07,-.025],[-.16,-.128],[.043,-.038]],'#df9662');
+   oval(.146,-.021,.023,.022,'#254b55',0);
+   if(time&&Math.sin(phase*3)>.63){
+    c.strokeStyle='#d3eee969';c.lineWidth=.012;c.beginPath();c.ellipse(.29,.1,.11,.075,0,0,2*Math.PI);c.stroke();
+   }
+  });
  }
  function paintRoads(drives,visible,detail){
   const active=roads.filter(road=>pathVisible(road,visible));
@@ -353,20 +370,52 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
    c.fillText('ARCHE',0,-.065,.89);
   });
  }
- function vehicle(x,y,angle,color,long,detail,shipment){
+ function vehicle(x,y,angle,color,kind,detail){
   withState(()=>{
    c.translate(x,y);c.rotate(angle);
-   const w=long?1.19:.76,h=long?.37:.32,center=w/2;
-   rr(-center+.11,-h*.5+.09,w,h,.067,'#15262286');
-   rr(-center,-h/2,w,h,.071,color);
-   if(!detail)return;
-   for(const x of [-center+.14,center-.17]){
-    rr(x-.084,-h*.5-.041,.15,.082,.026,'#272e2f');rr(x-.084,h*.5-.042,.15,.082,.026,'#272e2f');
+   const truck=kind==='truck'||kind==='freight',van=kind==='van';
+   const length=truck?1.36:van ? .95 : .8,width=truck ? .40 : .34,end=length/2;
+   rr(-end+.065,-width/2+.055,length,width,.085,'#14252786');
+   if(detail){
+    const axles=truck?[-.51,-.34,.49]:[-end+.15,end-.16];
+    for(const axle of axles)for(const side of [-1,1]){
+     rr(axle-.075,side*width/2-.038,.15,.076,.021,'#202729');
+    }
    }
-   rr(center-.28,-h*.39,.115,h*.78,.025,'#31545b');
-   rr(center-.025,-h*.36,.055,.071,.018,'#efe5ac');rr(center-.025,h*.14,.055,.071,.018,'#efe5ac');
-   rr(-center,-h*.37,.044,.058,.012,'#fa9d72');rr(-center,h*.16,.044,.058,.012,'#fa9d72');
-   if(long)rr(-center+.072,-h*.39,w*.56,h*.78,.033,shipment?'#e4cc94':'#e0e0cb8a');
+   if(truck){
+    rr(-end,-.18,length,.36,.065,'#283537');
+    const cargo=kind==='freight'?'#e4cc94':color;
+    rr(-.675,-.194,.91,.388,.035,cargo);
+    rr(.28,-.181,.397,.362,.061,color);
+    if(detail){
+     for(const y of [-.156,.132])rr(-.62,y,.79,.023,.008,'#fff7');
+     for(const x of [-.48,-.27,-.06,.14])rr(x,-.14,.014,.28,.005,'#35414637');
+     rr(.514,-.152,.075,.304,.027,'#3d5d66');
+     rr(.334,-.122,.132,.244,.034,'#d7dcd482');
+     if(kind==='freight')line([[-.596,-.10],[-.596,.10]],.028,'#675a3e');
+    }
+   }else if(van){
+    rr(-end,-.175,length,.35,.073,color);
+    if(detail){
+     rr(-.426,-.133,.509,.266,.035,'#dedfd6ac');
+     rr(.239,-.147,.067,.294,.021,'#2b5667');
+     rr(-.29,-.13,.018,.26,.008,'#53626791');
+    }
+   }else{
+    polygon([[-.38,-.103],[-.29,-.162],[.232,-.164],[.395,-.084],[.395,.084],[.232,.164],[-.29,.162],[-.38,.103]],color);
+    if(detail){
+     polygon([[-.233,-.117],[-.11,-.129],[.163,-.126],[.231,-.096],[.231,.096],[.163,.126],[-.11,.129],[-.233,.117]],'#365d6d');
+     rr(-.128,-.099,.269,.198,.047,color);
+     rr(-.119,-.082,.23,.032,.013,'#d5e9ec70');
+     for(const y of [-.177,.153])rr(.125,y,.093,.023,.007,color);
+    }
+   }
+   if(!detail)return;
+   for(const side of [-1,1]){
+    const yy=side*(width/2-.052);
+    rr(end-.058,yy-.025,.054,.05,.012,'#fff0b5');
+    rr(-end+.014,yy-.023,.037,.046,.009,'#ed7770');
+   }
   });
  }
  function climate(l,t,r,b,time,visible,worldWidth){
@@ -515,7 +564,7 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
     const {x,y,angle}=sample(lane,reverse?lane.distance-offset:offset);
     if(!main&&[j.motorWest,j.motorEast].some(([a,b])=>Math.abs(x-a)<1&&Math.abs(y-b)<1.32))continue;
     const yaw=angle+(reverse?Math.PI:0),shift=main?0:.24;
-    if(visible(x-.7,y-.7,1.4,1.4))vehicle(x-Math.sin(yaw)*shift,y+Math.cos(yaw)*shift,yaw,colors[i%colors.length],i%5===0,detail,false);
+    if(visible(x-.7,y-.7,1.4,1.4))vehicle(x-Math.sin(yaw)*shift,y+Math.cos(yaw)*shift,yaw,colors[i%colors.length],i%7===0?'truck':i%5===0?'van':'car',detail);
    }
    climate(l,t,r,b,time,visible,worldWidth);
   });
@@ -529,7 +578,7 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
     const lane=Math.max(0,Math.min(.055,distance*.25,(trip.route.distance-distance)*.25));
     const x=point.x-Math.sin(angle)*lane,y=point.y+Math.cos(angle)*lane;
     if(!intersects((x-1)*tile,(y-1)*tile,2*tile,2*tile))continue;
-    vehicle(x,y,angle,'#d4a557',true,detail,true);
+    vehicle(x,y,angle,'#d4a557','freight',detail);
     if(detail){
      const unloading=distance>=trip.route.distance;
      const label=unloading?'Entladung · '+trip.count+'× '+items[trip.item].n:trip.count+'× '+items[trip.item].n;
