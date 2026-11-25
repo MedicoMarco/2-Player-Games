@@ -592,7 +592,7 @@ const wantPor=()=>S.ori=='p'||(S.ori=='a'&&innerHeight>innerWidth*1.05);
 /* Spiele mit echter Hochkant-Ansicht (Spielfeld wird gedreht, Texte bleiben aufrecht) */
 const PORX=['curling','ice'];
 function setView(off){
-  const g=!off&&gdef&&(gdef.id=='pong'||gdef.id=='hockey')&&!ON&&!(S.cpu===2),tn=!off&&gdef&&gdef.id=='tennis'&&!ON&&S.cpu!==2,gx=!off&&gdef&&PORX.includes(gdef.id)&&!ON&&S.cpu!==2,rc=!off&&gdef&&(gdef.id=='racing'||gdef.id=='chess')&&!ON&&S.cpu!==2;
+  const g=!off&&gdef&&(gdef.id=='pong'||gdef.id=='hockey')&&!ON&&!(S.cpu===2),tn=!off&&gdef&&gdef.id=='tennis'&&!ON&&S.cpu!==2,gx=!off&&gdef&&PORX.includes(gdef.id)&&!ON&&S.cpu!==2,rc=!off&&gdef&&!ON&&((gdef.id=='racing'||gdef.id=='chess')&&S.cpu!==2||gdef.id=='sudoku');
   V.factory=!!(!off&&gdef?.id==='fabrik');
   document.body.classList.toggle('fab',V.factory);
   if(V.factory){
@@ -636,7 +636,7 @@ const LV=a=>{if(S.d!=3)return a[S.d];const r=adEff(),i=Math.min(a.length-2,Math.
 const LI=a=>a[DI()];
 const adSync=()=>{try{if(typeof OL!='undefined'&&OL.me&&OL.db&&gdef){const m=adM();OL.db.ref('users/'+OL.me+'/ad/'+gdef.id).set({r:Math.round(adR()*1000)/1000,s:Math.round(m.s*1000)/1000,d:m.d,n:m.n,k:m.k,v:m.v}).catch(()=>{})}}catch(e){}};
 const adSet=v=>{if(!gdef||!Number.isFinite(v))return;S.ar=S.ar||{};v=Math.max(0,Math.min(2,v));S.ar[gdef.id]=v;S.ag=(S.ag!=null?S.ag:1)+(v-(S.ag!=null?S.ag:1))*.2;save();adSync()};
-const adTick=dt=>{const st=gdef&&(gdef.id=='chess'||gdef.id=='ludo'||gdef.id=='maumau');
+const adTick=dt=>{const st=gdef&&(gdef.id=='chess'||gdef.id=='ludo'||gdef.id=='maumau'||gdef.id=='sudoku');
   if(S.d!=3||S.cpu!==1||ON||over||idle||!gdef){if(AD.lo&&(over||S.d!=3))AD.lo*=.9;return}
   if(AD.cur!==cur){AD.cur=cur;AD.t=0;AD.ph=rnd(0,6.3);AD.form=rnd(-.3,.3);AD.lo=adCal()?0:(st?rnd(-.35,.35):0)}
   if(st)return; /* Schach/Mensch ärgere dich nicht: Stärke pro Partie fest (Tagesform), gelernt wird nach der Partie */
@@ -1065,6 +1065,7 @@ const WORLD_ART={
   snakes:  [['#527a61','#26463e','#13282a','#a7bc75'],'leaves',[['fern','log','fern'],['fern','mushrooms'],['log','mushrooms','fern'],['mushrooms','fern']]],
   sumo:    [['#64301d','#311716','#180e10','#fa9b49'],'faults',[['basalt','lava','basalt'],['lava','basalt'],['basalt','lava','basalt'],['basalt','lava']]],
   ttt:     [['#eee7f5','#d7d9ed','#989cc3','#6d6c9c'],'paper',[['pencil','doodles','pencil'],['clips','eraser'],['eraser','doodles','clips'],['pencil','clips']]],
+  sudoku:  [['#f1e6c9','#dccba1','#ad9a6a','#7a8f6a'],'paper',[['pencil','doodles','pencil'],['eraser','clips'],['clips','pencil','eraser'],['doodles','pencil']]],
   react:   [['#394567','#1e2947','#0d1528','#f4be5c'],'circuits',[['lamps','beacon','lamps'],['beacon','panel'],['panel','wave','panel'],['wave','beacon']]],
   tug:     [['#d7e3ab','#87a66b','#4f7b50','#f4d18e'],'grass',[['flags','bench','flags'],['rope','crates'],['crates','rope','crates'],['bench','rope']]],
   curling: [['#517391','#284057','#101f32','#c8ebf8'],'ice',[['seats','stone','seats'],['brooms','bench'],['bench','brooms','stone'],['stone','brooms']]],
@@ -1389,9 +1390,9 @@ function go(){if(!idle||coinB)return;
   setTimeout(()=>{coinB=0;if(cur!==c0||!idle)return;try{c0.first(f)}catch(e){}begin()},3000);
 }
 /* Was der Zielwert (3/5/7) im jeweiligen Spiel konkret bedeutet */
-const GOALS={pong:v=>v+' Punkte',tennis:v=>({3:7,5:11,7:21}[v])+' Punkte',hockey:v=>v+' Tore',volley:v=>v+' Punkte',snakes:v=>Math.ceil(v/2)+' Siege',sumo:v=>Math.ceil(v/2)+' Siege',cup:v=>v+' Spiele',ttt:v=>Math.ceil(v/2)+' Siege',tug:v=>Math.ceil(v/2)+' Siege',spinner:v=>Math.ceil(v/2)+' Siege',elf:v=>v+' Schüsse',mini:v=>Math.min(v,MG_POOL.length)+' Bahnen',memory:v=>(v<4?16:v<6?24:36)/2+' Paare',clash:v=>v*2+' Züge',target:v=>(v==3?30:v==5?45:60)+' s',spot:v=>({3:2,5:3,7:4}[v])+' Bilder',bball:v=>(30+v*5)+' s',micro:v=>({3:2,5:3,7:5}[v])+' Runden',racing:v=>v==3?'0,8 km':v==5?'1,4 km':'2,0 km'};
+const GOALS={pong:v=>v+' Punkte',tennis:v=>({3:7,5:11,7:21}[v])+' Punkte',hockey:v=>v+' Tore',volley:v=>v+' Punkte',snakes:v=>Math.ceil(v/2)+' Siege',sumo:v=>Math.ceil(v/2)+' Siege',cup:v=>v+' Spiele',ttt:v=>Math.ceil(v/2)+' Siege',tug:v=>Math.ceil(v/2)+' Siege',spinner:v=>Math.ceil(v/2)+' Siege',elf:v=>v+' Schüsse',mini:v=>Math.min(v,MG_POOL.length)+' Bahnen',memory:v=>(v<4?16:v<6?24:36)/2+' Paare',sudoku:v=>({3:30,5:40,7:50}[v]||40)+' Felder',clash:v=>v*2+' Züge',target:v=>(v==3?30:v==5?45:60)+' s',spot:v=>({3:2,5:3,7:4}[v])+' Bilder',bball:v=>(30+v*5)+' s',micro:v=>({3:2,5:3,7:5}[v])+' Runden',racing:v=>v==3?'0,8 km':v==5?'1,4 km':'2,0 km'};
 const goalOf=(id,v)=>GOALS[id]?GOALS[id](v):null;
-const goalLbl=(g,v)=>g.id=='snakes'&&isSolo()?null:goalOf(g.id,v);
+const goalLbl=(g,v)=>(g.id=='snakes'||g.id=='sudoku')&&isSolo()?null:goalOf(g.id,v);
 function intro(){if(gdef.id=='fabrik'){idle=0;$('#hint').textContent=gdef.h;cur.boot();return}if(ROOMG.includes(gdef.id)){idle=0;$('#hint').textContent=gdef.h;cur.showSetup();return}idle=1;const g=gdef,again=()=>{clearInput();PA=[];cur=g.mk();intro();$('#hint').textContent=g.h+(isSolo()?' · Solo: spiele auf Highscore':'')};
 showOv(`<div class=intro style='--k:${KC[g.cat]||"#888"}'><div class=ipic>${g.th?'<img alt="" src="'+g.th+'">':g.ic}</div><div class=itx><div class=kick>${g.cat} · 1–2 Spieler</div><h2>${g.n}</h2><p class=lead>${g.d}</p><h4>So funktioniert’s</h4><p>${isSolo()?(g.soloRules||RULES[g.id]):RULES[g.id]}</p><h4>Steuerung</h4><p>${g.h}</p><h4>Einstellungen</h4><div class=bar style='justify-content:flex-start'><div class=seg id=im></div><div class=seg id=id></div><div class=seg id=it${goalLbl(g,3)?'':' style=display:none'}></div></div><button class=btn id=ig>Spiel starten</button></div></div>`);
 seg('im','cpu',[[0,'2 Spieler'],[1,'Gegen Computer'],...(g.solo&&!cup?[[2,'Solo']]:[])],again);seg('id','d',[[0,'Einfach'],[1,'Normal'],[2,'Schwer'],[3,'Adaptiv']],again);if(goalLbl(g,3))seg('it','t',[3,5,7].map(v=>[v,goalLbl(g,v)]),again);bd('ig',go)}
@@ -2345,6 +2346,121 @@ c.restore()});
 hud(sc[0],sc[1],nm(turn)+' ist dran · Paare '+found+'/'+NC/2)}};return api};
 RULES.memory='Decke abwechselnd zwei Karten auf. Ein Paar gibt einen Punkt und noch einen Zug, sonst wird verdeckt und der andere ist dran. Wer mehr Paare findet, gewinnt. Ziel 3 / 5 / 7 = 16 / 24 / 36 Karten.';
 GAMES.push({id:'memory',n:'Memory Duel',ic:'🃏',d:'Finde mehr Paare als dein Gegner.',cat:'Puzzle',mk:memory,h:'Karte antippen oder anklicken – abwechselnd, wer ein Paar findet, bleibt am Zug · Ziel 3 / 5 / 7 wählt 16 / 24 / 36 Karten'});
+/* ===== Sudoku ===== */
+const SUDO=(()=>{
+ const U=[];for(let r=0;r<9;r++){const a=[];for(let k=0;k<9;k++)a.push(r*9+k);U.push(a)}
+ for(let k=0;k<9;k++){const a=[];for(let r=0;r<9;r++)a.push(r*9+k);U.push(a)}
+ for(let b=0;b<9;b++){const a=[],r0=b-b%3,c0=b%3*3;for(let i=0;i<3;i++)for(let j=0;j<3;j++)a.push((r0+i)*9+c0+j);U.push(a)}
+ const P=[];for(let i=0;i<81;i++){const s=new Set();for(const u of U)if(u.includes(i))for(const j of u)if(j!=i)s.add(j);P.push([...s])}
+ const pc=m=>{let n=0;for(;m;m&=m-1)n++;return n},dg=m=>32-Math.clz32(m&-m);
+ const sh=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+ const cands=g=>{const m=new Int16Array(81);for(let i=0;i<81;i++)if(!g[i]){let x=511;for(const p of P[i])if(g[p])x&=~(1<<(g[p]-1));m[i]=x}return m};
+ const fill=g=>{let bi=-1,bm=0,bc=10;for(let i=0;i<81;i++)if(!g[i]){let x=511;for(const p of P[i])if(g[p])x&=~(1<<(g[p]-1));const n=pc(x);if(n<bc){bc=n;bi=i;bm=x;if(n<2)break}}if(bi<0)return true;if(!bc)return false;const ds=[];for(let d=1;d<10;d++)if(bm&(1<<(d-1)))ds.push(d);sh(ds);for(const d of ds){g[bi]=d;if(fill(g))return true}g[bi]=0;return false};
+ /* sichere Züge: Naked Singles (ein Kandidat im Feld) und Hidden Singles (Ziffer passt in der Zeile/Spalte/dem Block nur in ein Feld) */
+ const sure=(g,cm)=>{const o=new Map();
+  for(let i=0;i<81;i++)if(!g[i]&&pc(cm[i])==1)o.set(i,{i,d:dg(cm[i]),h:0});
+  for(const u of U)for(let d=1;d<10;d++){const b=1<<(d-1);let n=0,w=-1;for(const i of u)if(!g[i]&&cm[i]&b){n++;w=i;if(n>1)break}if(n==1&&!o.has(w))o.set(w,{i:w,d,h:1})}
+  return[...o.values()]};
+ const solves=g0=>{const g=Int8Array.from(g0);for(;;){const cm=cands(g);let e=0;for(let i=0;i<81;i++)if(!g[i]){e++;if(!cm[i])return false}if(!e)return true;const s=sure(g,cm);if(!s.length)return false;for(const m of s)g[m.i]=m.d}};
+ /* Rätsel: punktsymmetrisch, eindeutig lösbar und ganz ohne Raten (nur Singles) – E = gewünschte Zahl leerer Felder */
+ const make=E=>{let best=null;
+  for(let t=0;t<12;t++){const sol=new Int8Array(81);fill(sol);const pz=Int8Array.from(sol);let rem=0;
+   for(const i of sh([...Array(41).keys()])){if(rem>=E)break;const j=80-i,a=pz[i],b=pz[j];pz[i]=0;pz[j]=0;if(solves(pz))rem+=i==j?1:2;else{pz[i]=a;pz[j]=b}}
+   if(!best||rem>best.rem)best={sol,pz,rem};if(rem>=E)break}
+  return best};
+ return{U,P,pc,dg,sh,cands,sure,make}})();
+const sudoku=()=>{const{U,P,pc,cands,sure,make}=SUDO,nm=i=>i?n2():n1,CO=i=>i?R:B,INK='#1b1a17',PAPER='#fffdf5';
+const solo=isSolo(),NE=solo?LI([34,42,50]):({3:30,5:40,7:50}[S.t]||40),pz=make(NE),sol=pz.sol,g=Int8Array.from(pz.pz),giv=Int8Array.from(pz.pz),own=new Int8Array(81).fill(-1),pop=new Float32Array(81);
+const sc=[0,0],mis=[0,0];let pt=0,turn=0,sel=-1,hd=0,bad=null,ai=null,aiT=1.4,notes=1,fl=[],done=0,tt=0,cm=cands(g),th=!!window.NOFIN;
+const left=()=>{let n=0;for(let i=0;i<81;i++)if(!g[i])n++;return n},cnt=d=>{let n=0;for(let i=0;i<81;i++)if(g[i]==d)n++;return n};
+const recalc=()=>{cm=cands(g)};
+/* Layout: Querformat 800x480, Hochformat 480x800 (nur lokal) */
+const lay=()=>{const por=V.por&&!ON;
+ if(por){const cs=48,bx=24,by=170,pw=43.5,gp=5,py=by+cs*9+22,pad=[];for(let d=1;d<10;d++)pad.push({d,x:bx+(d-1)*(pw+gp),y:py,w:pw,h:66});
+  return{por,cs,bx,by,pad,note:{x:bx,y:py+84,w:176,h:44},cards:[{x:84,y:46,w:154,h:84},{x:242,y:46,w:154,h:84}],PW:480,PH:800}}
+ const cs=47,bx=189,by=28,pad=[];for(let d=1;d<10;d++)pad.push({d,x:628+((d-1)%3)*54,y:150+Math.floor((d-1)/3)*64,w:48,h:58});
+ return{por,cs,bx,by,pad,note:{x:628,y:352,w:156,h:44},cards:[{x:16,y:34,w:156,h:96},{x:16,y:146,w:156,h:96}],PW:800,PH:480}};
+const hit=(r,x,y)=>x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h;
+const cellXY=(i,L)=>[L.bx+(i%9)*L.cs+L.cs/2,L.by+Math.floor(i/9)*L.cs+L.cs/2];
+const endTurn=()=>{sel=-1;hd=0;ai=null;if(solo)return;turn=1-turn;aiT=LV([2.8,1.9,1.1])+rnd(0,.8)};
+const finish=()=>{done=1;sel=-1;hd=0;setTimeout(()=>{if(cur!==api||over)return;if(solo){const secs=Math.round(pt),bonus=Math.max(0,Math.round((NE*8-secs)/4));finSolo(Math.max(0,sc[0])+bonus,'Zeit '+Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0')+' · Fehler '+mis[0]+' · Zeitbonus '+bonus)}else fin(sc[0]>sc[1]?1:sc[0]<sc[1]?2:0)},1000)};
+const place=(i,d)=>{if(done||bad||g[i]||d<1||d>9)return;const L=lay(),[x,y]=cellXY(i,L),col=CO(turn),k=pc(cm[i]);
+ if(d==sol[i]){g[i]=d;own[i]=turn;pop[i]=1;sc[turn]+=k;recalc();fl.push({x,y,txt:'+'+k,col,t:1.2});spark(x,y,col,10);snd(560+k*40,.12,'triangle');setTimeout(()=>snd(840,.1,'triangle'),70);
+  if(!left())finish();else endTurn()}
+ else{mis[turn]++;sc[turn]-=2;bad={i,d,t:1,who:turn};fl.push({x,y,txt:'−2',col:'#dc2626',t:1.2});snd(150,.3,'sawtooth');sel=i}};
+const press=d=>{if(done||bad)return;if(sel>=0&&!g[sel])place(sel,d);else if(cnt(d)<9){hd=hd==d?0:d;snd(500,.03)}};
+const pick=i=>{if(done||bad)return;sel=i;hd=g[i]||0;snd(420,.03)};
+/* Computer-Gegner: wählt sichere Züge (Naked/Hidden Singles), je nach Stufe mit Fehlgriffen und unterschiedlich geschickter Feldwahl */
+const aiPick=()=>{const em=[];for(let i=0;i<81;i++)if(!g[i])em.push(i);if(!em.length)return null;
+ const ss=sure(g,cm).map(m=>({i:m.i,d:sol[m.i],k:pc(cm[m.i])}));
+ if(!ss.length||Math.random()<LV([.2,.09,.025])){const hard=em.filter(i=>pc(cm[i])<=3),pl=hard.length?hard:em,i=pl[Math.random()*pl.length|0],ds=[];for(let d=1;d<10;d++)if(cm[i]&(1<<(d-1)))ds.push(d);return{i,d:ds[Math.random()*ds.length|0]||1+(Math.random()*9|0)}}
+ ss.sort((a,b)=>b.k-a.k);const r=Math.random(),n=ss.length,q=LV([.0,.55,.9]);
+ /* schwer: fast immer das wertvollste Feld, einfach: eher zufällig */
+ const idx=r<q?Math.min(n-1,Math.floor(Math.random()*Math.min(2,n))):Math.floor(Math.random()*n);return ss[idx]};
+const mv=k=>{if(sel<0){sel=lastSel();hd=g[sel]||0;return}let r=Math.floor(sel/9),c0=sel%9;if(k=='L')c0=(c0+8)%9;if(k=='R')c0=(c0+1)%9;if(k=='U')r=(r+8)%9;if(k=='D')r=(r+1)%9;sel=r*9+c0;hd=g[sel]||0};
+const lastSel=()=>{for(let i=0;i<81;i++)if(!g[i])return i;return 40};
+const first=f=>{turn=f;aiT=1.5};
+const api={first,who(){return turn},
+ click(x,y){if(done||bad||(S.cpu&&turn==1))return;const L=lay();
+  if(x>=L.bx&&x<L.bx+L.cs*9&&y>=L.by&&y<L.by+L.cs*9){pick(Math.floor((y-L.by)/L.cs)*9+Math.floor((x-L.bx)/L.cs));return}
+  for(const b of L.pad)if(hit(b,x,y)){if(cnt(b.d)<9)press(b.d);return}
+  if(hit(L.note,x,y)){notes=1-notes;snd(480,.04)}},
+ key(k){if(done||bad||(S.cpu&&turn==1))return;let m=/^(?:Digit|Numpad)([1-9])$/.exec(k);if(m){if(cnt(+m[1])<9)press(+m[1]);return}
+  if(k=='ArrowLeft'||k=='KeyA')mv('L');else if(k=='ArrowRight'||k=='KeyD')mv('R');else if(k=='ArrowUp'||k=='KeyW')mv('U');else if(k=='ArrowDown'||k=='KeyS')mv('D');
+  else if(k=='Escape'||k=='Backspace'||k=='Delete'){sel=-1;hd=0}else if(k=='KeyN'){notes=1-notes}},
+ update(dt){tt+=dt;if(!idle&&!done)pt+=dt;if(!window.NOFIN&&!ON&&!!V.por!=wantPor())setView();
+  for(let i=0;i<81;i++)if(pop[i]>0)pop[i]=Math.max(0,pop[i]-dt*4);
+  fl=fl.filter(f=>(f.t-=dt)>0);
+  if(bad){bad.t-=dt;if(bad.t<=0){bad=null;endTurn()}return}
+  if(done)return;
+  if(S.cpu&&turn==1){aiT-=dt;if(aiT<=0){if(!ai){ai=aiPick();if(!ai)return;sel=ai.i;hd=0;aiT=.55}else{const a=ai;ai=null;place(a.i,a.d)}}}},
+ draw(){const L=lay(),{por,cs,bx,by}=L,col=CO(turn);bg('#f6eed9','#e4d8ba');LS=solo?[Math.max(0,sc[0]),0]:[sc[0],sc[1]];
+  c.save();if(th&&!por)c.translate(-86,0);c.textAlign='center';c.textBaseline='middle';
+  const bw=cs*9,sh=(x,y,w,h,r,f)=>{rr(x+4,y+4,w,h,r,INK);rr(x,y,w,h,r,f)};
+  /* Brett */
+  sh(bx-8,by-8,bw+16,bw+16,12,PAPER);
+  const sp=new Set();if(sel>=0){const r0=Math.floor(sel/9),c0=sel%9;for(let i=0;i<81;i++)if(Math.floor(i/9)==r0||i%9==c0||(Math.floor(Math.floor(i/9)/3)==Math.floor(r0/3)&&Math.floor(i%9/3)==Math.floor(c0/3)))sp.add(i)}
+  for(let i=0;i<81;i++){const r=Math.floor(i/9),q=i%9,x=bx+q*cs,y=by+r*cs;
+   c.fillStyle=((Math.floor(r/3)+Math.floor(q/3))&1)?'#f6efd9':PAPER;c.fillRect(x,y,cs,cs);
+   if(own[i]>=0){c.fillStyle=CO(own[i])+'1c';c.fillRect(x,y,cs,cs)}
+   if(sp.has(i)){c.fillStyle=col+'1f';c.fillRect(x,y,cs,cs)}
+   if(hd&&g[i]==hd){c.fillStyle='#fbbf2477';c.fillRect(x,y,cs,cs)}
+   if(i==sel){c.fillStyle=col+'44';c.fillRect(x,y,cs,cs)}
+   if(bad&&bad.i==i){c.fillStyle='#ef444466';c.fillRect(x,y,cs,cs)}}
+  c.strokeStyle='#cdbf9b';c.lineWidth=1;c.beginPath();for(let k=1;k<9;k++){if(k%3==0)continue;c.moveTo(bx+k*cs,by);c.lineTo(bx+k*cs,by+bw);c.moveTo(bx,by+k*cs);c.lineTo(bx+bw,by+k*cs)}c.stroke();
+  c.strokeStyle=INK;c.lineWidth=3;c.beginPath();for(let k=0;k<=9;k+=3){c.moveTo(bx+k*cs,by);c.lineTo(bx+k*cs,by+bw);c.moveTo(bx,by+k*cs);c.lineTo(bx+bw,by+k*cs)}c.stroke();
+  if(sel>=0){const x=bx+(sel%9)*cs,y=by+Math.floor(sel/9)*cs;gl(col,10);c.strokeStyle=col;c.lineWidth=3.5;c.strokeRect(x+2,y+2,cs-4,cs-4);ng()}
+  /* Ziffern und Notizen */
+  for(let i=0;i<81;i++){const x=bx+(i%9)*cs+cs/2,y=by+Math.floor(i/9)*cs+cs/2;
+   if(bad&&bad.i==i){const sx=Math.sin(tt*60)*3*bad.t;c.font='bold '+(cs*.62|0)+'px system-ui';c.fillStyle='#dc2626';c.fillText(bad.d,x+sx,y+2);continue}
+   if(g[i]){const pp=pop[i],s=1+pp*.45;c.save();c.translate(x,y+2);c.scale(s,s);c.font='bold '+(cs*.62|0)+'px system-ui';c.fillStyle=giv[i]?INK:CO(own[i]);if(!giv[i]){gl(CO(own[i]),pp*18)}c.fillText(g[i],0,0);ng();c.restore()}
+   else if(notes){const m=cm[i];c.font=(cs*.23|0)+'px system-ui';for(let d=1;d<10;d++)if(m&(1<<(d-1))){const hl=hd==d;c.fillStyle=hl?col:'#8f866c';if(hl)c.font='bold '+(cs*.27|0)+'px system-ui';c.fillText(d,x+((d-1)%3-1)*cs*.27,y+(Math.floor((d-1)/3)-1)*cs*.27+1);if(hl)c.font=(cs*.23|0)+'px system-ui'}}}
+  /* Ziffernblock */
+  const ce=sel>=0&&!g[sel]?cm[sel]:0;
+  for(const b of L.pad){const n=cnt(b.d),dead=n>=9,act=hd==b.d;c.globalAlpha=dead?.3:1;sh(b.x,b.y,b.w,b.h,10,act?'#fde68a':PAPER);
+   c.strokeStyle=INK;c.lineWidth=2;c.beginPath();c.roundRect(b.x,b.y,b.w,b.h,10);c.stroke();
+   c.font='bold '+(por?28:30)+'px system-ui';c.fillStyle=ce&&!(ce&(1<<(b.d-1)))?'#a39a82':INK;c.fillText(b.d,b.x+b.w/2,b.y+b.h/2-3);
+   c.font='bold 11px system-ui';c.fillStyle='#6d665a';c.fillText(dead?'✓':9-n,b.x+b.w/2,b.y+b.h-10);c.globalAlpha=1}
+  if(!th){const b=L.note;sh(b.x,b.y,b.w,b.h,10,notes?'#d9f2e6':PAPER);c.strokeStyle=INK;c.lineWidth=2;c.beginPath();c.roundRect(b.x,b.y,b.w,b.h,10);c.stroke();c.font='bold 15px system-ui';c.fillStyle=INK;c.fillText('✎ Notizen '+(notes?'an':'aus'),b.x+b.w/2,b.y+b.h/2+1)}
+  /* Spielerkarten */
+  if(!th)for(let i=0;i<2;i++){const k=L.cards[i],cc=CO(i),act=!solo&&turn==i&&!done,tm=solo&&i==1,ps=Math.round(pt);
+   if(act){gl(cc,18+6*Math.sin(tt*5));c.fillStyle=cc;c.beginPath();c.roundRect(k.x-5,k.y-5,k.w+10,k.h+10,16);c.fill();ng()}
+   sh(k.x,k.y,k.w,k.h,12,PAPER);c.fillStyle=tm?'#4b4a44':cc;c.beginPath();c.roundRect(k.x,k.y,k.w,26,[12,12,0,0]);c.fill();
+   let t=tm?'Zeit':String(nm(i));if(t.length>13)t=t.slice(0,12)+'…';c.font='bold 14px system-ui';c.fillStyle='#fff';c.fillText(t,k.x+k.w/2,k.y+14);
+   c.font='bold '+(por?36:42)+'px system-ui';c.fillStyle=tm?INK:cc;c.fillText(tm?Math.floor(ps/60)+':'+String(ps%60).padStart(2,'0'):solo?Math.max(0,sc[0]):sc[i],k.x+k.w/2,k.y+53);
+   c.font='12px system-ui';c.fillStyle='#6d665a';c.fillText(tm?'Beste '+(highScore()||'–'):'Fehler '+mis[i]+(act?'  ·  am Zug':''),k.x+k.w/2,k.y+k.h-11)}
+  /* Statuszeile */
+  if(!th){let st=done?'Geschafft!':bad?'Falsch! −2 Punkte':sel>=0&&!g[sel]?'Dieses Feld: +'+pc(cm[sel])+(pc(cm[sel])==1?' Punkt':' Punkte'):hd?'Ziffer '+hd+' markiert':(S.cpu&&turn==1?'Computer denkt …':'Feld wählen, dann Ziffer');
+  c.font='bold 15px system-ui';c.fillStyle=INK;const info='Offen: '+left()+' Felder';
+  if(por){c.fillStyle=done?INK:col;c.fillText(st,240,150);c.font='13px system-ui';c.fillStyle='#6d665a';c.textAlign='right';c.fillText(info,bx+bw,L.note.y+22);c.textAlign='center'}
+  else{c.fillStyle=done?INK:col;c.font='bold 14px system-ui';const w=c.measureText(st).width;c.font='bold '+Math.min(14,14*150/w).toFixed(1)+'px system-ui';c.fillText(st,94,268);c.font='13px system-ui';c.fillStyle='#6d665a';c.fillText(info,94,292)}}
+  /* Punktanzeigen */
+  for(const f of fl){c.globalAlpha=Math.min(1,f.t*2);c.font='bold 24px system-ui';c.fillStyle=f.col;gl(f.col,8);c.fillText(f.txt,f.x,f.y-(1.2-f.t)*40);ng()}c.globalAlpha=1;
+  c.restore()}};
+if(window.NOFIN){const em=[];for(let i=0;i<81;i++)if(!g[i])em.push(i);SUDO.sh(em);const n=Math.floor(em.length*.45);for(let k=0;k<n;k++){const i=em[k];g[i]=sol[i];own[i]=k&1;sc[k&1]+=2}recalc();sel=em[n];turn=0}
+return api};
+RULES.sudoku='Ein gemeinsames Sudoku, ohne Raten lösbar. Ihr setzt abwechselnd genau eine Ziffer: Feld antippen, dann die Ziffer wählen. Richtig gibt so viele Punkte, wie das Feld Notiz-Kandidaten hatte – knifflige Felder sind mehr wert. Eine falsche Ziffer kostet 2 Punkte und der Gegner ist dran. Wer am Ende die meisten Punkte hat, gewinnt. Ziel 3 / 5 / 7 = 30 / 40 / 50 leere Felder.';
+GAMES.push({id:'sudoku',solo:true,soloRules:'Löse das Sudoku allein und möglichst schnell – ohne Raten, jedes Rätsel hat genau eine Lösung. Feld antippen, dann Ziffer wählen. Eine richtige Ziffer gibt so viele Punkte, wie das Feld Notiz-Kandidaten hatte, ein Fehler kostet 2 Punkte; am Ende gibt es einen Zeitbonus. Die Schwierigkeit bestimmt die Zahl leerer Felder (34 / 42 / 50), der Highscore gilt je Schwierigkeit.',n:'Sudoku',ic:'🔢',d:'Allein auf Bestzeit oder abwechselnd im Duell – knifflige Felder bringen mehr Punkte.',cat:'Puzzle',mk:sudoku,h:'Feld antippen, dann Ziffer wählen · Tastatur: Pfeile/WASD + 1–9, N = Notizen · Ziel 3 / 5 / 7 wählt 30 / 40 / 50 leere Felder'});
 const api_=0;
 /* ===== Schach ===== */
 const chess=(gst)=>{const SQ=56;let X0=176,Y0=16;const PO=()=>V.por&&!ON&&!gst,lay=()=>{if(PO()){X0=16;Y0=176}else{X0=176;Y0=16}};const ysP=i=>(i?!FL():FL())?12:636;const VAL={P:100,N:320,B:330,R:500,Q:900,K:0},PV={P:1,N:3,B:3,R:5,Q:9,K:0},D8=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]],ND=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
@@ -3661,6 +3777,8 @@ GAMES.push({id:'ludo',n:'Mensch ärgere dich nicht',ic:'\ud83c\udfb2',d:'Würfel
 RULES.ludo='Jeder hat vier Figuren (in den Spieleinstellungen auch nur zwei für kürzere Runden). Mit einer 6 kommt eine Figur aufs Startfeld; nach jeder 6 würfelst du nochmal. Ohne Figur auf dem Feld hast du drei Versuche. Wer auf ein besetztes Feld zieht, schmeißt die Figur raus – das ist freiwillig, du darfst den anderen auch verschonen (Computer schlagen meistens). Bei einer 6 darfst du wählen: rauskommen oder mit einer Figur ziehen. Rauskommen geht nicht, solange eine eigene Figur auf dem Startfeld steht. Im Zielhaus wird nicht gesprungen, du brauchst die genaue Augenzahl. Wer zuerst alle vier Figuren im Ziel hat, gewinnt.';
 ICON.maumau=GI(`<rect x="6" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(-12 16 24)"/><rect x="20" y="9" width="21" height="29" rx="4" fill="${Wh}" transform="rotate(10 30 24)"/><path d="M31 17c-3-4-8 0-5 5l5 5 5-5c3-5-2-9-5-5z" fill="${Rd}" stroke="none" transform="rotate(10 30 24)"/>`);
 NM.maumau=['Mau-Mau','Das Kartenspiel für 2–10 Spieler, auch online.'];
+ICON.sudoku=GI(`<rect x="5" y="5" width="38" height="38" rx="5" fill="${Wh}"/><path d="M17.7 5v38M30.3 5v38M5 17.7h38M5 30.3h38" stroke-width="1.6"/><text x="11.3" y="15.3" text-anchor="middle" font-size="11" font-weight="800" fill="${Bl}" stroke="none" style="font-family:system-ui">5</text><text x="24" y="27.9" text-anchor="middle" font-size="11" font-weight="800" fill="${Ik}" stroke="none" style="font-family:system-ui">3</text><text x="36.7" y="40.5" text-anchor="middle" font-size="11" font-weight="800" fill="${Rd}" stroke="none" style="font-family:system-ui">9</text>`);
+NM.sudoku=['Sudoku','Allein auf Bestzeit oder abwechselnd im Duell – knifflige Felder bringen mehr Punkte.'];
 const ROOMG=['ludo','maumau','poker','blackjack','fabrik'];
 /* ===== Karten-Bibliothek (für alle Kartenspiele) =====
    Karte = Zahl 0..51: Farbe = id/13 (0 Pik, 1 Herz, 2 Karo, 3 Kreuz), Rang = id%13 (0 = 2 ... 8 = 10, 9 = Bube, 10 = Dame, 11 = König, 12 = Ass).
@@ -4565,7 +4683,7 @@ const sel=new Set(GAMES.map(g=>g.id));ROOMG.forEach(x=>sel.delete(x));S.lu=S.lu|
 function seg(id,key,o,cb){const el=$('#'+id);el.innerHTML='';o.forEach(([v,l])=>{const b=document.createElement('button');b.textContent=l;b.className=S[key]==v?'on':'';b.onclick=()=>{S[key]=v;save();(cb||menu)()};el.append(b)})}
 function menu(){tabs();seg('sm','cpu',[[0,'2 Spieler'],[1,'Gegen Computer'],[2,'Solo']]);seg('sd','d',[[0,'Einfach'],[1,'Normal'],[2,'Schwer'],[3,'Adaptiv']]);seg('st','t',[[3,'Ziel 3'],[5,'Ziel 5'],[7,'Ziel 7']]);
 $('#bo').textContent='Ausrichtung: '+({a:'Auto',l:'Quer',p:'Hochkant'}[S.ori]||'Auto');$('#bi').textContent='Meine Seite: '+(wantPor()?(S.side?'Oben':'Unten'):(S.side?'Rechts':'Links')+' (Schach: '+(S.side?'Oben':'Unten')+')');$('#bs').textContent='Ton '+(S.snd?'an':'aus');$('#ba').textContent='Effekte '+(S.anim?'an':'aus');document.body.classList.toggle('noanim',!S.anim);
-$('#cup').disabled=S.cpu===2;$('#cinfo').textContent=S.cpu===2?'Solo: Snake, Block Battle und Basketball mit persönlichen Highscores.':cupInfo();
+$('#cup').disabled=S.cpu===2;$('#cinfo').textContent=S.cpu===2?'Solo: Snake, Block Battle, Basketball und Sudoku mit persönlichen Highscores.':cupInfo();
 $('#grid').innerHTML=list().map(g=>{const s=S.st[g.id]||[0,0];return`<div class=card data-id=${g.id} style='--k:${KC[g.cat]||"#888"}'>${ROOMG.includes(g.id)?'':`<label><input type=checkbox ${sel.has(g.id)?'checked':''}> Cup</label>`}<span class=fv>${S.fav.includes(g.id)?'★':'☆'}</span><div class=pic>${g.th?'<img alt="" src="'+g.th+'">':g.ic}<b class=tg>${g.cat}</b></div><h3>${g.n}</h3><small>${g.sub||(g.solo?'Solo · 2 Spieler · Computer':'2 Spieler · Computer')}${s[0]+s[1]?' · Siege '+s[0]+':'+s[1]:''}</small></div>`}).join('')}
 $('#grid').onclick=e=>{const k=e.target.closest('label'),cd=e.target.closest('.card');if(e.target.closest('.fv')){const id=cd.dataset.id;S.fav=S.fav.includes(id)?S.fav.filter(x=>x!=id):[...S.fav,id];save();if(S.fav.length)ach('fav','Erster Favorit');menu();return}if(k){const i=k.querySelector('input');setTimeout(()=>{i.checked?sel.add(cd.dataset.id):sel.delete(cd.dataset.id);$('#cinfo').textContent=cupInfo()});return}if(cd){cup=null;start(cd.dataset.id)}};
 $('#cup').onclick=()=>{if(S.cpu===2){toast('Für den Cup bitte 2 Spieler oder Computer wählen.');return}cup=newCup(GAMES.filter(g=>sel.has(g.id)&&!ROOMG.includes(g.id)).map(g=>g.id),S.t);start(cupNext())};
