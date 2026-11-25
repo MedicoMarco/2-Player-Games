@@ -1090,6 +1090,16 @@ async function testCloud() {
  assert.equal(server.sl[1],1);
  assert.equal(server.saleIncome[1],6);
  assert.equal(first.dbg().cloud.pending, null);
+ const setItem=scope.localStorage.setItem;
+ try{
+  scope.localStorage.setItem=()=>{throw new Error('Storage blocked')};
+  firstGame.G.m=555;
+  firstGame.sv(true);
+  await settle();
+  assert.equal(firstGame.cloud.localSaved,false);
+  assert.equal(firstGame.cloud.status,'synced');
+  assert.equal(server.m,555,'blocked local storage must not prevent a cloud write');
+ }finally{scope.localStorage.setItem=setItem}
  console.log('Phase 5: exact offline replay, report, saved backlog, viewport controls and concurrent cloud retries passed.');
 }
 

@@ -1069,14 +1069,45 @@ function itemPos(o){const b=(o.r+2)%4,e=o.ein==null||o.ein==o.r?b:o.ein,R=TS/2,c
 /* ---- Speichern ---- */
 const cloud={ref:null,uid:null,base:null,status:'guest',pending:null,busy:false,localSaved:true,localKey:null,migrationBlocked:false,localMigrationBlocked:false,last:0,backoff:0,remote:null};
 let saveOpen=false, saveAfterTick=false;
-const {validSave,revision}=FactoryRuntime;
+const {validSave,revision,openSaveStorage}=FactoryRuntime;
+let saveStorage=null,latestLocalAttempt=0;
+const diskSaves=new Map(),diskWrites=new Map();
 function readLocal(key){
- try{return JSON.parse(localStorage.getItem(key))}catch{return null}
+ let browserSave=null;
+ try{browserSave=JSON.parse(localStorage.getItem(key))}catch{}
+ const disk=diskSaves.get(key);
+ if(disk&&(!browserSave||validSave(browserSave)&&disk.ts>=browserSave.ts))return disk;
+ return browserSave;
 }
 function writeLocal(key,value){
  try{localStorage.setItem(key,JSON.stringify(value));return true}
  catch{return false}
 }
+function writeDisk(key,value){
+ if(!saveStorage)return Promise.resolve(false);
+ const previous=diskWrites.get(key);
+ if(previous&&(previous.value===value||value.rev&&previous.value.rev===value.rev))return previous.promise;
+ const entry={value,promise:null};
+ entry.promise=saveStorage.write(key,value).then(()=>{
+  diskSaves.set(key,value);return true;
+ },()=>false).finally(()=>{if(diskWrites.get(key)===entry)diskWrites.delete(key)});
+ diskWrites.set(key,entry);
+ return entry.promise;
+}
+function storeSnapshot(key,value){
+ const attempt=++latestLocalAttempt;
+ cloud.localSaved=writeLocal(key,value);
+ if(cloud.localSaved&&!diskSaves.has(key)&&!diskWrites.has(key)){cloud.localPending=false;sv.warned=false;return}
+ const immediate=cloud.localSaved;
+ cloud.localPending=!!saveStorage;
+ writeDisk(key,value).then(written=>{
+  if(attempt!==latestLocalAttempt)return;
+  cloud.localPending=false;cloud.localSaved=immediate||written;
+  if(cloud.localSaved){sv.warned=false;return}
+  if(!sv.warned){sv.warned=true;toast(stillSignedIn()&&!cloud.migrationBlocked?'Lokale Sicherung fehlt. Cloud-Status unter Firma → Werkzeuge → Spielstand prüfen.':'Lokale Sicherung fehlt. Unter Firma → Werkzeuge → Spielstand als Datei sichern.')}
+ });
+}
+const storeBackup=async(key,value)=>writeLocal(key,value)||await writeDisk(key,value);
 function stillSignedIn(){
  return cloud.ref&&typeof OL!='undefined'&&OL.me===cloud.uid;
 }
@@ -1090,10 +1121,23 @@ function readCloud(){
 function backupOriginal(save,suffix){
  if(!KEY)return true;
  const key=KEY+'.'+suffix,previous=readLocal(key);
- if(previous===null)return writeLocal(key,save);
+ if(previous===null){
+  const saved=writeLocal(key,save);
+  if(!saved)writeDisk(key,save);
+  return saved;
+ }
  if(revision(previous)===revision(save))return true;
  const separate=key+'.'+revision(save).replace(/[^a-z0-9-]/gi,'-');
- return readLocal(separate)!==null||writeLocal(separate,save);
+ if(readLocal(separate)!==null||writeLocal(separate,save))return true;
+ writeDisk(separate,save);
+ return false;
+}
+async function finishMigrationBackup(value){
+ if(!saveStorage||!validSave(value))return;
+ // Each stage may open a different backup key. Retry only while writes succeed.
+ while(!backupBeforeMigration(value)&&diskWrites.size){
+  if(!(await Promise.all([...diskWrites.values()].map(entry=>entry.promise))).every(Boolean))break;
+ }
 }
 function backupBeforeMigration(save){
  if(needsCampaignMigration(save)&&!backupOriginal(save,'before-horizont-expansion'))return false;
@@ -1130,32 +1174,50 @@ function chooseSave(remote,local,guest){
   return local;
  }
  if(validSave(local)&&local.ts>remote.ts){
-  writeLocal(KEY+'.recovery',local);
+  if(!writeLocal(KEY+'.recovery',local))writeDisk(KEY+'.recovery',local);
   cloud.status='recovered';
  }else cloud.status='synced';
  return remote;
 }
 function readAccountSave(){
- let raw=null;
- try{raw=localStorage.getItem(KEY)}catch{}
+ let raw=null,unsupportedLocal=false;
+ try{
+  raw=localStorage.getItem(KEY);
+  unsupportedLocal=raw!==null&&!validSave(JSON.parse(raw));
+ }catch{unsupportedLocal=raw!==null}
  const current=readLocal(KEY);
  const supported=validSave(current);
  cloud.localMigrationBlocked=supported&&!backupBeforeMigration(current);
- if(raw!==null&&(!supported||cloud.localMigrationBlocked)){
-  cloud.localKey=KEY+'.compatible';
-  const fallback=readLocal(cloud.localKey);
+ const compatibleKey=KEY+'.compatible',fallback=readLocal(compatibleKey);
+ if(unsupportedLocal||cloud.localMigrationBlocked||!supported&&validSave(fallback)){
+  cloud.localKey=compatibleKey;
   return validSave(fallback)?fallback:supported?current:null;
  }
  return current;
 }
 async function loadFactory(){
+ const storage=openSaveStorage();
+ if(storage){
+  try{
+   saveStorage=await storage;
+   if(saveStorage){
+    for(const [key,value] of await saveStorage.read([...new Set([KEY,'2pg_fe_guest'])]))diskSaves.set(key,value);
+    await finishMigrationBackup(readLocal(KEY));
+   }
+  }catch{saveStorage=null;}
+ }
  const local=readAccountSave();
  if(!stillSignedIn()){applySave(local);return}
  cloud.status='loading';
  try{
   const remote=await readCloud();
   if(!stillSignedIn())return;
-  applySave(chooseSave(remote,local,readLocal('2pg_fe_guest')));
+  const chosen=chooseSave(remote,local,readLocal('2pg_fe_guest'));
+  if(saveStorage){
+   await diskWrites.get(KEY+'.recovery')?.promise;
+   await finishMigrationBackup(chosen);
+  }
+  if(stillSignedIn())applySave(chosen);
  }catch{
   cloud.base=validSave(local)?local.base??(local.rev?revision(local):null):null;
   cloud.status='offline';applySave(local);
@@ -1199,10 +1261,7 @@ function snapshot(){
 function sv(force){
  if(!ready||preview)return;
  const data=JSON.parse(JSON.stringify(snapshot()));
- cloud.localSaved=writeLocal(cloud.localKey||(cloud.migrationBlocked?KEY+'.compatible':KEY),data);
- if(!cloud.localSaved){
-  if(!sv.warned){sv.warned=true;toast('Lokaler Speicher ist voll oder gesperrt.')}
- }
+ storeSnapshot(cloud.localKey||(cloud.migrationBlocked?KEY+'.compatible':KEY),data);
  if(!stillSignedIn()||cloud.migrationBlocked)return;
  cloud.pending=data;
  if(cloud.status!='conflict'&&cloud.status!='invalid'){
@@ -1235,27 +1294,30 @@ async function flushCloud(force=false){
   }
   cloud.base=data.rev;cloud.backoff=0;
   if(cloud.pending===data){
-   cloud.pending=null;cloud.status='synced';writeLocal(cloud.localKey||KEY,{...data,base:data.rev});
+   cloud.pending=null;cloud.status='synced';storeSnapshot(cloud.localKey||KEY,{...data,base:data.rev});
   }else cloud.status='pending';
  }catch{
   cloud.status='offline';cloud.backoff=Date.now()+15000;
  }finally{cloud.busy=false}
 }
-function takeCloudSave(){
+async function takeCloudSave(){
  if(cloud.status!='conflict'||!validSave(cloud.remote)||!stillSignedIn())return;
  const remote=cloud.remote;
- if(!writeLocal(KEY+'.recovery',cloud.pending||snapshot())){
+ if(!(await storeBackup(KEY+'.recovery',snapshot()))){
   toast('Lokale Sicherung fehlgeschlagen. Beide Spielstände bleiben verfügbar.');return;
  }
- writeLocal(cloud.localKey||KEY,remote);
+ if(!stillSignedIn()||cloud.remote!==remote)return;
+ await finishMigrationBackup(remote);
  cloud.base=revision(remote);cloud.remote=null;cloud.pending=null;cloud.status='recovered';saveOpen=false;
- applySave(remote);
+ applySave(remote);sv(false);
 }
-function keepLocalSave(){
+async function keepLocalSave(){
  if(cloud.status!='conflict'||!validSave(cloud.remote)||!stillSignedIn())return;
- if(!writeLocal(KEY+'.cloud-backup',cloud.remote)){
+ const remote=cloud.remote;
+ if(!(await storeBackup(KEY+'.cloud-backup',remote))){
   toast('Sicherung des bisherigen Cloud-Stands fehlgeschlagen.');return;
  }
+ if(!stillSignedIn()||cloud.remote!==remote)return;
  cloud.base=revision(cloud.remote);cloud.remote=null;cloud.status='pending';saveOpen=false;sv(true);
 }
 let confirmLocal=false;
@@ -1263,7 +1325,7 @@ async function restoreLocalBackup(){
  const local=readLocal(KEY+'.recovery');
  if(!validSave(local)||cloud.busy)return;
  if(!stillSignedIn()){
-  writeLocal(KEY+'.recovery',snapshot());
+  if(!(await storeBackup(KEY+'.recovery',snapshot()))){toast('Aktueller Stand konnte nicht gesichert werden.');return}
   applySave(local);sv(false);saveOpen=false;return;
  }
  cloud.busy=true;
@@ -1276,17 +1338,43 @@ async function restoreLocalBackup(){
  }catch{toast('Cloud nicht erreichbar. Die lokale Sicherung bleibt gespeichert.')}
  finally{cloud.busy=false}
 }
+function downloadFactorySave(){
+ const file=new Blob([JSON.stringify(snapshot())],{type:'application/json'});
+ const url=URL.createObjectURL(file),link=document.createElement('a');
+ link.href=url;link.download='factory-empire-'+new Date().toISOString().slice(0,10)+'.json';
+ link.click();
+ setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+function importFactorySave(){
+ const input=document.createElement('input');
+ input.type='file';input.accept='.json,application/json';
+ input.onchange=async()=>{
+  let imported;
+  try{imported=JSON.parse(await input.files[0].text())}catch{toast('Die Spielstanddatei konnte nicht gelesen werden.');return}
+  if(!validSave(imported)||!Array.isArray(imported.o)){toast('Ungültige Factory-Empire-Spielstanddatei.');return}
+  if(!window.confirm('Den Spielstand aus dieser Datei laden? Der aktuelle Stand wird zuerst gesichert.'))return;
+  if(cloud.busy){toast('Warte auf die laufende Synchronisierung und versuche es erneut.');return}
+  if(!(await storeBackup(KEY+'.recovery',snapshot()))){
+   toast('Der aktuelle Stand konnte nicht gesichert werden. Die Datei wurde nicht geladen.');return;
+  }
+  await finishMigrationBackup(imported);
+  applySave(imported);saveOpen=false;sv(true);
+ };
+ input.click();
+}
 function savePanel(){
  const [X,Y,W,H]=MENUS.save.box;
  pnlBox(X,Y,W,H,'Spielstand',()=>{saveOpen=false;confirmLocal=false});
  const labels={
-  guest:'Lokaler Gast-Spielstand',pending:'Lokal gesichert · wartet auf Cloud-Bestätigung',synced:'Letzter Spielstand in der Cloud bestätigt',
-  offline:'Cloud nicht erreichbar · lokale Sicherung und automatische Wiederholung',recovered:'Cloud geladen · abweichender lokaler Stand wurde separat gesichert',
+  guest:'Gast-Spielstand',pending:'Wartet auf Cloud-Bestätigung',synced:'Letzter Spielstand in der Cloud bestätigt',
+  offline:'Cloud nicht erreichbar · erneuter Versuch folgt automatisch',recovered:'Cloud geladen · lokaler Wiederherstellungspunkt prüfen',
   conflict:'Cloud-Konflikt · ein anderes Gerät hat seit deinem letzten Abgleich gespeichert',invalid:'Cloud-Spielstand hat ein unbekanntes Format · lokaler Stand ist aktiv',loading:'Cloud wird geladen',local:'Lokaler Spielstand ist aktiv'
  };
  tx(labels[cloud.status],X+20,Y+61,13,'#cbd5e1');
- if(!cloud.localSaved)tx('Lokale Speicherung ist derzeit nicht verfügbar.',X+20,Y+78,10.5,'#fca5a5');
- else if(cloud.migrationBlocked||cloud.localKey)tx('Der ursprüngliche Spielstand bleibt separat erhalten.',X+20,Y+78,10.5,'#fde68a');
+ if(cloud.localPending)tx('Lokale Sicherung wird geschrieben …',X+20,Y+78,10.5,'#cbd5e1');
+ else if(!cloud.localSaved)tx('Keine lokale Sicherung. Der Cloud-Status steht oben.',X+20,Y+78,10.5,'#fca5a5');
+ else if(cloud.migrationBlocked)tx('Cloud-Synchronisierung wartet auf eine Sicherung des ursprünglichen Spielstands.',X+20,Y+78,10.5,'#fde68a');
+ else if(diskSaves.has(cloud.localKey||KEY))tx('Auf diesem Gerät über IndexedDB gesichert.',X+20,Y+78,10.5,'#86efac');
  if(cloud.status=='conflict'&&validSave(cloud.remote)){
   const remote=cloud.remote;
   tx('Cloud · '+fmtSaveDate(remote.ts)+' · '+fm(remote.m)+' €',X+20,Y+95,12,'#fde68a');
@@ -1295,7 +1383,7 @@ function savePanel(){
   tx('Cloud laden · lokale Sicherung behalten',X+145,Y+166,11,'#fff','center',700);
   btn(X+283,Y+144,350,35,()=>{if(confirmLocal){confirmLocal=false;keepLocalSave()}else confirmLocal=true},confirmLocal?'#92400e':'#334155');
   tx(confirmLocal?'Lokalen Stand in der Cloud speichern? Bestätigen':'Lokalen Stand auswählen',X+458,Y+166,11,'#fff','center',700);
- }else if(cloud.status=='offline'||cloud.status=='pending'||cloud.status=='local'){
+ }else if(stillSignedIn()&&!['loading','invalid'].includes(cloud.status)&&!cloud.migrationBlocked){
   btn(X+20,Y+86,178,34,()=>sv(true),'#334155');tx('Jetzt synchronisieren',X+109,Y+108,11,'#fff','center',700);
  }
  const backup=readLocal(KEY+'.recovery');
@@ -1303,6 +1391,12 @@ function savePanel(){
   tx('Wiederherstellungspunkt · '+fmtSaveDate(backup.ts)+' · '+fm(backup.m)+' €',X+20,Y+211,11,'#cbd5e1');
   btn(X+399,Y+190,234,30,restoreLocalBackup,'#334155');
   tx('Lokale Sicherung öffnen',X+516,Y+210,11,'#fff','center',700);
+ }
+ if(!preview){
+  btn(X+20,Y+229,178,30,downloadFactorySave,'#29504f',null,'save_download');
+  tx('Spielstand herunterladen',X+109,Y+249,11,'#fff','center',700);
+  btn(X+209,Y+229,159,30,importFactorySave,'#334155',null,'save_import');
+  tx('Spielstand aus Datei laden',X+288.5,Y+249,11,'#fff','center',700);
  }
 }
 function offlineStart(seconds){
@@ -2883,7 +2977,7 @@ const MENUS={
  planning:{box:[55,60,690,322],show:()=>planningOpen,draw:planningPanel},
  line:{box:[57,62,686,321],show:()=>lineOpen&&sel&&L.includes(sel),draw:()=>linePanel(sel)},
  growth:{box:[55,60,690,323],show:()=>growthOpen,draw:growthPanel},
- save:{box:[71,69,658,252],show:()=>saveOpen,draw:savePanel},
+ save:{box:[71,69,658,273],show:()=>saveOpen,draw:savePanel},
  stats:{box:[54,60,692,327],show:()=>statsOpen,draw:statsPanel}
 };
 const openMenu=()=>Object.entries(MENUS).find(([,menu])=>menu.show());
