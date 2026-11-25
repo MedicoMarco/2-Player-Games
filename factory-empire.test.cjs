@@ -721,6 +721,14 @@ assert.equal(d.industrial.crossings.length,0,'no connectors cross a river in the
 for(const [x,y] of [[4,8],[13,19],[27,29],[15,51],[140,26]]){
  assert.equal(d.industrial.get(x,y),1,'clear industrial ground at '+x+','+y);
 }
+for(const v of [3,4]){
+ d=load([], {v,hl:{hit:3},sp:7});
+ const [left,top,,bottom]=d.hrect(d.hallOf('hit'));
+ for(let y=top;y<=bottom;y++)for(let x=left-6;x<left;x++){
+  assert.equal(d.industrial.get(x,y),1,'continuous west apron at '+x+','+y+' on map '+v);
+  assert.equal(d.bchk(x,y,'belt'),'');
+ }
+}
 console.log('Factory landscape, locked halls, construction grids and seven ARCHE phases passed.');
 
 const idle = { v: 2, m: 120, ts: clock, tk: 0, o: starter, hl: { gar: 1 } };

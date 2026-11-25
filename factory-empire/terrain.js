@@ -32,12 +32,12 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
  const waterways=[
   {w:1.12,path:[[-12,-20],[-11.7,-10.7],[-13.2,-4],[-8.75,2.45],[-7.35,7.55],[-3.7,12.2],[-2.35,16.9],[-4.35,21],[-8.25,24.45],[-10,29.3]]},
   {w:2.65,path:[[122,-18],[115.7,-8],[111.4,1.45],[113.05,9.3],[111.3,17.6],[113.15,24.8],[112.2,32],[113.01,40.25],[115.8,48.9],[118.7,56.1],[120.7,64.4],[127.9,78]]},
-  {w:1.04,path:[[-11.5,34.3],[-9.5,40.55],[-6.55,45.6],[-4.57,50.95],[-6.6,56.6],[-3.72,61.4],[1.8,66.2],[6.8,68.1],[12.6,68.4]]}
+  {w:1.04,path:[[-11.5,34.3],[-9.5,40.55],[-6.55,45.6],[-4.57,50.95],[-6.6,56.6+north],[-3.72,61.4+total],[1.8,66.2+total],[6.8,68.1+total],[12.6,68.4+total]]}
  ];
  const lakes=[
   {x:-11.1,y:32.4,shore:[[-19,25],[-14,22],[-8,22.6],[-3.61,25.5],[-3.6,29.3],[-2.75,33.2],[-4.7,37.9],[-10,41.4],[-15.3,40.1],[-21,37.8],[-23.2,31.9],[-21.9,27.3]]},
   {x:122.3,y:56.2,fish:true,shore:[[113.4,48.6],[117.6,48.2],[124.9,49.05],[131.3,52.95],[132.8,57.5],[130.9,62.2],[126.8,65],[120.7,66],[114.3,62.8],[112.1,56.7]]},
-  {x:12.9,y:69.9,shore:[[9.5,68.1],[12,66.5],[15,67.12],[16.4,69.9],[14.5,72.4],[10.8,71.8]]},
+  {x:12.9,y:69.9+total,shore:[[9.5,68.1],[12,66.5],[15,67.12],[16.4,69.9],[14.5,72.4],[10.8,71.8]].map(([x,y])=>[x,y+total])},
   {x:8.5,y:-7.1,shore:[[3.9,-8.25],[6.26,-11.6],[9.4,-12],[14.5,-9.6],[14.2,-6.8],[11.3,-4.4],[8.65,-4.7],[5.7,-4.75]]}
  ];
  const woods=[
@@ -590,8 +590,8 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
     shape(outline.map(([a,b])=>[x+(a-x)*.52-1.8,y+(b-y)*.53-2]),'#bac38b36');
    }
    if(detail)withState(()=>{c.globalAlpha=.34;paintFields(visible)});
-   paintIndustrial(industrial,slabs,visible,detail);
    paintWater(visible,time,detail);
+   paintIndustrial(industrial,slabs,visible,detail);
    const drives=plots.flatMap(plot=>plot.drive?[plot.drive]:[]);
    for(const prop of spots){
     const {x,y,kind,size,style}=prop;
@@ -599,6 +599,17 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
     if(x>=bunker[0]-1&&x<=bunker[2]+2&&y>=bunker[1]-1&&y<=bunker[3]+2)continue;
     if(industrial.get(Math.floor(x),Math.floor(y)))continue;
     if(occupied(Math.floor(x),Math.floor(y)))continue;
+    if(kind==='tree'){
+     // A trunk just outside the pavement can still put its canopy over the lot.
+     const reach=size*1.8+.12;
+     let overlaps=false;
+     for(let row=Math.floor(y-reach);row<=Math.floor(y+reach)&&!overlaps;row++){
+      for(let col=Math.floor(x-reach);col<=Math.floor(x+reach);col++){
+       if(industrial.get(col,row)||occupied(col,row)){overlaps=true;break}
+      }
+     }
+     if(overlaps)continue;
+    }
     if(drives.some(d=>Math.abs(x-d.x)<1.17&&y>=Math.min(d.y,d.route.at(-1)[1])-.35&&y<=Math.max(d.y,d.route.at(-1)[1])+.35))continue;
     if(kind==='tree')tree(prop,time,detail);
     else if(detail&&kind==='rock'){
