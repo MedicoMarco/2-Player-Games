@@ -4803,12 +4803,13 @@ function olGone(){
 const PRESENCE_IDLE=10*60*1000;
 const INVITE_IDLE=5*60*1000;
 const ONLINE_PULSE=2*60*1000;
+const PRESENCE_RETRY=5000;
 const olNow=()=>Date.now()+(OL.clockOffset||0);
 const olInviteValid=v=>v&&Number(v.ts)>olNow()-INVITE_IDLE;
 function olPresence(){
   OL.presence?.stop(false);
   const db=OL.db,me=OL.me,connected=db.ref('.info/connected'),offset=db.ref('.info/serverTimeOffset');
-  let session=null,closed=false;
+  let session=null,closed=false,retry=null;
   const valid=()=>!closed&&OL.me===me&&!OL.deleting;
   const paths=id=>['presence/'+me+'/tabs/'+id,'expiry/presence/'+me+'/'+id];
   const touch=()=>{
@@ -4819,32 +4820,43 @@ function olPresence(){
     const current=session;
     return write(game).catch(error=>{
       // Preserve the online indicator while older database rules are still active.
-      if((game==='fabrik'||game==='blackjack')&&error.code==='PERMISSION_DENIED'&&valid()&&session===current&&OL.game===game)return write(null);
+      if(game&&error.code==='PERMISSION_DENIED'&&valid()&&session===current&&OL.game===game)return write(null);
       throw error;
     });
   };
-  const pulse=()=>{
-    if(!valid()||!session?.ready)return;
-    touch().catch(()=>{});luPulse();olInvites();olBadge();
+  const retryPulse=current=>{
+    if(!valid()||session!==current||retry!==null)return;
+    retry=setTimeout(()=>{retry=null;pulse()},PRESENCE_RETRY);
   };
-  const changed=async snap=>{
-    if(!snap.val()||!valid()){session=null;return}
-    const current={id:db.ref('presence/'+me+'/tabs').push().key,ready:false};
-    session=current;
-    const [row]=paths(current.id);
+  const pulse=async()=>{
+    const current=session;
+    if(!valid()||!current||current.pending)return;
+    current.pending=true;
     try{
-      // Dieser Tab hat pro Verbindung eine eigene Kennung. Ältere Disconnect-Aufträge
-      // können die Präsenz der neuen Verbindung dadurch nicht entfernen.
-      await db.ref(row).onDisconnect().remove();
-      if(!valid()||session!==current)return;
-      current.ready=true;pulse();
-    }catch(_){}
+      if(!current.ready){
+        // Each connection uses its own tab ID, including after reconnecting.
+        await db.ref(paths(current.id)[0]).onDisconnect().remove();
+        if(!valid()||session!==current)return;
+        current.ready=true;
+      }
+      await touch();
+    }catch(_){retryPulse(current)}
+    finally{current.pending=false}
+  };
+  const tick=()=>{
+    if(!valid()||!session)return;
+    pulse();luPulse();olInvites();olBadge();
+  };
+  const changed=snap=>{
+    clearTimeout(retry);retry=null;
+    session=snap.val()&&valid()?{id:db.ref('presence/'+me+'/tabs').push().key,ready:false}:null;
+    if(session)tick();
   };
   const skew=snap=>{OL.clockOffset=Number(snap.val())||0};
-  const visible=()=>{if(!document.hidden)pulse()};
-  const timer=setInterval(pulse,ONLINE_PULSE);
+  const visible=()=>{if(!document.hidden)tick()};
+  const timer=setInterval(tick,ONLINE_PULSE);
   const stop=remove=>{
-    closed=true;clearInterval(timer);connected.off('value',changed);offset.off('value',skew);
+    closed=true;clearTimeout(retry);clearInterval(timer);connected.off('value',changed);offset.off('value',skew);
     document.removeEventListener('visibilitychange',visible);
     const old=session;session=null;
     if(OL.presence?.stop===stop)OL.presence=null;
@@ -4890,8 +4902,9 @@ function olListen(){
     offs.push(()=>r.off('value',changed))
   }
   const on=(p,f)=>{const r=d.ref(p),changed=s=>f(s.val()||{});r.on('value',changed);offs.push(()=>r.off('value',changed))};
-  const presence=new Map();
+  const presence=new Map(),retryAt=new Map();
   const raw={};
+  let retryTimer=null,closed=false;
   const refresh=()=>{
     for(const [u,value] of Object.entries(raw)){
       const status=olPeerPresence(value);
@@ -4900,24 +4913,32 @@ function olListen(){
     olUpd();window.luFr&&luFr()
   };
   const syncPresence=()=>{
+    if(closed||OL.me!==me)return;
+    for(const u of retryAt.keys())if(!OL.F[u]||!olAllowed(u))retryAt.delete(u);
     for(const [u,stop] of presence){if(OL.F[u]&&olAllowed(u))continue;stop();presence.delete(u);delete raw[u];delete OL.P[u];delete OL.U[u]}
     for(const u of Object.keys(OL.F)){
-      if(presence.has(u)||!olAllowed(u))continue;
+      if(presence.has(u)||!olAllowed(u)||(retryAt.get(u)||0)>Date.now())continue;
       const ref=d.ref('presence/'+u);
-      const changed=s=>{raw[u]=s.val();refresh()};
-      const denied=()=>{delete raw[u];delete OL.P[u];presence.delete(u);refresh()};
+      const changed=s=>{retryAt.delete(u);raw[u]=s.val();refresh()};
+      const denied=()=>{
+        delete raw[u];delete OL.P[u];presence.delete(u);refresh();
+        if(closed||!OL.F[u]||!olAllowed(u))return;
+        // A new friendship can arrive locally before the server accepts both entries.
+        retryAt.set(u,Date.now()+PRESENCE_RETRY);
+        if(retryTimer===null)retryTimer=setTimeout(()=>{retryTimer=null;syncPresence()},PRESENCE_RETRY);
+      };
       presence.set(u,()=>ref.off('value',changed));
       ref.on('value',changed,denied)
     }
     olNames(Object.keys(OL.F).filter(olAllowed));
     refresh()
   };
-  offs.push(()=>{for(const stop of presence.values())stop();presence.clear()});
+  offs.push(()=>{closed=true;clearTimeout(retryTimer);for(const stop of presence.values())stop();presence.clear()});
   onBlockSetup();
   on('friends/'+me,v=>{OL.F=v;syncPresence()});
   on('requests/'+me,v=>{OL.RQ=v;olUpd();olBadge()});
   on('invites/'+me,v=>{OL.INV=v;olInvites();olBadge()});
-  const expiryTimer=setInterval(refresh,30000);offs.push(()=>clearInterval(expiryTimer));
+  const expiryTimer=setInterval(syncPresence,30000);offs.push(()=>clearInterval(expiryTimer));
   OL.unl=()=>offs.forEach(f=>f());
 }
 function olNames(ids){
