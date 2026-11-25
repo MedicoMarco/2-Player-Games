@@ -38,7 +38,7 @@ function ticks(count) {
  for (let i = 0; i < count; i++) core().tick();
 }
 function load(objects = [], setup = {}) {
- core().init({ v: 2, m: 1e6, o: objects, ...setup }, false);
+ core().init({ v: 2, m: 1e6, o: objects, ...setup }, 2);
  core().analyze();
  return core();
 }
@@ -155,26 +155,26 @@ const oldFootprints={
 core().applySave(oldFootprints);
 d=core();
 assert.deepEqual(JSON.parse(data.get('2pg_fe_demo.before-compact-buildings')),oldFootprints);
-assert.deepEqual(Array.from(d.cell(28,5).base),[1,1]);
-assert.equal(d.cell(29,5).t,'belt');
-assert.equal(d.cell(29,5).r,0);
-assert.equal(d.cell(32,9).t,'belt');
-assert.equal(d.cell(32,9).r,3);
-assert.equal(d.cell(28,5).lv,3);
+assert.deepEqual(Array.from(d.cell(38,5).base),[1,1]);
+assert.equal(d.cell(39,5).t,'belt');
+assert.equal(d.cell(39,5).r,0);
+assert.equal(d.cell(42,9).t,'belt');
+assert.equal(d.cell(42,9).r,3);
+assert.equal(d.cell(38,5).lv,3);
 assert.equal(d.G.m,9600);
 ticks(90);
-assert.deepEqual(Array.from(d.cell(30,5).q),[7]);
-assert.deepEqual(Array.from(d.cell(30,5).qq),[126]);
-assert.deepEqual(Array.from(d.cell(32,7).q),[7]);
+assert.deepEqual(Array.from(d.cell(40,5).q),[7]);
+assert.deepEqual(Array.from(d.cell(40,5).qq),[126]);
+assert.deepEqual(Array.from(d.cell(42,7).q),[7]);
 const compactSave=save();
 d=load(compactSave.o,compactSave);
 assert.equal(d.L.length,oldFootprints.o.length+2,'reloading does not insert a belt a second time');
-assert.equal(d.cell(28,5).lv,3);
-const compactTemplate=d.previewPlan([[0,0,'sme',0,true],[2,0,'sto',0,false]],35,9);
+assert.equal(d.cell(38,5).lv,3);
+const compactTemplate=d.previewPlan([[0,0,'sme',0,true],[2,0,'sto',0,false]],45,9);
 assert.equal(compactTemplate.error,'');
-assert(compactTemplate.rows.some(row=>row.t==='belt'&&row.x===36&&row.y===9&&row.r===0));
+assert(compactTemplate.rows.some(row=>row.t==='belt'&&row.x===46&&row.y===9&&row.r===0));
 assert(d.commitBuild(compactTemplate));
-assert.equal(d.cell(36,9).t,'belt');
+assert.equal(d.cell(46,9).t,'belt');
 
 d = load([[7, 6, 'src', 0, 1], [10, 6, 'grid', 0, 1], [13, 6, 'shp', 0, 1]]);
 const route = d.planRoute(d.cell(7, 6), d.cell(13, 6));
@@ -1403,7 +1403,7 @@ const loadedObjects=[];
 for(let y=3;y<20;y++)for(let x=6;x<44;x++)loadedObjects.push([
  x,y,x%3===0?'belt':x%3===1?'saw':'sto',0,1,x%3===0?1:-1,x%3===1?[2]:0,-1,x%3===2?[1,0]:0
 ]);
-d.init({v:2,m:65000,o:loadedObjects,hl:{gar:3,met:3,elk:3},emp:{p:12,q:12}});
+d.init({v:2,m:65000,o:loadedObjects,hl:{gar:3,met:3,elk:3},emp:{p:12,q:12}},2);
 d=zoomGame.dbg();
 d.setTool('hand');
 d.view(17,11,.83);
@@ -1431,7 +1431,7 @@ delete nativeTarget.scale;
 const catalogue=Object.keys(d.MD).map((type,i)=>[
  6+i%10,3+Math.floor(i/10),type,i%4,2,-1,0,-1,type==='sto'?[1]:0
 ]);
-d.init({v:2,m:65000,o:catalogue,hl:{gar:3,met:3,elk:3},sp:7,campaign:{level:2}});
+d.init({v:2,m:65000,o:catalogue,hl:{gar:3,met:3,elk:3},sp:7,campaign:{level:2}},2);
 d=zoomGame.dbg();
 for(const z of [.22,.41,.42,1.3,2.6]){
  for(const x of [6,10,14]){
@@ -1442,7 +1442,7 @@ for(const z of [.22,.41,.42,1.3,2.6]){
 }
 assert.equal(d.L.length,catalogue.length);
 assert.deepEqual(renderErrors,[],'all catalogue objects draw across zoom levels');
-d.init({v:2,m:65000,o:loadedObjects,hl:{gar:3,met:3,elk:3}});
+d.init({v:2,m:65000,o:loadedObjects,hl:{gar:3,met:3,elk:3}},2);
 d=zoomGame.dbg();
 
 assert(!html.includes('paintFactorySurround'));
@@ -1529,7 +1529,7 @@ assert.equal(oldGame.bchk(4,5,'src'),'');
 assert.deepEqual(JSON.parse(data.get('2pg_fe_guest.before-v2')),oldSave);
 oldGame.sv(false);
 const migratedSave=JSON.parse(data.get('2pg_fe_guest'));
-assert.equal(migratedSave.v,3);
+assert.equal(migratedSave.v,4);
 assert.equal(migratedSave.m,16480);
 assert.deepEqual(migratedSave.legacyPlots,['w','e']);
 const recoveredFactory=factory();
@@ -1543,13 +1543,13 @@ const compatible=factory();
 compatible.update(.6);
 compatible.dbg().sv(false);
 assert.equal(data.get('2pg_fe_guest'),futureSave);
-assert.equal(JSON.parse(data.get('2pg_fe_guest.compatible')).v,3);
+assert.equal(JSON.parse(data.get('2pg_fe_guest.compatible')).v,4);
 data.delete('2pg_fe_guest');
 data.delete('2pg_fe_guest.compatible');
 console.log('Zoom: wheel, camera bounds, two pointer zoom, canceled gestures and editing passed. Saves: original v1 and unsupported snapshots preserved.');
 
 const earlyYard=factory();
-earlyYard.dbg().init({v:3,m:1000,hl:{gar:1,met:1}});
+earlyYard.dbg().init({v:4,yardRows:[2,2],m:1000,hl:{gar:1,met:1}});
 assert.equal(earlyYard.dbg().bchk(24,25,'belt'),'','the first logistics yard opens with the metal hall');
 
 const oldYardSave={
@@ -1574,26 +1574,26 @@ let yard=expanded();
 assert.deepEqual(JSON.parse(data.get('2pg_fe_guest.before-logistics-yard.yard-original')),oldYardSave);
 assert.equal(yard.G.m,oldYardSave.m);
 assert.equal(yard.L.length,oldYardSave.o.length);
-assert.equal(yard.hrect(yard.hallOf('vrs'))[1],32);
-assert.equal(yard.hrect(yard.hallOf('hit'))[1],64);
-assert.equal(yard.SITE[1],62);
+assert.equal(yard.hrect(yard.hallOf('vrs'))[1],30);
+assert.equal(yard.hrect(yard.hallOf('hit'))[1],60);
+assert.equal(yard.SITE[1],58);
 assert.equal(yard.bchk(35,26,'belt'),'');
 assert.equal(yard.bchk(35,57,'belt'),'');
 assert(yard.bchk(35,26,'src'));
-assert(yard.bchk(74,67,'belt').includes('ARCHE'));
-assert.equal(yard.cell(10,29).t,'kre');
-assert.equal(yard.cell(15,31).t,'tunnel');
-assert.equal(yard.cell(22,61).t,'belt');
-assert.equal(yard.cell(21,66),yard.cell(20,65));
-assert.equal(yard.G.mg[0].y,65);
-assert.equal(yard.cell(20,65).lv,3);
-assert.equal(yard.cell(90,12).q[0],2);
-assert(yard.connectedLine(yard.cell(10,18)).includes(yard.cell(10,30)));
-assert(yard.connectedLine(yard.cell(15,16)).includes(yard.cell(15,32)));
-assert(yard.connectedLine(yard.cell(22,62)).includes(yard.cell(22,49)));
+assert(yard.bchk(94,67,'belt').includes('ARCHE'));
+assert.equal(yard.cell(10,27).t,'kre');
+assert.equal(yard.cell(15,29).t,'tunnel');
+assert.equal(yard.cell(22,57).t,'belt');
+assert.equal(yard.cell(21,62),yard.cell(20,61));
+assert.equal(yard.G.mg[0].y,61);
+assert.equal(yard.cell(20,61).lv,3);
+assert.equal(yard.cell(110,12).q[0],2);
+assert(yard.connectedLine(yard.cell(10,18)).includes(yard.cell(10,28)));
+assert(yard.connectedLine(yard.cell(15,16)).includes(yard.cell(15,30)));
+assert(yard.connectedLine(yard.cell(22,58)).includes(yard.cell(22,47)));
 yard.sv(false);
 const beforeTransport=JSON.parse(data.get('2pg_fe_guest'));
-assert.equal(beforeTransport.v,3);
+assert.equal(beforeTransport.v,4);
 assert.equal(beforeTransport.yardLinks.length,3);
 const reloadedFactory=factory();
 reloadedFactory.update(.6);
@@ -1601,21 +1601,21 @@ yard=reloadedFactory.dbg();
 assert.equal(yard.L.length,oldYardSave.o.length);
 assert.equal(yard.cell(10,18).queue[0][1],131);
 for(let i=0;i<80;i++)yard.tick();
-assert.deepEqual(Array.from(yard.cell(10,30).q.slice(0,3)),[3,1,2]);
-assert.deepEqual(Array.from(yard.cell(10,30).qq.slice(0,3)),[112,122,131]);
-assert.equal(yard.cell(15,32).qq[0],138);
-assert.equal(yard.cell(22,49).qq[0],119);
+assert.deepEqual(Array.from(yard.cell(10,28).q.slice(0,3)),[3,1,2]);
+assert.deepEqual(Array.from(yard.cell(10,28).qq.slice(0,3)),[112,122,131]);
+assert.equal(yard.cell(15,30).qq[0],138);
+assert.equal(yard.cell(22,47).qq[0],119);
 yard.view(10.5,22,1);
 yard.sel(yard.cell(10,18));
 reloadedFactory.draw();
 assert.deepEqual(renderErrors,[],'the expanded map and selection render');
 assert(yard.tuD().HB.some(hit=>hit.id==='disconnect_yard'));
 assert.equal(yard.bchk(10,20,'belt'),'');
-yard.delAt(10,29);
+yard.delAt(10,27);
 yard.sv(false);
 const afterRemoval=JSON.parse(data.get('2pg_fe_guest'));
 assert.equal(afterRemoval.yardLinks.length,2);
-assert(!yard.connectedLine(yard.cell(10,18)).includes(yard.cell(10,30)));
+assert(!yard.connectedLine(yard.cell(10,18)).includes(yard.cell(10,28)));
 
 const legacyFootprint={v:2,ts:clock,m:5600,hl:{gar:3,hit:1},o:[
  [10,18,'cellFab',0,3,-1,[1,2,1,1],-1,0,0,{large:true}]
@@ -1630,6 +1630,83 @@ assert.equal(retained.v,2);
 assert.deepEqual(retained.o[0].slice(0,5),legacyFootprint.o[0].slice(0,5));
 data.delete('2pg_fe_guest');
 console.log('Expanded yards, migration backups, both conveyor directions, tunnels, managers and saved cargo passed.');
+
+const oldSideYard={
+ v:3,ts:clock,rev:'side-yard-original',m:520000,sp:6,rs:['bel2'],hl:{gar:3,met:3,elk:3,vrs:3,ene:3,fzg:3,hit:3,bnk:3},
+ yardLinks:[[27,18,27,29,1,false]],
+ o:[
+  [24,6,'express',0,1,1,0,-1,0,0,{iq:139}],
+  [25,6,'kre',0,1],[26,6,'sto',0,1],
+  [25,9,'belt',2,1,2,0,-1,0,0,{iq:132}],[24,9,'sto',2,1],
+  [27,18,'belt',1,1,1,0,-1,0,0,{iq:127}],[27,29,'sto',0,1],
+  [29,60,'belt',1,1,3,0,-1,0,0,{iq:126}],[29,61,'sto',0,1],
+  [30,60,'belt',1,1,4,0,-1,0,0,{iq:114}],[40,61,'sto',0,1],
+  [10,19,'tunnel',1,1,1,0,-1,0,0,{iq:143}],[10,26,'tunnel',1,1],[10,27,'sto',1,1]
+ ]
+};
+reloadedFactory.dbg().applySave(oldSideYard);
+yard=reloadedFactory.dbg();
+const rect=id=>yard.hrect(yard.hallOf(id));
+for(const [left,right] of [['gar','met'],['met','elk'],['vrs','ene'],['ene','fzg'],['hit','bnk']]){
+ const a=rect(left),b=rect(right);
+ assert.equal(b[0]-a[2]-1,12,left+' to '+right);
+ for(let x=a[2]+1;x<b[0];x++)assert.equal(yard.bchk(x,a[1]+4,'belt'),'',left+' to '+right+' pavement');
+}
+assert.equal(rect('vrs')[1]-rect('gar')[3]-1,12);
+assert.equal(rect('hit')[1]-rect('vrs')[3]-1,12);
+assert.deepEqual(JSON.parse(data.get('2pg_fe_guest.before-side-yards')),oldSideYard);
+assert.equal(yard.cell(35,6).t,'kre');
+assert(yard.connectedLine(yard.cell(24,6)).includes(yard.cell(36,6)));
+assert(yard.connectedLine(yard.cell(37,18)).includes(yard.cell(27,27)));
+assert(!yard.connectedLine(yard.cell(40,56)).includes(yard.cell(40,57)));
+assert(!yard.connectedLine(yard.cell(10,19)).includes(yard.cell(10,25)));
+yard.sv(false);
+const sideSave=JSON.parse(data.get('2pg_fe_guest'));
+assert.equal(sideSave.v,4);
+assert.deepEqual(sideSave.yardRows,[2,2]);
+assert.equal(sideSave.yardLinks.filter(link=>link[6]).length,2);
+yard.applySave(sideSave);
+yard=reloadedFactory.dbg();
+for(let i=0;i<32;i++)yard.tick();
+assert.equal(yard.L.length,oldSideYard.o.length);
+assert.equal(yard.cell(36,6).qq[0],139);
+assert.equal(yard.cell(24,9).qq[0],132);
+assert.equal(yard.cell(27,27).qq[0],127);
+assert.equal(yard.cell(29,57).qq[0],126);
+assert.equal(yard.cell(40,57).q.length,0);
+assert.equal(yard.cell(10,25).q.length,0);
+assert.equal(yard.cell(10,19).it,1);
+yard.view(30,10,.6);
+yard.sel(yard.cell(24,6));
+reloadedFactory.draw();
+assert.deepEqual(renderErrors,[],'the new side corridors render');
+yard.view(40,56,.8);
+yard.sel(yard.cell(40,56));
+reloadedFactory.draw();
+const unseal=yard.tuD().HB.find(hit=>hit.id==='unlock_yard_ports');
+assert(unseal);
+unseal.fn();
+for(let i=0;i<10;i++)yard.tick();
+assert.equal(yard.cell(40,57).qq[0],114);
+
+
+const busyRows={...oldSideYard,rev:'dense-yard-original',yardLinks:[],o:Array.from({length:10},(_,i)=>[
+ 11,19+i,'belt',0,2,1,0,-1,0,0,{iq:110+i}
+])};
+yard.applySave(busyRows);
+yard=reloadedFactory.dbg();
+for(const row of busyRows.o){
+ assert.equal(yard.cell(row[0],row[1]).iq,row[10].iq);
+}
+yard.sv(false);
+const denseSave=JSON.parse(data.get('2pg_fe_guest'));
+assert.equal(denseSave.v,4);
+assert.deepEqual(denseSave.yardRows,[0,2]);
+assert.equal(denseSave.o.length,busyRows.o.length);
+assert.equal(yard.hrect(yard.hallOf('met'))[0]-yard.hrect(yard.hallOf('gar'))[2]-1,12);
+data.delete('2pg_fe_guest');
+console.log('Sideways yards, retained dense rows, existing links and blocked accidental connections passed.');
+
 
 
 
@@ -1730,9 +1807,9 @@ assert.equal(lesson(),'fleet-plan');
 tutorialButton('bk');
 assert.equal(lesson(),'fleet-machine');
 tutorialButton('panel_close');
-exercise('fleet-machine','fleet-ramp',d=>assert(d.place(155,12,'laminate',0)));
-exercise('fleet-ramp','fleet-check',d=>assert(d.place(156,12,'orbitRamp',0)));
-exercise('fleet-check','fleet-summary',d=>d.sel(d.cell(156,12)));
+exercise('fleet-machine','fleet-ramp',d=>assert(d.place(175,12,'laminate',0)));
+exercise('fleet-ramp','fleet-check',d=>assert(d.place(176,12,'orbitRamp',0)));
+exercise('fleet-check','fleet-summary',d=>d.sel(d.cell(176,12)));
 tutorialButton('tnext');
 assert.equal(learner().G.tu,-1);
 assert.equal(learner().G.campaign.level,2);

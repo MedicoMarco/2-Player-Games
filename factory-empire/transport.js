@@ -53,6 +53,7 @@ function jtick(o){
   const n=inputNeighbor(o,d);
   const output=(d+2)%4;
   if(!n||n.needsRelocation||!isBelt(n.t)||!beltDirections(n).includes(output)||n.it<0||n.ag<beltTime(n.t))return null;
+  if(n.yardBlocked?.[output]===o)return null;
   if(n.yardOutputs?.[output]&&n.yardOutputs[output]!==o||n.t=='tunnel'&&!n.jumped&&tunnelExit(n))return null;
   const parcel=[n.it,n.iq];
   record(n,'moves');n.beltCarry=0;clearBelt(n);

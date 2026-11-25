@@ -1,5 +1,5 @@
 /* The factory uses one terrain projection for landscaping, traffic, and outdoor logistics. */
-function createFactoryWorldArt(c,tile,columns,rows,bunker,{rr,tx,withState},yardDepth){
+function createFactoryWorldArt(c,tile,columns,rows,bunker,{rr,tx,withState},layout){
  function polygon(points,fill){
   c.beginPath();c.moveTo(...points[0]);
   for(let i=1;i<points.length;i++)c.lineTo(...points[i]);
@@ -114,7 +114,7 @@ function createFactoryWorldArt(c,tile,columns,rows,bunker,{rr,tx,withState},yard
    });
   }
  }
- const terrain=createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,line,oval},yardDepth);
+ const terrain=createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,line,oval},layout);
  return {...terrain,hall,clouds,polygon,line,oval,platform};
 }
 

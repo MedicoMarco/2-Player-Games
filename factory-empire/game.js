@@ -2,7 +2,7 @@
 const fabrik=()=>{
 const canvasScope=createFactoryCanvasScope(c);
 const {save:saveCanvas,restore:restoreCanvas,withState:withCanvasState}=canvasScope;
-const TS=48,GW=188,ORIGINAL_HEIGHT=62,TICK=.125,DAYSEC=300,DAYS=1500,BELT=.25,OFF=28800,RRC=1920,DX=[1,0,-1,0],DY=[0,1,0,-1],PI=Math.PI;
+const TS=48,TICK=.125,DAYSEC=300,DAYS=1500,BELT=.25,OFF=28800,RRC=1920,DX=[1,0,-1,0],DY=[0,1,0,-1],PI=Math.PI;
 let view=FactoryLayout.create(800,480),FW=view.width,FH=view.height,CX=view.cx,CY=view.cy;
 let uiTransform={x:0,y:0,scale:1,clip:null},panelSurface=null;
 let panelScroll={id:null,x:0,y:0},layoutRotated=false;
@@ -230,32 +230,31 @@ HL.push(
 );
 const siteAvailable=site=>(site.chapter||1)<=campaignChapter()&&(!site.retired||hlv(site.hall));
 const hallAvailable=hall=>(hall.chapter||1)<=campaignChapter()&&(!hall.retired||hlv(hall.id));
-const regionTiles=new Array(GW*ORIGINAL_HEIGHT);
+const originalWidth=FactoryYard.width,originalHeight=FactoryYard.height;
+const regionTiles=new Array(originalWidth*originalHeight);
 for(const site of REGIONS){
  const [left,top,right,bottom]=site.rect;
- for(let y=top;y<=bottom;y++)for(let x=left;x<=right;x++)regionTiles[y*GW+x]=site;
+ for(let y=top;y<=bottom;y++)for(let x=left;x<=right;x++)regionTiles[y*originalWidth+x]=site;
 }
-// Keep every hall in its original shape. Insert a ten-tile yard between each row.
-const yardCuts=[19,41],yardDepth=10,mainRight=79,bunkerOriginal=[66,42,81,61];
-const yardOffset=(x,y)=>x<=bunkerOriginal[2]&&y>=yardCuts[0]?yardDepth*(y>=yardCuts[1]?2:1):0;
-const yardRect=([x,y,r,b])=>[x,y+yardOffset(x,y),r,b+yardOffset(r,b)];
-let GH=ORIGINAL_HEIGHT,SITE=bunkerOriginal,expandedYard=false;
+const bunkerOriginal=[66,42,81,61],fleetOriginal=[179,29,186,48];
+const latestLayout=4;
+let yardLayout=FactoryYard.create(2),GW=yardLayout.width,GH=yardLayout.height,SITE=bunkerOriginal,FLEET=fleetOriginal;
 const siteAt=(x,y)=>{
- const site=x>=0&&y>=0&&x<GW&&y<GH
-  ?regionTiles[y*GW+x]??(expandedYard&&x<=mainRight&&y>=ORIGINAL_HEIGHT?REGIONS[0]:null)
-  :null;
+ if(x<0||y<0||x>=GW||y>=GH)return;
+ const originalX=x-yardLayout.east;
+ const site=x<=yardLayout.mainRight?REGIONS[0]:originalX>=FactoryYard.annexStart&&y<originalHeight
+  ?regionTiles[y*originalWidth+originalX]:null;
  return site&&siteAvailable(site)?site:undefined;
 };
 let currentSite='main';
 const hlv=id=>(G&&G.hl&&G.hl[id])|0,hallOf=id=>HL.find(h=>h.id==id),inR=(r,x,y)=>x>=r[0]&&x<=r[2]&&y>=r[1]&&y<=r[3];
 const hallExtensions={gar:[2,2],met:[2,1],vrs:[2,2],elk:[2,1],ene:[2,2],fzg:[0,2],hit:[2,2],bnk:[0,2],nor:[2,2],lab:[2,2],prt:[2,2],orb:[0,2]};
 const extendedHallRects=new Map(HL.map(h=>[h.id,h.rc.map(([x,y,r,b])=>[x,y,r+hallExtensions[h.id][0],b+hallExtensions[h.id][1]])]));
-const layoutRect=rect=>expandedYard?yardRect(rect):rect;
+const layoutRect=rect=>yardLayout.rect(rect);
 const originalHallRect=h=>layoutRect(h.rc[Math.max(1,hlv(h.id))-1]);
 const hrect=h=>hlv(h.id)?layoutRect(extendedHallRects.get(h.id)[hlv(h.id)-1]):originalHallRect(h);
-const FLEET=[179,29,186,48];
 const isProjectRamp=t=>t==='prj'||t==='orbitRamp';
-const mapWidth=()=>campaignChapter()>=2?GW:144;
+const mapWidth=()=>campaignChapter()>=2?GW:144+yardLayout.east;
 const hSize=h=>{const r=hrect(h);return(r[2]-r[0]+1)+'×'+(r[3]-r[1]+1)},hArea=r=>(r[2]-r[0]+1)*(r[3]-r[1]+1);
 const ORD=['saw','frm','asm','pnt','pck'],QT=[1,10,25,0];
 const fm=n=>{n=Math.floor(n);for(const[v,s]of[[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'K']])if(n>=v)return(n/v).toFixed(n>=v*100?0:n>=v*10?1:2).replace(/(\.\d*?)0+$/,'$1').replace(/\.$/,'').replace('.',',')+' '+s;return n.toLocaleString('de-DE')};
@@ -290,9 +289,14 @@ function mapObject(o,value){
 function physicalNeighbor(o,d){
  return o.base[0]===1&&o.base[1]===1?cell(o.x+DX[d],o.y+DY[d]):cell(...port(o,d));
 }
+function yardNeighbor(o,d,physical,keepLink){
+ const linked=o.yardOutputs?.[d];
+ if(linked&&(!keepLink||keepLink(linked)))return linked;
+ return physical&&o.yardBlocked?.[d]===physical&&(!keepLink||keepLink(physical))?null:physical;
+}
 function neighbor(o,d){
  if(o.needsRelocation)return null;
- const next=o.yardOutputs?.[d]||physicalNeighbor(o,d);
+ const next=yardNeighbor(o,d,physicalNeighbor(o,d));
  return next?.needsRelocation?null:next;
 }
 function inputNeighbor(o,d){
@@ -301,6 +305,10 @@ function inputNeighbor(o,d){
 function tunnelExit(o,lookup=cell,keepLink){
  if(o.t!='tunnel'||o.needsRelocation)return null;
  if(o.yardTunnel&&(!keepLink||keepLink(o.yardTunnel))&&!o.yardTunnel.needsRelocation)return o.yardTunnel;
+ const next=physicalTunnelExit(o,lookup);
+ return next&&o.yardBlockedTunnel===next&&(!keepLink||keepLink(next))?null:next;
+}
+function physicalTunnelExit(o,lookup){
  for(let distance=1;distance<=6;distance++){
   const q=lookup(o.x+distance*DX[o.r],o.y+distance*DY[o.r]);
   if(q?.t=='tunnel'&&!q.needsRelocation&&q.r==o.r)return distance>=2?q:null;
@@ -328,15 +336,21 @@ const legacyPlots=[
  {id:'n',name:'Verpackungszentrum',rect:[6,0,17,2]},
  {id:'e',name:'Elektronikhalle',rect:[23,3,33,10]}
 ];
+let legacyYards=[];
+function ownedLegacyPlots(){
+ return legacyPlots.filter(plot=>G.legacyPlots.includes(plot.id)).flatMap(plot=>
+  yardLayout.plotRects(plot.rect).map(rect=>({...plot,rect})));
+}
 const logisticsSiteError='Baue Logistik auf dem Werksboden rund um deine Hallen.';
 let industrial;
 function refreshIndustrialArea(){
  teamPaths.clear();
+ legacyYards=ownedLegacyPlots();
  const halls=HL.filter(hall=>hlv(hall.id)>0);
  const plots=rectFor=>halls.map(hall=>{
   const rect=rectFor(hall);
   return {rect,site:siteAt(rect[0],rect[1])};
- }).concat(legacyPlots.filter(plot=>G.legacyPlots.includes(plot.id)).map(plot=>({
+ }).concat(legacyYards.map(plot=>({
   rect:plot.rect,site:siteAt(plot.rect[0],plot.rect[1])
  })));
  const options={
@@ -349,8 +363,14 @@ function refreshIndustrialArea(){
  };
  const previous=FactoryGrid.industrialArea(plots(originalHallRect),options).tiles;
  const yards=[];
- if(expandedYard&&['met','vrs','elk','ene','fzg'].some(hlv))yards.push([6,18,mainRight,31]);
- if(expandedYard&&['hit','bnk'].some(hlv))yards.push([6,50,mainRight,63]);
+ const [north,south]=yardLayout.depths;
+ if(north&&['met','vrs','elk','ene','fzg'].some(hlv))yards.push([6,18,yardLayout.mainRight,21+north]);
+ if(south&&['hit','bnk'].some(hlv))yards.push([6,40+north,yardLayout.mainRight,43+north+south]);
+ if(yardLayout.east)for(const [left,right] of FactoryYard.hallPairs){
+  if(!hlv(left)||!hlv(right))continue;
+  const a=hrect(hallOf(left)),b=hrect(hallOf(right));
+  yards.push([a[2]+1,Math.min(a[1],b[1]),b[0]-1,Math.max(a[3],b[3])]);
+ }
  industrial=FactoryGrid.industrialArea(plots(hrect),{...options,apron:6,corridor:2,previous,
   yards:yards.map(rect=>({rect,site:REGIONS[0]}))});
 }
@@ -383,7 +403,7 @@ function compactPortBridges(objects,compacted,canBridge){
 function logisticsHall(x,y,lastX=x,lastY=y){
  const fits=rect=>inR(rect,x,y)&&inR(rect,lastX,lastY);
  return HL.some(h=>hlv(h.id)>0&&fits(hrect(h)))||
-  legacyPlots.some(plot=>G.legacyPlots.includes(plot.id)&&fits(plot.rect));
+  legacyYards.some(plot=>fits(plot.rect));
 }
 function refreshLogisticsPlacement(){
  for(const o of L){
@@ -403,19 +423,25 @@ function migrateLegacy(save){
  return {...save,v:2,hl,legacyPlots:plots};
 }
 let yardLinks=[];
-function setYardLayout(expanded){
- expandedYard=expanded;
- GH=ORIGINAL_HEIGHT+(expanded?yardCuts.length*yardDepth:0);
- SITE=layoutRect(bunkerOriginal);
- [worldArt,drawBunker]=yardArt(expanded);
+function setYardLayout(version,removed){
+ yardLayout=FactoryYard.create(version,removed);
+ GW=yardLayout.width;GH=yardLayout.height;
+ SITE=layoutRect(bunkerOriginal);FLEET=layoutRect(fleetOriginal);
+ [worldArt,drawBunker]=yardArt(yardLayout);
 }
 function attachYardLinks(links){
  for(const {from,to} of yardLinks){
   delete from.yardOutputs;delete from.yardTunnel;
+  delete from.yardBlocked;delete from.yardBlockedTunnel;
   delete to.yardInputs;delete to.yardFeeders;
  }
  yardLinks=links;
- for(const {from,to,d,tunnel,reverse} of links){
+ for(const {from,to,d,tunnel,reverse,blocked} of links){
+  if(blocked){
+   if(tunnel)from.yardBlockedTunnel=to;
+   else (from.yardBlocked??=[])[d]=to;
+   continue;
+  }
   if(tunnel)from.yardTunnel=to;
   else{
    (from.yardOutputs??=[])[d]=to;
@@ -437,15 +463,15 @@ function readYardLinks(saved){
   if(!from||!to||from===to||from.x!==row[0]||from.y!==row[1]||to.x!==row[2]||to.y!==row[3])continue;
   if(siteAt(from.x,from.y)!==REGIONS[0]||siteAt(to.x,to.y)!==REGIONS[0])continue;
   if(tunnel&&(from.t!=='tunnel'||to.t!=='tunnel'||from.r!==to.r))continue;
-  links.push({from,to,d:tunnel?from.r:row[4],tunnel,reverse:row[5]===true});
+  links.push({from,to,d:tunnel?from.r:row[4],tunnel,reverse:row[5]===true,blocked:row[6]===true});
  }
  return links;
 }
 function expandSavedYard(){
- const offset=o=>yardOffset(o.x,o.y);
+ const expanded=FactoryYard.create(3),offset=o=>expanded.point(o.x,o.y)[1]-o.y;
  // An older or manually edited save can contain a footprint across a cut.
  // Keep the entire original layout if that footprint cannot move as a unit.
- if(L.some(o=>footprint(o).some(([x,y])=>yardOffset(x,y)!==offset(o))))return false;
+ if(L.some(o=>footprint(o).some(([x,y])=>expanded.point(x,y)[1]-y!==offset(o))))return false;
 
  const links=[];
  for(const from of L){
@@ -460,7 +486,7 @@ function expandSavedYard(){
   const to=tunnelExit(from);
   if(to&&offset(from)!==offset(to))links.push({from,to,d:from.r,tunnel:true});
  }
- setYardLayout(true);
+ setYardLayout(3);
  g=[];
  for(const o of L){o.y+=offset(o);mapObject(o,o)}
  for(const manager of G.mg)if(manager.x>=0&&manager.y>=0)manager.y+=offset(manager);
@@ -469,11 +495,55 @@ function expandSavedYard(){
  refreshLogisticsPlacement();
  return true;
 }
-function init(value,expand=true){
+function widenSavedYard(){
+ const occupied=new Set();
+ for(const o of L)for(const [x,y] of footprint(o))if(x<FactoryYard.annexStart)occupied.add(y);
+ const removed=FactoryYard.previousRows(occupied);
+ const project=(x,y)=>FactoryYard.widen(x,y,removed);
+ const moves=L.map(o=>({o,dest:project(o.x,o.y)}));
+ // Keep a saved multi-tile building intact if it spans one of the new boundaries.
+ if(moves.some(({o,dest:[a,b]})=>footprint(o).some(([x,y])=>{
+  const [u,v]=project(x,y);
+  return u-a!==x-o.x||v-b!==y-o.y;
+ })))return false;
+
+ const links=yardLinks.slice(),ports=[],tunnels=[];
+ for(const from of L){
+  if(from.x>=FactoryYard.annexStart||from.needsRelocation)continue;
+  for(let d=0;d<4;d++){
+   if(!fdn(from,(d+2)%4)||from.yardOutputs?.[d])continue;
+   const peer=neighbor(from,d),reverse=peer&&inputNeighbor(peer,(d+2)%4)===from;
+   const active=compatiblePort(from,peer,d)&&siteAt(from.x,from.y)===siteAt(peer.x,peer.y)&&(!isBelt(from.t)||!peer.j||reverse);
+   ports.push({from,d,to:active?peer:null,reverse});
+  }
+  if(from.t==='tunnel'&&!from.yardTunnel)tunnels.push({from,to:tunnelExit(from),d:from.r,tunnel:true});
+ }
+ setYardLayout(4,removed.map(rows=>rows.length));
+ g=[];
+ for(const {o,dest:[x,y]} of moves){o.x=x;o.y=y;mapObject(o,o)}
+ for(const manager of G.mg)if(manager.x>=0&&manager.y>=0)[manager.x,manager.y]=project(manager.x,manager.y);
+ if(G.guide)G.guide.anchor=project(...G.guide.anchor);
+ for(const link of ports){
+  const {from,to,d,reverse}=link,next=physicalNeighbor(from,d);
+  if(to&&(to!==next||isBelt(from.t)&&to.j&&reverse&&physicalNeighbor(to,(d+2)%4)!==from))links.push(link);
+  else if(!to&&compatiblePort(from,next,d))links.push({...link,to:next,reverse:false,blocked:true});
+ }
+ for(const link of tunnels){
+  const {from,to}=link,next=physicalTunnelExit(from,cell);
+  if(to===next)continue;
+  links.push(to?link:{...link,to:next,blocked:true});
+ }
+ attachYardLinks(links);
+ refreshIndustrialArea();
+ refreshLogisticsPlacement();
+ if(currentSite!=='main')centerSite(REGIONS.find(site=>site.id===currentSite));
+ return true;
+}
+function init(value,target=latestLayout){
  const legacy=value&&(value.v==null||value.v===1);
  const d=legacy?migrateLegacy(value):value;
  attachYardLinks([]);
- setYardLayout(!d||d.v===3);
+ setYardLayout(d?.v??latestLayout,d?.yardRows);
  resetPlanning();
  projectCargo.clear();projectTrucks.length=0;
  rejectedBuild=null;
@@ -544,7 +614,7 @@ function init(value,expand=true){
   G.tutorialPaused=d.tutorialPaused===true;
   G.tutorialAward=d.tutorialAward??(!d.guide&&d.tu<0);
   if(campaignChapter()===2&&G.campaign.stage===0&&d.story?.version===1&&d.guide===undefined){
-   G.guide=newGuide('fleet',[155,12]);G.tu=0;
+   G.guide=newGuide('fleet',yardLayout.point(155,12));G.tu=0;
   }
   if(campaignChapter()>=2)G.hl.orb=Math.max(1,G.hl.orb||0);
   const compensation=legacyCompensation(d);
@@ -585,8 +655,9 @@ function init(value,expand=true){
  const bridges=compactPortBridges(L,compacted,(x,y,a,b)=>siteAt(a,b)===siteAt(x,y)&&!bchk(x,y,'belt',true,true));
  for(const {x,y,t,r} of bridges)put(x,y,t,r);
  refreshLogisticsPlacement();
- if(d?.v===3)attachYardLinks(readYardLinks(d.yardLinks));
- else if(d&&expand)expandSavedYard();
+ if(d?.v>=3)attachYardLinks(readYardLinks(d.yardLinks));
+ else if(d&&target>=3)expandSavedYard();
+ if(yardLayout.version===3&&target>=4)widenSavedYard();
  if(legacy){
   G.sf={...G.sf,mig:1};
   stQ.push(storyCard('Spielstand übernommen','Deine Fabrik ist wieder da',[
@@ -861,7 +932,8 @@ function backupOriginal(save,suffix){
  return readLocal(separate)!==null||writeLocal(separate,save);
 }
 function backupBeforeMigration(save){
- if(save.v===3)return true;
+ if(save.v===4)return true;
+ if(save.v===3)return backupOriginal(save,'before-side-yards');
  if(!backupOriginal(save,'before-logistics-yard'))return false;
  if(save.v!==2)return backupOriginal(save,'before-v2');
  const oversized=Object.values(save.o||{}).some(row=>row?.[10]?.large===true&&MD[row[2]]?.previousSize);
@@ -923,7 +995,7 @@ async function loadFactory(){
 function snapshot(){
  const ts=Date.now();
  return {
-  v:expandedYard?3:2,ts,rev:ts.toString(36)+'-'+Math.random().toString(36).slice(2,12),base:cloud.base,
+  v:yardLayout.version,ts,rev:ts.toString(36)+'-'+Math.random().toString(36).slice(2,12),base:cloud.base,
   carry:Math.max(0,acc),m:G.m,te:G.te,sold:G.sold,made:G.made,units:G.units,productTracks:G.productTracks,pk:G.pk,cost:G.cost,
   tk:G.tk,ord:G.ord,history:G.history,rt:Math.round(rate()*10)/10,
   hl:G.hl,legacyPlots:G.legacyPlots,site:currentSite,campaign:G.campaign,story:G.story,legacyIndustry:G.legacyIndustry,sp:G.sp,sq:G.sq.map(v=>v|0),st:G.st,sd:G.sd,sf:G.sf,late:G.late,end:G.end,
@@ -933,8 +1005,9 @@ function snapshot(){
   plans:G.plans,epoch:G.epoch,stock:G.stock,activeBoosts:G.activeBoosts,milestones:G.milestones,
   lineCounts:G.lineCounts,recent:G.recent,wins:G.wins,goals:G.goals,contracts:G.contracts,contractWins:G.contractWins,
   supplyOrders:G.supplyOrders,od:G.od.map(q=>[q.s,q.n,q.d,q.r]),rr:G.rr??null,
-  ...(yardLinks.length?{yardLinks:yardLinks.map(({from,to,d,tunnel,reverse})=>[
-   from.x,from.y,to.x,to.y,tunnel?4:d,!!reverse
+  ...(yardLayout.east?{yardRows:yardLayout.removed}:{}),
+  ...(yardLinks.length?{yardLinks:yardLinks.map(({from,to,d,tunnel,reverse,blocked})=>[
+   from.x,from.y,to.x,to.y,tunnel?4:d,!!reverse,!!blocked
   ])}:{}),
   o:L.map(o=>[
    o.x,o.y,o.t,o.r,o.lv,o.it,o.iv.length?o.iv:0,o.out,isStorage(o.t)&&o.q.length?o.q:0,
@@ -1112,7 +1185,7 @@ function bchk(x,y,t,existing=false,keepGround=false){
   return keepGround||industrial.get(x,y)?'':logisticsSiteError;
  }
  if(!site)return 'Zwischen den Standorten kann nicht gebaut werden.';
- const previousPlot=legacyPlots.find(plot=>G.legacyPlots.includes(plot.id)&&inR(plot.rect,x,y));
+ const previousPlot=legacyYards.find(plot=>inR(plot.rect,x,y));
  if(previousPlot&&(!m?.a||m.a==='gar'||m.a==='met'&&RH('met')||m.a==='elk'&&previousPlot.id==='e'))return '';
  if(site.hall&&!hlv(site.hall))return 'LOCK:'+site.hall;
  if(h){if(hlv(h.id)<1)return'LOCK:'+h.id;if(m&&m.a&&m.a!=h.id&&!h.allow?.includes(m.a))return'Nur in der '+hallOf(m.a).n+' baubar.';return''}
@@ -1310,12 +1383,13 @@ const onHide=()=>{
 const {rr,tx,sh,di,dart}=createFactoryDrawing(c,ITEMS,MD,()=>tm,canvasScope);
 const worldPrimitives={rr,tx,withState:withCanvasState};
 const worldArtByLayout=new Map();
-function yardArt(expanded){
- if(!worldArtByLayout.has(expanded)){
-  const art=createFactoryWorldArt(c,TS,GW,GH,SITE,worldPrimitives,expanded?yardDepth:0);
-  worldArtByLayout.set(expanded,[art,createFactoryBunkerArt(c,TS,worldPrimitives,art)]);
+function yardArt(layout){
+ const key=[layout.version,...layout.depths].join('/');
+ if(!worldArtByLayout.has(key)){
+  const art=createFactoryWorldArt(c,TS,GW,GH,SITE,worldPrimitives,layout);
+  worldArtByLayout.set(key,[art,createFactoryBunkerArt(c,TS,worldPrimitives,art)]);
  }
- return worldArtByLayout.get(expanded);
+ return worldArtByLayout.get(key);
 }
 let worldArt,drawBunker;
 const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
@@ -1632,7 +1706,8 @@ function drawFleet(){
  });
 }
 function drawYardLinks(intersects){
- for(const {from,to,d} of yardLinks){
+ for(const {from,to,d,blocked} of yardLinks){
+  if(blocked)continue;
   const [ax,ay]=port(from,d),[bx,by]=port(to,(d+2)%4);
   const x=(ax+.5-DX[d]*.66)*TS,y=(ay+.5-DY[d]*.66)*TS;
   const u=(bx+.5+DX[d]*.66)*TS,v=(by+.5+DY[d]*.66)*TS;
@@ -1652,7 +1727,7 @@ function world(){
   return intersects(o.x*TS,o.y*TS,w*TS,h*TS,TS);
  });
  const isVisible=([x,y,lastX,lastY],margin=TS)=>intersects(x*TS,y*TS,(lastX-x+1)*TS,(lastY-y+1)*TS,margin);
- const plots=legacyPlots.filter(plot=>G.legacyPlots.includes(plot.id)).map(plot=>({
+ const plots=legacyYards.map(plot=>({
   id:'alt-'+plot.id,name:plot.name,rect:plot.rect,floor:['#bec4ac','#9ea996']
  }));
  for(const hall of HL){
@@ -1861,7 +1936,7 @@ function beginNextChapter(){
  const region=REGIONS.find(site=>site.id===next.site);
  G.campaign={level:campaignChapter()+1,stage:0,delivery:[],total:0};
  G.end=1;G.hl[region.hall]=1;G.m+=next.grant;
- G.guide=newGuide('fleet',[155,12]);G.tu=0;G.tutorialPaused=false;
+ G.guide=newGuide('fleet',yardLayout.point(155,12));G.tu=0;G.tutorialPaused=false;
  closeP2();resetPlanning();tool='hand';sel=null;asg=null;
  refreshIndustrialArea();switchSite(region);focusWorld(hrect(hallOf(region.hall)));
  rfx();recalc();analyze();queueStory('horizont-intro');sv(1);
@@ -2711,6 +2786,7 @@ function ui(){
 }
 
 const hasYardLinks=o=>!!(o.yardOutputs||o.yardTunnel||o.yardFeeders);
+const hasYardBlocks=o=>!!(o.yardBlocked||o.yardBlockedTunnel);
 function objectPanelBox(o){
  const d=MD[o.t],isB=isBelt(o.t);
  let h=104;
@@ -2722,21 +2798,23 @@ function objectPanelBox(o){
  else if(d.supply||d.distribution)h=116;
  else if(d.j)h=o.j===1?208:150;
  else if(isProjectRamp(o.t))h=112+28*(projectPhase(o.t)?.q.length||0);
- return [548,96,240,h+(hasYardLinks(o)?33:0)];
+ return [548,96,240,h+(hasYardLinks(o)?33:0)+(hasYardBlocks(o)?33:0)];
 }
 function panel(o){
  const [X,Y,W,H]=objectPanelBox(o),isB=isBelt(o.t),d=isB?null:MD[o.t],prod=!!d&&d.o!=null,jn=!!d?.j;
  btn(X,Y,W,H,()=>{},'#0f141bf0');c.strokeStyle='#ffffff22';c.lineWidth=1;c.beginPath();c.roundRect(X,Y,W,H,12);c.stroke();
  tx(isB?MD[o.t]?.n||'Förderband':d.n,X+14,Y+24,isB&&o.t!='belt'||prod&&d.n.length>17?12:16,'#fff','left',800);if(prod)tx('Level '+o.lv,X+W-14,Y+24,13,'#fde68a','right',700);
  let y=Y+46;
- if(hasYardLinks(o)){
+ const yardAction=(label,id,keep)=>{
   const top=y-9;
   btn(X+14,top,W-28,26,()=>{
-   forgetYardLinks(new Set([o]));analyze();sv(0);
-  },'#29504f',0,'disconnect_yard');
-  tx('Unterführung trennen',X+W/2,top+17,11,'#c5f4ec','center',700);
+   attachYardLinks(yardLinks.filter(keep));analyze();sv(0);
+  },'#29504f',0,id);
+  tx(label,X+W/2,top+17,11,'#c5f4ec','center',700);
   y+=33;
- }
+ };
+ if(hasYardLinks(o))yardAction('Unterführung trennen','disconnect_yard',link=>link.blocked||link.from!==o&&link.to!==o);
+ if(hasYardBlocks(o))yardAction('Anschlüsse freigeben','unlock_yard_ports',link=>!link.blocked||link.from!==o);
  const delB=(bx,bw,lab)=>{btn(X+bx,y,bw,28,()=>{delAt(o.x,o.y);sel=null;sv(0);analyze()},'#7f1d1d',0,'del');tx(lab,X+bx+bw/2,y+19,12,'#fff','center',700)};
  if(prod){recipePreview(o.t,X+12,y-3,W-22);y+=22;
   const t0=tme(o),p=plan(o),t1=tme(o,o.lv+p.n);
@@ -2830,7 +2908,7 @@ function resetPlanning(){
 const planLimit=()=>3+legacyIndustry('storage')+(RH('bau')?3:0);
 function readPlans(raw){
  return Object.values(raw||{}).slice(0,20).map(value=>Object.values(value||{}).slice(0,100)
-  .filter(e=>e&&Number.isInteger(e[0])&&Number.isInteger(e[1])&&e[0]>=0&&e[0]<GW&&e[1]>=0&&e[1]<GH&&knownType(e[2]))
+  .filter(e=>e&&Number.isInteger(e[0])&&Number.isInteger(e[1])&&e[0]>=0&&e[0]<FactoryYard.width+2*FactoryYard.sideDepth&&e[1]>=0&&e[1]<FactoryYard.height+2*FactoryYard.oldDepth&&knownType(e[2]))
   .map(e=>[e[0],e[1],e[2],e[3]&3,e[4]===true,e[5]||null])).filter(plan=>plan.length);
 }
 function makePlan(objects){
@@ -2908,7 +2986,7 @@ function planRoute(from,to){
  if(site!==siteAt(to.x,to.y))return null;
  return FactoryGrid.planRoute(from,to,{
   width:GW,cell,canUse:(x,y)=>siteAt(x,y)===site&&!bchk(x,y,'belt',false,!!cell(x,y)),
-  canLeave:(belt,direction)=>!belt.yardOutputs?.[direction],
+  canLeave:(belt,direction)=>!belt.yardOutputs?.[direction]&&(!belt.yardBlocked?.[direction]||belt.yardBlocked[direction]!==physicalNeighbor(belt,direction)),
   canEnter:(target,direction)=>!target.yardInputs?.[direction]&&(target.j==1?target.jm[direction]==1:!isBelt(target.t)||target.r!=direction),
   validate:checkBuild
  });
@@ -3028,7 +3106,8 @@ function progressChecks(){
  }
 }
 function centerSite(site){
- cam={x:site.center[0]*TS,y:site.center[1]*TS,z:site.hall?.92:1.3};
+ const [x,y]=yardLayout.point(...site.center);
+ cam={x:x*TS,y:y*TS,z:site.hall?.92:1.3};
 }
 function switchSite(site){
  if(!site||site.hall&&!hlv(site.hall))return false;
@@ -3100,8 +3179,7 @@ function outgoing(o,lookup=cell,keepLink=()=>true){
  const outputs=[0,1,2,3].filter(d=>fdn(o,(d+2)%4));
  const targets=new Set();
  for(const d of outputs){
-  const link=o.yardOutputs?.[d];
-  const q=link&&keepLink(link)?link:lookup(...port(o,d));
+  const q=yardNeighbor(o,d,lookup(...port(o,d)),keepLink);
   if(compatiblePort(o,q,d))targets.add(q);
  }
  const exit=tunnelExit(o,lookup,keepLink);
@@ -3224,7 +3302,7 @@ const newGuide=(kind,anchor)=>({kind,anchor,actions:{},sales:G?.sl?.[1]||0});
 function readGuide(value){
  if(!value||!['build','fleet'].includes(value.kind)||value.kind==='fleet'&&campaignChapter()<2)return null;
  const [x,y]=value.anchor||[],hall=hallOf(value.kind==='fleet'?'orb':'gar');
- const anchor=Number.isInteger(x)&&Number.isInteger(y)&&inR(hrect(hall),x,y)?[x,y]:value.kind==='fleet'?[155,12]:[7,6];
+ const anchor=Number.isInteger(x)&&Number.isInteger(y)&&inR(hrect(hall),x,y)?[x,y]:value.kind==='fleet'?yardLayout.point(155,12):[7,6];
  const actions={};
  for(const id of ['pan','zoom','home'])if(value.actions?.[id])actions[id]=true;
  return {kind:value.kind,anchor,actions,sales:Math.max(0,Number(value.sales)||0)};
