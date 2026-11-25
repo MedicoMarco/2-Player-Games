@@ -7,6 +7,7 @@
     let playerCount=4, mode='setup', mySeat=0, engine=null, snapshot=null, privateHand=null;
     let controls=null, chips=null, turnTimer=null, dealingSince=0, busy=false, pending=false, seen=new Map(), snapshotWrites=Promise.resolve();
     let publishedHand=-1;
+    let rankedCards='', rankLabel='';
     const alive = ()=>cur===api;
 
     function mountControls() {
@@ -333,13 +334,24 @@
         rr(x,173,70,98,7,'#ffffff0c');
         if(i<state.board.length)drawCard(x,173,70,state.board[i],{sh:true});
       }
-      const hand=mode==='guest'?(privateHand?.rn===state.rn?privateHand.h:[]):engine?.hand(mySeat)||[];
+      const hand=mode==='guest'?(privateHand?.rn===state.rn?privateHand.h||[]:[]):engine?.hand(mySeat)||[];
       const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const animate=S.anim&&!reduced, dealElapsed=now()-dealingSince;
       hand.forEach((card,i)=>{
-        const progress=S.anim&&!reduced?Math.max(0,Math.min(1,(now()-dealingSince-i*100)/360)):1;
+        const progress=animate?Math.max(0,Math.min(1,(dealElapsed-i*100)/360)):1;
         if(progress===0)return;
         drawCard(400+(318+i*87-400)*progress,185+129*progress,75,progress<.68?-1:card,{sh:true});
       });
+      if(hand.length===2&&(!animate||dealElapsed>=460)){
+        const cardsKey=hand.join(',')+'|'+state.board.join(',');
+        if(cardsKey!==rankedCards){
+          rankLabel=PokerRules.handName(hand,state.board);
+          rankedCards=cardsKey;
+        }
+        rr(614,191,168,56,10,'#091e23d9');
+        label('Deine Hand',698,211,15,'#bfd8cc',152);
+        label(rankLabel,698,235,22,'#fff2d1',152);
+      }
       const current=state.players[state.turn];
       const left=state.deadline?Math.max(0,Math.min(25,Math.ceil((state.deadline-Date.now())/1000))):0;
       const status=current?(state.turn===mySeat?'Du bist dran':current.name+' ist dran')+' · '+left+' s'

@@ -3,6 +3,8 @@
   const startingChips = 500;
   const handNames = ['Hohe Karte', 'Ein Paar', 'Zwei Paare', 'Drilling', 'Straße', 'Flush', 'Full House', 'Vierling', 'Straight Flush'];
   const streetNames = ['Preflop', 'Flop', 'Turn', 'River'];
+  const rankName = ([category, highCard]) =>
+    category === 8 && highCard === 14 ? 'Royal Flush' : handNames[category];
 
   function compare(a, b) {
     for (let i = 0; i < a.length; i++) {
@@ -45,6 +47,12 @@
           if (compare(rank,best)>0) best=rank;
         }
     return best;
+  }
+
+  function handName(hand, board) {
+    if (hand.length !== 2) return '';
+    if (board.length < 3) return handNames[Number(hand[0] % 13 === hand[1] % 13)];
+    return rankName(bestRank([...hand, ...board]));
   }
 
   function create(seats, shuffledDeck) {
@@ -137,7 +145,7 @@
         });
       }
       const winners=players.filter(p=>p.won>0).sort((a,b)=>b.won-a.won);
-      result=winners.map(p=>p.name+' +'+p.won+(ranks.size?' ('+handNames[ranks.get(p.seat)[0]]+')':'')).join(' · ');
+      result=winners.map(p=>p.name+' +'+p.won+(ranks.size?' ('+rankName(ranks.get(p.seat))+')':'')).join(' · ');
       turn=-1;pending.clear();
       const surviving=players.filter(p=>p.chips>0);
       phase=surviving.length<2?'end':'result';
@@ -260,7 +268,7 @@
     }};
   }
 
-  const rules={create,bestRank,compare,handNames,streetNames,maxPlayers,startingChips};
+  const rules={create,bestRank,compare,handName,handNames,streetNames,maxPlayers,startingChips};
   if(typeof module!=='undefined'&&module.exports)module.exports=rules;
   else root.PokerRules=rules;
 })(typeof window==='undefined'?null:window);
