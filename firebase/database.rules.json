@@ -144,6 +144,18 @@
         }
       }
     },
+    "onlineDirectory": {
+      ".indexOn": "ts",
+      ".read": "auth != null && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() && query.orderByChild === 'ts' && query.startAt != null",
+      "$entry": {
+        ".write": "auth != null && (newData.exists() && newData.child('uid').val() === auth.uid && (!data.exists() || data.child('uid').val() === auth.uid) && root.child('users').child(auth.uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() || !newData.exists() && ($entry.beginsWith(auth.uid + '_') && (!data.exists() || data.child('uid').val() === auth.uid) || auth.uid === root.child('operations/cleanupUid').val() && (!data.exists() || data.child('ts').val() <= now - 600000)))",
+        ".validate": "newData.hasChildren(['uid','tab','ts']) && $entry === newData.child('uid').val() + '_' + newData.child('tab').val() && newData.parent().parent().child('presence').child(newData.child('uid').val()).child('tabs').child(newData.child('tab').val()).child('ts').val() === newData.child('ts').val()",
+        "uid": { ".validate": "newData.isString() && newData.val() === auth.uid" },
+        "tab": { ".validate": "newData.isString() && newData.val().matches(/^[-0-9A-Za-z_]{20}$/)" },
+        "ts": { ".validate": "newData.isNumber() && newData.val() === now" },
+        "$other": { ".validate": false }
+      }
+    },
     "presence": {
       "$uid": {
         ".read": "auth != null && !root.child('deletionLocks').child(auth.uid).exists() && (auth.uid === $uid || root.child('users').child(auth.uid).exists() && root.child('friends').child(auth.uid).child($uid).exists() && root.child('friends').child($uid).child(auth.uid).exists() && !root.child('blocked').child(auth.uid).child($uid).exists() && !root.child('blocked').child($uid).child(auth.uid).exists())",
@@ -153,6 +165,7 @@
         },
         "tabs": {
           "$tab": {
+            ".read": "auth != null && root.child('users').child(auth.uid).exists() && root.child('users').child($uid).exists() && !root.child('deletionLocks').child(auth.uid).exists() && !root.child('deletionLocks').child($uid).exists() && !root.child('blocked').child(auth.uid).child($uid).exists() && !root.child('blocked').child($uid).child(auth.uid).exists() && root.child('onlineDirectory').child($uid + '_' + $tab).child('ts').val() > now - 600000",
             ".write": "(((auth != null) && (auth.uid === $uid)) && ((!newData.exists()) || ((root.child('users').child(auth.uid).exists()) && (!root.child('deletionLocks').child(auth.uid).exists())))) || ((auth != null && auth.uid === root.child('operations/cleanupUid').val()) && (!newData.exists()) && ((!root.child('presence').child($uid).child('tabs').child($tab).exists()) || ((root.child('presence').child($uid).child('tabs').child($tab).child('ts').isNumber()) && (root.child('presence').child($uid).child('tabs').child($tab).child('ts').val() <= now - 600000))))",
             ".validate": "($tab.matches(/^[-0-9A-Za-z_]{20}$/)) && (newData.hasChildren(['name','ts'])) && (newData.parent().parent().parent().parent().child('expiry').child('presence').child($uid).child($tab).val() === newData.child('ts').val())",
             "name": {

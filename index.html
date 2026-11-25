@@ -4713,7 +4713,7 @@ const olEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt
 const olOK=()=>!!(OL_CONFIG.apiKey&&OL_CONFIG.databaseURL);
 const olTS=()=>firebase.database.ServerValue.TIMESTAMP;
 const olMail=n=>n.toLowerCase()+'@spieler.2pg.invalid';
-const olNameOf=u=>(OL.P[u]&&OL.P[u].name)||(OL.U[u]&&OL.U[u].name)||(OL.RQ[u]&&OL.RQ[u].name)||(OL.BL[u]&&OL.BL[u].name)||'…';
+const olNameOf=u=>(OL.P[u]&&OL.P[u].name)||(OL.directory?.[u]?.name)||(OL.U[u]&&OL.U[u].name)||(OL.RQ[u]&&OL.RQ[u].name)||(OL.BL[u]&&OL.BL[u].name)||'…';
 const olGameName=id=>{if(id=='cup')return'Cup (zufällige Spiele)';const g=GAMES.find(x=>x.id==id);return g?g.n:id};
 
 /* ---- Fortschritt im Konto (users/<uid>/progress) ----
@@ -4796,7 +4796,7 @@ function olGone(){
   window.gameChat?.stop();
   window.directChat?.logout();
   if(progT)progPush(1);
-  if(OL.unl)OL.unl();OL.unl=null;OL.presence?.stop(false);OL.game=null;OL.pready=0;OL.me=null;OL.name='';OL.P={};OL.F={};OL.BL={};OL.blocksReady=false;OL.U={};OL.stats={};OL.seen={};OL.view='main';OL.RQ={};OL.INV={};OL.sent={};
+  if(OL.unl)OL.unl();OL.unl=null;OL.presence?.stop(false);OL.game=null;OL.pready=0;OL.me=null;OL.name='';OL.P={};OL.directory={};OL.directoryReady=false;OL.F={};OL.BL={};OL.blocksReady=false;OL.U={};OL.stats={};OL.seen={};OL.view='main';OL.RQ={};OL.INV={};OL.sent={};
   olBadge();olRender();$('#oli').innerHTML='';
 }
 
@@ -4812,17 +4812,33 @@ function olPresence(){
   let session=null,closed=false,retry=null;
   const valid=()=>!closed&&OL.me===me&&!OL.deleting;
   const paths=id=>['presence/'+me+'/tabs/'+id,'expiry/presence/'+me+'/'+id];
-  const touch=()=>{
-    if(!valid()||!session?.ready)return Promise.resolve();
-    const [row,lease]=paths(session.id),ts=olTS();
-    const game=OL.game;
-    const write=g=>db.ref().update({[row]:{name:OL.name,ts,g},[lease]:ts});
+  const directoryPath=id=>'onlineDirectory/'+me+'_'+id;
+  const currentSession=current=>valid()&&session===current;
+  const touch=async()=>{
     const current=session;
-    return write(game).catch(error=>{
-      // Preserve the online indicator while older database rules are still active.
-      if(game&&error.code==='PERMISSION_DENIED'&&valid()&&session===current&&OL.game===game)return write(null);
-      throw error;
-    });
+    if(!currentSession(current)||!current?.ready)return;
+    const [row,lease]=paths(current.id);
+    const game=OL.game;
+    const write=(g,listed)=>{
+      const ts=olTS(),updates={[row]:{name:OL.name,ts,g},[lease]:ts};
+      if(listed)updates[directoryPath(current.id)]={uid:me,tab:current.id,ts};
+      return db.ref().update(updates);
+    };
+    try{
+      if(!current.listed){
+        await db.ref(directoryPath(current.id)).onDisconnect().remove();
+        current.listed=true;
+      }
+      if(currentSession(current)&&OL.game===game)await write(game,true);
+    }catch(error){
+      if(error.code!=='PERMISSION_DENIED')throw error;
+      if(!currentSession(current)||OL.game!==game)return;
+      try{await write(game,false)}
+      catch(error){
+        if(!game||error.code!=='PERMISSION_DENIED')throw error;
+        if(currentSession(current)&&OL.game===game)await write(null,false);
+      }
+    }
   };
   const retryPulse=current=>{
     if(!valid()||session!==current||retry!==null)return;
@@ -4862,7 +4878,10 @@ function olPresence(){
     if(OL.presence?.stop===stop)OL.presence=null;
     if(!remove||!old?.ready)return Promise.resolve();
     const [row,lease]=paths(old.id);
-    return db.ref().update({[row]:null,[lease]:null}).catch(()=>{});
+    const removePresence={[row]:null,[lease]:null};
+    if(!old.listed)return db.ref().update(removePresence).catch(()=>{});
+    return db.ref().update({...removePresence,[directoryPath(old.id)]:null})
+      .catch(()=>db.ref().update(removePresence)).catch(()=>{});
   };
   OL.presence={touch,stop};
   document.addEventListener('visibilitychange',visible);
@@ -4897,8 +4916,8 @@ function olListen(){
   const d=OL.db,me=OL.me,offs=[];
   function onBlockSetup(){
     const r=d.ref('blocked/'+me);
-    const changed=s=>{OL.BL=s.val()||{};OL.blocksReady=true;window.gameChat?.refreshBlocks();syncPresence();olInvites();olBadge()};
-    r.on('value',changed,()=>{OL.blocksReady=false;syncPresence();olCards()});
+    const changed=s=>{OL.BL=s.val()||{};OL.blocksReady=true;window.gameChat?.refreshBlocks();syncPresence();directory.sync();olInvites();olBadge()};
+    r.on('value',changed,()=>{OL.blocksReady=false;syncPresence();directory.sync();olCards()});
     offs.push(()=>r.off('value',changed))
   }
   const on=(p,f)=>{const r=d.ref(p),changed=s=>f(s.val()||{});r.on('value',changed);offs.push(()=>r.off('value',changed))};
@@ -4934,12 +4953,65 @@ function olListen(){
     refresh()
   };
   offs.push(()=>{closed=true;clearTimeout(retryTimer);for(const stop of presence.values())stop();presence.clear()});
+  const directory=olDirectory(d,me);offs.push(directory.stop);
   onBlockSetup();
   on('friends/'+me,v=>{OL.F=v;syncPresence()});
   on('requests/'+me,v=>{OL.RQ=v;olUpd();olBadge()});
   on('invites/'+me,v=>{OL.INV=v;olInvites();olBadge()});
   const expiryTimer=setInterval(syncPresence,30000);offs.push(()=>clearInterval(expiryTimer));
   OL.unl=()=>offs.forEach(f=>f());
+}
+function olDirectory(db,me){
+  const peers=new Map();
+  let rows={},query=null,changed=null,closed=false;
+  OL.directory={};OL.directoryReady=false;
+  const refresh=()=>{
+    if(closed||OL.me!==me)return;
+    const users={};
+    for(const {uid,value} of peers.values()){
+      if(!olAllowed(uid)||!(Number(value?.ts)>olNow()-PRESENCE_IDLE))continue;
+      const old=users[uid];
+      if(!old||value.g&&!old.g||!!value.g===!!old.g&&value.ts>old.ts)users[uid]=value;
+    }
+    OL.directory=users;olUpd(false);
+  };
+  const sync=()=>{
+    if(closed||OL.me!==me)return;
+    const eligible=({uid,tab,ts}={})=>uid&&uid!==me&&olAllowed(uid)&&typeof tab==='string'&&Number(ts)>olNow()-PRESENCE_IDLE;
+    for(const [key,peer] of peers){
+      if(eligible(rows[key]))continue;
+      peer.ref.off('value',peer.changed);peers.delete(key);
+    }
+    for(const [key,row] of Object.entries(rows)){
+      if(!eligible(row)||peers.has(key))continue;
+      const {uid,tab}=row,ref=db.ref('presence/'+uid+'/tabs/'+tab);
+      const peer={uid,ref,value:null,next:0};
+      peer.changed=s=>{peer.value=s.val();refresh()};
+      peers.set(key,peer);
+    }
+    for(const peer of peers.values()){
+      if(peer.next>Date.now())continue;
+      peer.next=Infinity;
+      peer.ref.on('value',peer.changed,()=>{
+        peer.value=null;peer.next=Date.now()+30000;refresh();
+      });
+    }
+    refresh();
+  };
+  const subscribe=()=>{
+    if(query)query.off('value',changed);
+    const ref=query=db.ref('onlineDirectory').orderByChild('ts').startAt(olNow()-PRESENCE_IDLE);
+    changed=s=>{if(query!==ref||closed)return;OL.directoryReady=true;rows=s.val()||{};sync()};
+    ref.on('value',changed,()=>{if(query!==ref||closed)return;OL.directoryReady=false;rows={};sync()});
+  };
+  subscribe();
+  const expire=setInterval(sync,30000),renew=setInterval(subscribe,60000);
+  return {sync,stop(){
+    closed=true;clearInterval(expire);clearInterval(renew);
+    query?.off('value',changed);
+    for(const peer of peers.values())peer.ref.off('value',peer.changed);
+    peers.clear();
+  }};
 }
 function olNames(ids){
   ids.filter(i=>!OL.U[i]).forEach(i=>{
@@ -5007,8 +5079,9 @@ async function olLogout(){
 OL.open=0;OL.mode='login';OL.t=null;
 function olOpen(){OL.open=1;OL.t=OL.t||S.t;$('#olp').classList.add('on');olInit();olRender()}
 function olClose(){if(OL.deleting)return;OL.open=0;OL.view='main';$('#olp').classList.remove('on')}
-const olDot=u=>OL.P[u]?(OL.P[u].g?'busy':'on'):'';
-const olStat=u=>OL.P[u]?(OL.P[u].g?'Spielt gerade: '+olGameName(OL.P[u].g):'Frei zum Spielen'):'Offline';
+const olStatus=u=>OL.P[u]||OL.directory?.[u];
+const olDot=u=>olStatus(u)?(olStatus(u).g?'busy':'on'):'';
+const olStat=u=>olStatus(u)?(olStatus(u).g?'Spielt gerade: '+olGameName(olStatus(u).g):OL.F[u]?'Frei zum Spielen':'Online'):'Offline';
 
 function olRender(){
   if(!OL.open)return;
@@ -5048,12 +5121,14 @@ ${lg?'':'<p>Merke dir das Passwort gut – es gibt keine Zurücksetzen-Funktion.
   if(OL.me&&OL.view=='main'){olUpd();window.gameNotifications?.render()}
 }
 
-function olUpd(){
-  window.directChat?.sync();
-  document.querySelectorAll('.chat-presence').forEach(olPaintChatDot);
+function olUpd(syncChat=true){
+  if(syncChat){
+    window.directChat?.sync();
+    document.querySelectorAll('.chat-presence').forEach(olPaintChatDot);
+  }
   if(!OL.open||!OL.me||OL.view!='main')return;
   const box=$('#oll'),tb=$('#olt');if(!box||!tb)return;
-  const me=OL.me,online=Object.keys(OL.P).filter(u=>u!=me&&olAllowed(u)),fr=Object.keys(OL.F).filter(olAllowed),rq=Object.keys(OL.RQ).filter(olAllowed);
+  const me=OL.me,online=[...new Set([...Object.keys(OL.P),...Object.keys(OL.directory||{})])].filter(u=>u!=me&&olAllowed(u)),fr=Object.keys(OL.F).filter(olAllowed),rq=Object.keys(OL.RQ).filter(olAllowed);
   const nOn=online.length,nFr=fr.length;
   tb.innerHTML=[['on','Online ('+nOn+')'],['fr','Freunde ('+nFr+')'],['rq','Anfragen ('+rq.length+')'],['bl','Blockiert ('+Object.keys(OL.BL).length+')']].map(([k,l])=>`<button data-o=tab data-v=${k} class="${OL.tab==k?'on':''}">${l}</button>`).join('');
   const row=(u,btns,sub)=>`<div class=olrow><span class="dot ${olDot(u)}"></span><div class=nm>${olEsc(olNameOf(u))}<small>${sub}</small></div><div class=acts>${btns}${OL.tab!='bl'?`<button class="btn g" data-o=block data-u="${olEsc(u)}" title="Spieler blockieren">Blockieren</button>`:''}</div></div>`;
@@ -5061,11 +5136,12 @@ function olUpd(){
   let h='';
   if(OL.tab=='on'){
     const l=online.sort((a,b)=>(!!OL.F[b]-!!OL.F[a])||olNameOf(a).localeCompare(olNameOf(b)));
-    h=l.map(u=>row(u,ch(u)+(OL.F[u]?'<span title="Freund" style="font-size:18px">★</span>':OL.sent[u]?'<button class="btn g" disabled>Angefragt</button>':`<button class="btn g" data-o=req data-u=${u}>＋ Freund</button>`),olStat(u))).join('')
-      ||'<div class=olempty>Gerade sind keine bestätigten Freunde online. Du kannst Freunde unten per Benutzername hinzufügen.</div>';
+    h=l.map(u=>row(u,OL.F[u]?ch(u)+'<span title="Freund" style="font-size:18px">★</span>':OL.sent[u]?'<button class="btn g" disabled>Angefragt</button>':`<button class="btn g" data-o=req data-u="${olEsc(u)}">＋ Freund</button>`,olEsc(olStat(u)))).join('')
+      ||'<div class=olempty>Gerade ist niemand sonst online.</div>';
+    if(!OL.directoryReady)h+='<div class=olempty>Die vollständige Online-Liste ist momentan nicht verfügbar.</div>';
   }else if(OL.tab=='fr'){
     const l=fr.sort((a,b)=>(!!OL.P[b]-!!OL.P[a])||olNameOf(a).localeCompare(olNameOf(b)));
-    h=l.map(u=>row(u,ch(u)+`<button class="btn g" data-o=dm data-u="${olEsc(u)}">Chat</button><button class="btn g" data-o=rm data-u=${u} title="Entfernen">✕</button>`,olStat(u))).join('')
+    h=l.map(u=>row(u,ch(u)+`<button class="btn g" data-o=dm data-u="${olEsc(u)}">Chat</button><button class="btn g" data-o=rm data-u=${u} title="Entfernen">✕</button>`,olEsc(olStat(u)))).join('')
       ||'<div class=olempty>Noch keine Freunde. Füge unten jemanden per Benutzername hinzu oder klicke bei „Online“ auf „＋ Freund“.</div>';
   }else if(OL.tab=='bl'){
     h=Object.keys(OL.BL).map(u=>row(u,`<button class=btn data-o=unblock data-u="${olEsc(u)}">Entblockieren</button>`,'Blockiert')).join('')||'<div class=olempty>Keine blockierten Spieler.</div>';
@@ -5129,6 +5205,8 @@ async function olDeleteAccount(){
       if(Object.keys(changes).length)rm.push(db.ref().update(changes));
     }
     if(low)rm.push(db.ref('names/'+low).remove().catch(()=>{}));
+    const tabs=(await db.ref('presence/'+uid+'/tabs').once('value')).val()||{};
+    await Promise.all(Object.keys(tabs).map(tab=>db.ref('onlineDirectory/'+uid+'_'+tab).remove().catch(()=>{})));
     await db.ref('presence/'+uid).remove().catch(()=>{});
     await Promise.all(rm);
     await db.ref('users/'+uid).remove().catch(()=>{}); /* zuletzt: Regeln für presence/friends prüfen, ob users/<uid> existiert */

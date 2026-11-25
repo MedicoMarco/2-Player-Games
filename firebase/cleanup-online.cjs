@@ -29,9 +29,14 @@ function collect(index, now) {
 async function sweep(request, now = Date.now()) {
   const index = await request('expiry');
   const results = {removed: 0, refreshed: 0, refused: 0};
-  for (const {marker, deletions, ts} of collect(index, now).slice(0, 500)) {
+  const directory = {};
+  for (const {type, marker, deletions, ts} of collect(index, now).slice(0, 500)) {
     const write = await request('', deletions);
     if (write) {
+      if (type === 'presence') {
+        const [uid, tab] = marker.slice('expiry/presence/'.length).split('/');
+        directory['onlineDirectory/' + uid + '_' + tab] = null;
+      }
       results.removed++;
       continue;
     }
@@ -41,6 +46,8 @@ async function sweep(request, now = Date.now()) {
     if (current == null || current > ts) results.refreshed++;
     else results.refused++;
   }
+  // Remove directory entries separately so the sweep also works with the older rules.
+  if (Object.keys(directory).length) await request('', directory);
   return results;
 }
 

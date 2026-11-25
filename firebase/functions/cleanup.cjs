@@ -1,6 +1,7 @@
 'use strict';
 // Operates only on the data paths used by index.html. No other profiles are removed.
 function cleanup(data,uid){
+  for(const [id,row] of Object.entries(data.onlineDirectory||{}))if(row?.uid===uid)delete data.onlineDirectory[id];
   for(const path of ['users','presence','friends','requests','invites','blocked','pushSubscriptions','pushDispatch']){
     if(data[path])delete data[path][uid];
   }
