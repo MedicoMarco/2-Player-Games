@@ -2,6 +2,7 @@
 const FactoryRuntime=(()=>{
 function validSave(value){
  if(!value||typeof value!=='object'||!Number.isFinite(value.ts)||value.ts<=0||!Number.isFinite(value.m))return false;
+ if(value.transportVersion!=null&&value.transportVersion!==1&&value.transportVersion!==2)return false;
  if(value.v===4)return [0,1].every(i=>Number.isInteger(value.yardRows?.[i])&&value.yardRows[i]>=0&&value.yardRows[i]<=FactoryYard.trim);
  return value.v===1||value.v===2||value.v===3||value.v==null&&('ar' in value||'o' in value);
 }

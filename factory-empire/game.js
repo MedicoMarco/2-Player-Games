@@ -45,11 +45,12 @@ const orderReward=order=>Math.round(order.r*RM);
 const rawCost=i=>{const m=MD[PR[i]];return!m?0:m.r?m.r.reduce((a,x)=>a+x[1]*rawCost(x[0]),0):m.rc};
 const offlineLimits={regular:{seconds:1200,efficiency:.15},night:{seconds:1800,efficiency:.20}};
 const offlineThreshold=60;
-const transportResearch=['bel','bel2','logistics1','logistics2','logistics3'];
-const transportSpeeds=[2,4,8,16,32,64];
-const transportResearchText=stage=>transportSpeeds[stage]+' Waren/s je Band und Logistikspur';
-const transportStage=()=>transportResearch.reduce((stage,id,i)=>RH(id)?i+1:stage,0);
-const formatTransportRate=()=>((transportRate/10).toLocaleString('de-DE',{maximumFractionDigits:1}))+' Waren/s';
+const {paths:logisticsPaths,pathFor:logisticsPath,stage:pathStage,upgradeSavedResearch,baseSpeed:logisticsSpeed,
+ ranges:tunnelRanges,storage:storageBonuses}=FactoryLogistics;
+const logisticsStage=key=>pathStage(logisticsPaths[key].ids,RH);
+const tunnelRange=()=>tunnelRanges[logisticsStage('tunnel')];
+const decimal=value=>value.toLocaleString('de-DE',{maximumFractionDigits:2});
+const formatTransportRate=t=>decimal(logisticsRates[logisticsPath(t)]/100)+' Waren/s';
 /* ---- Forschung: Technologiebaum, jeder Knoten hat einen echten Effekt ---- */
 const RN=[
  {id:'met',n:'Materialkunde',c:4,p:[],x:0,y:0,e:'Rohstofflager (Holz, Erz, Granulat, Getreide, Wasser) arbeiten 20 % schneller.',rq:['2 Aufträge erfüllt',()=>G.ord>=2]},
@@ -61,9 +62,7 @@ const RN=[
  {id:'spd3',n:'Vollautomatisierung',c:30,p:['spd2','wrk'],x:2,y:1,e:'Alle Maschinen arbeiten weitere 20 % schneller.'},
  {id:'lean',n:'Lean Management',c:24,p:['spd3'],x:3,y:1,e:'Maschinen-Upgrades kosten 12 % weniger.'},
  {id:'lag',n:'Hochregal-Lagerung',c:6,p:[],x:0,y:2,e:'Zwischenlager fassen 40 statt 20 Stück.'},
- {id:'bel',n:'Logistiktempo I',c:12,p:['lag','spd1'],x:1,y:2,e:transportResearchText(1)},
  {id:'lag2',n:'Automatisches Lager',c:18,p:['bel'],x:2,y:2,e:'Zwischenlager fassen 80 statt 40 Stück.'},
- {id:'bel2',n:'Logistiktempo II',c:26,p:['lag2'],x:3,y:2,e:transportResearchText(2)+' · schaltet Tunnel frei.'},
  {id:'mkt',n:'Verkaufsverträge',c:6,p:[],x:0,y:3,e:'Alle Verkaufspreise +5 %.'},
  {id:'hnd',n:'Handelsbeziehungen',c:10,p:['mkt'],x:1,y:3,e:'Auftragsprämien +25 %.'},
  {id:'brd',n:'Markenaufbau',c:18,p:['hnd'],x:2,y:3,e:'Alle Verkaufspreise +8 %.'},
@@ -79,15 +78,23 @@ const researchSeries=[
  {id:'tools',n:'Präzisionslinien',p:'spd3',cost:[90,240,680],effect:'Maschinen arbeiten pro Stufe 4 % schneller.'},
  {id:'depots',n:'Modulare Depots',p:'lag2',cost:[65,180,500],effect:'Zwischenlager fassen pro Stufe 20 Stück mehr.'},
  {id:'sourcing',n:'Direktbeschaffung',p:'wrk',cost:[75,210,580],effect:'Rohstoffe kosten pro Stufe weitere 4 % weniger.'},
- {id:'service',n:'Planbare Wartung',p:'lean',cost:[80,225,640],effect:'Maschinen-Upgrades kosten pro Stufe weitere 4 % weniger.'},
- {id:'logistics',n:'Logistiktempo',p:'bel2',cost:[65,160,350],offset:2,effect:stage=>transportResearchText(stage+3)}
+ {id:'service',n:'Planbare Wartung',p:'lean',cost:[80,225,640],effect:'Maschinen-Upgrades kosten pro Stufe weitere 4 % weniger.'}
 ];
-const baseResearchCount=RN.length;
 for(const [row,series] of researchSeries.entries()){
  for(const [stage,cost] of series.cost.entries()){
-  RN.push({id:series.id+(stage+1),n:series.n+' '+['I','II','III','IV','V'][stage+(series.offset||0)],c:cost,
+  RN.push({id:series.id+(stage+1),n:series.n+' '+['I','II','III'][stage],c:cost,
    p:[stage?series.id+stage:series.p],x:stage,y:row,
-   e:typeof series.effect==='function'?series.effect(stage):series.effect,advanced:true});
+   e:series.effect,advanced:true});
+ }
+}
+const logisticsLevels=['I','II','III','IV','V'];
+for(const [row,[key,path]] of Object.entries(logisticsPaths).entries()){
+ for(const [i,id] of path.ids.entries()){
+  const p=key==='belt'&&i===0?['lag','spd1']:key==='belt'&&i===1?['bel','lag2']:i?[path.ids[i-1]]:path.requires?[path.requires]:[];
+  const speed=decimal(logisticsSpeed(key,i+1))+' Waren/s';
+  const extra=key==='tunnel'?' · Reichweite '+tunnelRanges[i+1]+' Felder':
+   key==='storage'?' Ausgabe · +'+storageBonuses[i+1]+' Lagerplätze':key==='belt'&&i===1?' · schaltet Tunnel frei.':'';
+  RN.push({id,n:path.name+' '+logisticsLevels[i],c:path.cost[i],p,x:i,y:row,e:speed+extra,logistics:key});
  }
 }
 const researchTier=id=>Number(RH(id+'1'))+Number(RH(id+'2'))+Number(RH(id+'3'));
@@ -189,7 +196,7 @@ const AC=[
  ['r1','Forscher','Erforsche deine erste Technologie.',()=>G.rs.length,1,30,'Forschung'],
  ['r10','Technologieführer','Erforsche 10 Technologien.',()=>G.rs.length,10,250,'Forschung'],
  ['r21','Forschungsleiter','Erforsche 22 Technologien.',()=>G.rs.length,22,400,'Forschung'],
- ['r34','Industrieforschung','Erforsche alle Grund- und Vertiefungstechnologien.',()=>RN.filter(n=>RH(n.id)).length,baseResearchCount-1+researchSeries.length*3,900,'Forschung'],
+ ['r34','Industrieforschung','Erforsche alle verfügbaren Technologien.',()=>RN.filter(n=>RH(n.id)).length,RN.length-1,900,'Forschung'],
  ['mg1','Chef','Stelle deinen ersten Manager ein.',()=>G.mg.length,1,30,'Team'],
  ['mg4','Führungsriege','Stelle alle vier Manager ein.',()=>G.mg.length,4,120,'Team'],
  ['mg10','Meisterhaft','Bringe einen Manager auf Level 10.',()=>Math.max(0,...G.mg.map(m=>m.lv)),10,150,'Team'],
@@ -226,9 +233,9 @@ function auTab(X,Y,W,H){tx('Audio',X+26,Y+68,15,'#fff','left',800);
  btn(X+26,Y+256,304,32,()=>{AS.ma=AS.ma?0:1;audApply();audSave()},AS.ma?'#b91c1c':'#334155');tx(AS.ma?'🔇 Ton ist aus – tippen zum Einschalten':'🔊 Alles stumm schalten',X+178,Y+276,12.5,'#fff','center',800);
  tx('Der Ton startet nach dem ersten Klick (Browser-Vorgabe). Einstellungen werden im Konto gespeichert.',X+26,Y+306,10,'#94a3b8')}
 const rOK=n=>!RH(n.id)&&n.p.every(p=>RH(p))&&(!n.rq||n.rq[1]());
-function rfx(){const arche=G.sp===PH.length;SPm=(1+(RH('spd1')?.1:0)+(RH('spd2')?.15:0)+(RH('spd3')?.2:0)+(RH('mas')?.2:0)-(RH('prm')?.05:0))*(1+.01*Math.min(24,LV-1))*(1+.05*legacyIndustry('speed'))*(chapters[campaignChapter()]?.speed||1)*(1+.04*researchTier('tools'));STC=(RH('lag2')?80:RH('lag')?40:20)+10*legacyIndustry('storage')+20*researchTier('depots')+(arche?archeUpgrade.storage:0);RM=RH('hnd')?1.25:1;
- transportRate=Math.round(transportSpeeds[transportStage()]*10*(arche?archeUpgrade.beltSpeed:1));
- BTv=10/transportRate;
+function rfx(){const arche=G.sp===PH.length;SPm=(1+(RH('spd1')?.1:0)+(RH('spd2')?.15:0)+(RH('spd3')?.2:0)+(RH('mas')?.2:0)-(RH('prm')?.05:0))*(1+.01*Math.min(24,LV-1))*(1+.05*legacyIndustry('speed'))*(chapters[campaignChapter()]?.speed||1)*(1+.04*researchTier('tools'));STC=(RH('lag2')?80:RH('lag')?40:20)+10*legacyIndustry('storage')+20*researchTier('depots')+storageBonuses[logisticsStage('storage')]+(arche?archeUpgrade.storage:0);RM=RH('hnd')?1.25:1;
+ for(const key of Object.keys(logisticsPaths))logisticsRates[key]=Math.round(logisticsSpeed(key,logisticsStage(key))*100*(arche?archeUpgrade.beltSpeed:1));
+ BTv=100/logisticsRates.belt;
  PM=(RH('mkt')?1.05:1)*(RH('brd')?1.08:1)*(RH('exp')?1.08:1)*(RH('vtr')?1.05:1)*
   (RH('prm')?1.12:1)*(RH('mas')?.95:1)*(1+.02*legacyIndustry('experience'))*(1+.02*legacyIndustry('sales'));
  OS=RH('off')?4:3;WG=crewRoles.reduce((sum,role)=>sum+assignedCrew(role.id),0)*WAGE*(1-.1*legacyIndustry('wages'));KUC=(RH('lean')?.88:1)*(1-.04*researchTier('service'));KBC=(RH('bau')?.85:1)*(arche?archeUpgrade.construction:1);
@@ -286,11 +293,15 @@ const mapWidth=()=>campaignChapter()>=2?GW:144+yardLayout.east;
 const hSize=h=>{const r=hrect(h);return(r[2]-r[0]+1)+'×'+(r[3]-r[1]+1)},hArea=r=>(r[2]-r[0]+1)*(r[3]-r[1]+1);
 const ORD=['saw','frm','asm','pnt','pck'],QT=[1,10,25,0];
 const fm=n=>{n=Math.floor(n);for(const[v,s]of[[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'K']])if(n>=v)return(n/v).toFixed(n>=v*100?0:n>=v*10?1:2).replace(/(\.\d*?)0+$/,'$1').replace(/\.$/,'').replace('.',',')+' '+s;return n.toLocaleString('de-DE')};
-let STC=20,BTv=1/transportSpeeds[0],SPm=1,RM=1,PM=1,OS=3,KUC=1,KBC=1,KOF=offlineLimits.regular.seconds,OFFE=offlineLimits.regular.efficiency,RCm=1,stQ=[],stOpen=0,hlO=false,bkO=false,hsel=null,mvO=null,mvT=null,delAsk=0,mp=null,mkTab=0,mkPg=0,WG=0,LV=1,XB=0,XN=60,acO=false,pfl=0,fTab=0,pcf=false,rsel=null,rsO=false,rflash={},pnO=false,asg=null;
-let transportRate=transportSpeeds[0]*10,transportCycle=0;
-// Integer arithmetic keeps the shared logistics clock deterministic for offline replay.
-const cyclesAt=tick=>Math.floor(tick*transportRate/80);
-const transportProgress=()=>Math.min(1,((G.tk*transportRate)%80)/80+acc/BTv);
+let STC=20,BTv=.5,SPm=1,RM=1,PM=1,OS=3,KUC=1,KBC=1,KOF=offlineLimits.regular.seconds,OFFE=offlineLimits.regular.efficiency,RCm=1,stQ=[],stOpen=0,hlO=false,bkO=false,hsel=null,mvO=null,mvT=null,delAsk=0,mp=null,mkTab=0,mkPg=0,WG=0,LV=1,XB=0,XN=60,acO=false,pfl=0,fTab=0,pcf=false,rsel=null,rsO=false,rflash={},pnO=false,asg=null;
+const logisticsRates={};
+let transportCycle=0;
+// The per-path calendars use integer hundredths of a transfer per second.
+const transferScale=800;
+function transportProgress(type){
+ const rate=logisticsRates[logisticsPath(type)];
+ return Math.min(1,((G.tk*rate)%transferScale)/transferScale+acc*rate/100);
+}
 let G,L=[],g=[],ready=0,cam={x:11.5*TS,y:6.5*TS,z:1.3},tool='hand',rot=0,sel=null,hv=null,HB=[],PO=[],tm=0,acc=0,lr=Date.now(),KEY,ld=0,wt=0,at=0,pdn=null,mv=0,lt=null,msg='',tl=0,bn=null,qi=0,fs=0,sc=0,rw=0,selA=null,afl={},pg='h',ff=null,mkO=false;
 const sb=new Array(60).fill(0),cell=(x,y)=>x<0||y<0||x>=GW||y>=GH?null:g[y*GW+x],areaAt=(x,y)=>HL.find(h=>inR(hrect(h),x,y)&&hallAvailable(h)),inG=(x,y)=>{const h=areaAt(x,y);return!!h&&hlv(h.id)>0};
 /* Maschinenparameter. Waren behalten ihre Qualitätswerte entlang der Transportkette. */
@@ -302,10 +313,10 @@ const knownType=t=>t=='belt'||Object.hasOwn(MD,t);
 const isBelt=t=>t=='belt'||!!MD[t]?.belt;
 const buildType=t=>t==='fast'||t==='express'?'belt':t;
 const isLogistics=t=>isBelt(t)||MD[t]?.g==='l'||isStorage(t)||typeShip(t)||!!MD[t]?.inspect;
-const beltSize=t=>Math.max(2,MD[t]?.belt||1,Math.ceil(TICK/BTv)+1);
-const maxBeltBuffer=Math.ceil(TICK*transportSpeeds.at(-1)*archeUpgrade.beltSpeed)+1;
+const beltSize=t=>Math.max(2,MD[t]?.belt||1,Math.ceil(logisticsRates[logisticsPath(t)]/transferScale)+1);
+const maxBeltBuffer=Math.ceil(TICK*logisticsSpeed('belt',5)*archeUpgrade.beltSpeed)+1;
 const beltCount=o=>o.it<0?0:1+o.queue.length;
-const beltCapacity=()=>60/BTv;
+const beltCapacity=(o={t:'belt'})=>logisticsRates[logisticsPath(o.t)]*.6;
 const terminal=t=>typeShip(t)||isProjectRamp(t)||!!(MD[t]?.supply||MD[t]?.distribution);
 const prod=o=>MD[o.t]?.o!=null;
 const cap=o=>Math.floor((STC+(o.extraStorage||0))*(1+(o.cb||0)));
@@ -335,11 +346,11 @@ function neighbor(o,d){
 function inputNeighbor(o,d){
  return o.yardInputs?.[d]||physicalNeighbor(o,d);
 }
-function tunnelExit(o,lookup=cell,keepLink){
+function legacyTunnelExit(o){
  if(o.t!='tunnel'||o.needsRelocation)return null;
- if(o.yardTunnel&&(!keepLink||keepLink(o.yardTunnel))&&!o.yardTunnel.needsRelocation)return o.yardTunnel;
- const next=physicalTunnelExit(o,lookup);
- return next&&o.yardBlockedTunnel===next&&(!keepLink||keepLink(next))?null:next;
+ if(o.yardTunnel&&!o.yardTunnel.needsRelocation)return o.yardTunnel;
+ const next=physicalTunnelExit(o,cell);
+ return next&&o.yardBlockedTunnel===next?null:next;
 }
 function physicalTunnelExit(o,lookup){
  for(let distance=1;distance<=6;distance++){
@@ -347,6 +358,60 @@ function physicalTunnelExit(o,lookup){
   if(q?.t=='tunnel'&&!q.needsRelocation&&q.r==o.r)return distance>=2?q:null;
  }
  return null;
+}
+const tunnelPairs=new Map();
+const tunnelDistance=(from,to)=>(to.x-from.x)*DX[from.r]+(to.y-from.y)*DY[from.r];
+function alignedTunnel(from,to){
+ if(from?.t!=='tunnel'||to?.t!=='tunnel'||from.r!==to.r)return false;
+ return DX[from.r]!==0?from.y===to.y:from.x===to.x;
+}
+function tunnelExit(o){
+ const target=tunnelPairs.get(o);
+ return !o.needsRelocation&&target&&!target.needsRelocation?target:null;
+}
+const tunnelSurfaceOutput=o=>o.jumped||o.legacyTunnelPass&&!tunnelPairs.has(o);
+const tunnelSurfaceInput=o=>!o.tunnelIn?.size||o.legacyTunnelPass||tunnelPairs.has(o);
+function rememberTunnel(from,to){
+ removeTunnel(from);
+ tunnelPairs.set(from,to);
+ (to.tunnelIn??=new Set()).add(from);
+}
+function removeTunnel(from){
+ tunnelPairs.get(from)?.tunnelIn.delete(from);
+ tunnelPairs.delete(from);
+}
+function unpairTunnel(o){
+ removeTunnel(o);
+ for(const from of o.tunnelIn||[])removeTunnel(from);
+}
+function keepsTunnel(from,to,future){
+ const a=future.get(from)||from,b=future.get(to)||to;
+ if(!alignedTunnel(a,b)||siteAt(a.x,a.y)!==siteAt(b.x,b.y))return false;
+ const distance=tunnelDistance(a,b);
+ return distance>=2&&(distance<=tunnelRange()||distance===tunnelDistance(from,to));
+}
+function pairTunnels(first,second){
+ if(!alignedTunnel(first,second)||first.needsRelocation||second.needsRelocation
+  ||siteAt(first.x,first.y)!==siteAt(second.x,second.y))return 'Wähle zwei gleich ausgerichtete Tunnel auf einer geraden Linie am selben Standort.';
+ if([first,second].some(o=>tunnelPairs.has(o)||o.tunnelIn?.size))return 'Ein Tunnelende ist bereits verbunden. Trenne zuerst das bisherige Paar.';
+ const distance=tunnelDistance(first,second);
+ if(Math.abs(distance)<2||Math.abs(distance)>tunnelRange())return 'Der Abstand muss 2 bis '+tunnelRange()+' Felder betragen.';
+ const [from,to]=distance>0?[first,second]:[second,first];
+ from.legacyTunnelPass=to.legacyTunnelPass=false;
+ // Goods already at the new exit are still allowed to leave on the surface.
+ if(to.it>=0)to.jumped=true;
+ for(const parcel of to.queue)parcel[4]=true;
+ rememberTunnel(from,to);
+ return '';
+}
+function readTunnelPairs(saved){
+ const links=[];
+ for(const row of Object.values(saved||{})){
+  if(!row||![row[0],row[1],row[2],row[3]].every(Number.isInteger))continue;
+  const from=cell(row[0],row[1]),to=cell(row[2],row[3]);
+  if(alignedTunnel(from,to)&&tunnelDistance(from,to)>=2&&siteAt(from.x,from.y)===siteAt(to.x,to.y))links.push([from,to]);
+ }
+ return links;
 }
 const newStats=s=>FactoryTelemetry.totals(s,G.tk);
 function record(o,key,value=1){
@@ -358,10 +423,10 @@ const companyRates=()=>FactoryTelemetry.rates(G.recent,G.tk,TICK);
 const uc=(o,l)=>Math.ceil(MD[o.t].c*.55*(Math.pow(1.5,l-1))*(o.ub||1)*KUC),cst=t=>Math.max(1,Math.round((t=='belt'?2:MD[t].c)*(1-.03*legacyIndustry('construction'))*KBC));
 const xsp=o=>{const m=MD[o.t];return(RH('met')&&m.rc!=null?1.2:1)*(RH('elk')&&(m.a=='elk'||m.a=='ene'||m.a=='hit'&&o.t!=='mobile')?1.12:1)};
 function put(x,y,t,r,lv,base=defaultSize(t)){const m=MD[t],o={t,x,y,r,lv:lv||1,it:-1,ein:(r+2)%4,wt:0,q:[],iv:(m&&m.r||[]).map(()=>0),wk:0,out:-1,p:0,ag:0,st:2,ew:0,es:0,eb:0,dv:0,fl:0,bt:1,bad:0};
- if(m&&m.j){o.j=m.j;o.rr=0;o.pr=0;o.xs=[-1,-1,-1,-1];o.xm=[];o.xQueue=[];o.jm=m.j==1?jpre(t,r):[0,0,0,0]}
+ if(m&&m.j){o.j=m.j;o.rr=0;o.pr=0;o.xs=[-1,-1,-1,-1];o.xm=[];o.xQueue=[];o.inQueue=[];o.jm=m.j==1?jpre(t,r):[0,0,0,0]}
  Object.assign(o,{up:{},spec:'',paused:false,priority:false,control:0,supplyItem:-1,supplyStock:0,credits:o.iv.map(()=>0),ivq:o.iv.map(()=>0),oq:100,pq:100,iq:100,qq:[],xq:[100,100,100,100],threshold:105,base,queue:[],jumped:false,sortRule:-1,smartMode:0,stats:newStats(),recent:FactoryTelemetry.create(G.tk,TICK)});
  L.push(o);mapObject(o,o);return o}
-function del(o){forgetYardLinks(new Set([o]));L=L.filter(q=>q!=o);mapObject(o,null);buildSelection.delete(o);if(routeSource===o){routeSource=null;buildPreview=null}if(sel==o)sel=null}
+function del(o){unpairTunnel(o);forgetYardLinks(new Set([o]));L=L.filter(q=>q!=o);mapObject(o,null);buildSelection.delete(o);if(routeSource===o){if(buildMode==='tunnel')buildMode='';routeSource=null;buildPreview=null}if(sel==o)sel=null}
 const legacyPlots=[
  {id:'w',name:'Lagerhalle',rect:[1,3,5,10]},
  {id:'o',name:'Produktionshalle',rect:[18,3,22,10]},
@@ -500,7 +565,7 @@ function readYardLinks(saved){
  }
  return links;
 }
-function expandSavedYard(){
+function expandSavedYard(legacyTunnels){
  const expanded=FactoryYard.create(3),offset=o=>expanded.point(o.x,o.y)[1]-o.y;
  // An older or manually edited save can contain a footprint across a cut.
  // Keep the entire original layout if that footprint cannot move as a unit.
@@ -516,7 +581,7 @@ function expandSavedYard(){
    if(isBelt(from.t)&&to.j&&!reverse)continue;
    links.push({from,to,d,reverse});
   }
-  const to=tunnelExit(from);
+  const to=legacyTunnels&&legacyTunnelExit(from);
   if(to&&offset(from)!==offset(to))links.push({from,to,d:from.r,tunnel:true});
  }
  setYardLayout(3);
@@ -528,7 +593,7 @@ function expandSavedYard(){
  refreshLogisticsPlacement();
  return true;
 }
-function widenSavedYard(){
+function widenSavedYard(legacyTunnels){
  const occupied=new Set();
  for(const o of L)for(const [x,y] of footprint(o))if(x<FactoryYard.annexStart)occupied.add(y);
  const removed=FactoryYard.previousRows(occupied);
@@ -549,7 +614,7 @@ function widenSavedYard(){
    const active=compatiblePort(from,peer,d)&&siteAt(from.x,from.y)===siteAt(peer.x,peer.y)&&(!isBelt(from.t)||!peer.j||reverse);
    ports.push({from,d,to:active?peer:null,reverse});
   }
-  if(from.t==='tunnel'&&!from.yardTunnel)tunnels.push({from,to:tunnelExit(from),d:from.r,tunnel:true});
+  if(legacyTunnels&&from.t==='tunnel'&&!from.yardTunnel)tunnels.push({from,to:legacyTunnelExit(from),d:from.r,tunnel:true});
  }
  setYardLayout(4,removed.map(rows=>rows.length));
  g=[];
@@ -576,8 +641,9 @@ function init(value,target=latestLayout){
  const legacy=value&&(value.v==null||value.v===1);
  const d=legacy?migrateLegacy(value):value;
  attachYardLinks([]);
+ tunnelPairs.clear();
  setYardLayout(d?.v??latestLayout,d?.yardRows);
- resetPlanning();advancedResearch=false;rsel=null;
+ resetPlanning();researchTab='basic';rsel=null;
  projectCargo.clear();projectTrucks.length=0;
  rejectedBuild=null;
  currentSite='main';traffic.clear();teamPaths.clear();teamTrips.length=0;teamHall='gar';teamTab=0;teamSpecialty=null;
@@ -595,7 +661,7 @@ function init(value,target=latestLayout){
   for(const row of Object.values(d.o||{})){if(!row||typeof row!='object')continue;const e=row;const t=e[2];if(!knownType(t)||!visibleModel(MD[t]))continue;
    const base=e[10]?.large===true?defaultSize(t):[1,1],shape={x:e[0],y:e[1],r:(e[3]|0)&3,base};
    if(!Number.isInteger(shape.x)||!Number.isInteger(shape.y)||footprint(shape).some(([x,y])=>x<0||y<0||x>=GW||y>=GH||cell(x,y)))continue;
-   const o=put(shape.x,shape.y,t,shape.r,Math.max(1,Math.min(100,e[4]|0)),base);o.it=Number.isInteger(e[5])&&ITEMS[e[5]]?e[5]:-1;{const v=e[6],r=MD[t]&&MD[t].r;if(r){if(typeof v=='number'){const i=r.findIndex(a=>a[0]==v);if(v>=0&&i>=0)o.iv[i]=1}else if(v)Object.values(v).forEach((n,i)=>{if(i<o.iv.length)o.iv[i]=Math.max(0,Math.min(500,n|0))})}}o.out=Number.isInteger(e[7])&&ITEMS[e[7]]?e[7]:-1;if(isStorage(t)&&e[8]&&typeof e[8]=='object')o.q=Object.values(e[8]).filter(v=>Number.isInteger(v)&&ITEMS[v]).slice(0,500);
+   const o=put(shape.x,shape.y,t,shape.r,Math.max(1,Math.min(100,e[4]|0)),base);o.it=Number.isInteger(e[5])&&ITEMS[e[5]]?e[5]:-1;{const v=e[6],r=MD[t]&&MD[t].r;if(r){if(typeof v=='number'){const i=r.findIndex(a=>a[0]==v);if(v>=0&&i>=0)o.iv[i]=1}else if(v)Object.values(v).forEach((n,i)=>{if(i<o.iv.length)o.iv[i]=Math.max(0,Math.min(500,n|0))})}}o.out=Number.isInteger(e[7])&&ITEMS[e[7]]?e[7]:-1;if(isStorage(t)&&e[8]&&typeof e[8]=='object')o.q=Object.values(e[8]).filter(v=>Number.isInteger(v)&&ITEMS[v]).slice(0,16384);
    if(o.j&&typeof e[9]=='string'){const a=e[9].split(o.j==1?'':',').map(Number);if(a.length==4&&a.every(v=>!isNaN(v))){if(o.j==1)o.jm=a.map(v=>Math.max(0,Math.min(2,v)));else o.xs=a.map(v=>ITEMS[v]?v:-1)}}
    const extra=e[10];
    if(extra&&typeof extra=='object'){
@@ -607,6 +673,7 @@ function init(value,target=latestLayout){
     o.p=prod(o)&&Number.isFinite(extra.p)?Math.max(0,Math.min(MD[t].w,extra.p)):0;
     o.iq=qvalue(extra.iq);o.oq=qvalue(extra.oq);o.pq=qvalue(extra.pq);
     o.jumped=extra.jumped===true;
+    o.legacyTunnelPass=t==='tunnel'&&extra.legacyTunnelPass===true;
     o.teamDepot=isStorage(t)&&extra.teamDepot===true;
     if(o.j===1){o.rr=extra.rr&3;o.pr=extra.pr&3}
     o.sortRule=Number.isInteger(extra.sortRule)&&(t=='sorter'?!!sortingGroups[extra.sortRule]:!!ITEMS[extra.sortRule])?extra.sortRule:-1;
@@ -615,6 +682,10 @@ function init(value,target=latestLayout){
     if(isBelt(t)||o.j===1){
      const limit=o.j===1?1:maxBeltBuffer-1;
      o.queue=Object.values(extra.queue||{}).filter(row=>ITEMS[row?.[0]]).slice(0,limit).map(row=>[row[0],qvalue(row[1]),row[2]&3,-1,row[4]===true]);
+    }
+    if(o.j===1)for(let dir=0;dir<4;dir++){
+     const parcel=extra.inQueue?.[dir];
+     if(ITEMS[parcel?.[0]])o.inQueue[dir]=[parcel[0],qvalue(parcel[1]),dir,-1,false];
     }
     if(o.j===2)for(let dir=0;dir<4;dir++){
      const parcel=extra.xQueue?.[dir];
@@ -632,6 +703,7 @@ function init(value,target=latestLayout){
   G.legacyPlots=legacyPlots.filter(plot=>Object.values(d.legacyPlots||{}).includes(plot.id)).map(plot=>plot.id);
   G.hl={gar:1};if(d.hl)for(const h of HL){const l=d.hl[h.id]|0;if(l>0&&(h.chapter||1)<=campaignChapter())G.hl[h.id]=Math.min(h.rc.length,l)}
   G.rs=Object.values(d.rs||{}).filter(id=>id==='grd'||RN.some(n=>n.id==id));
+  if(d.transportVersion!==2)G.rs=upgradeSavedResearch(G.rs);
   if(d.emp)for(const k of Object.keys(G.emp))G.emp[k]=Math.max(0,Math.min(12,d.emp[k]|0));
   for(const {id} of crewRoles){
    let available=G.emp[id];
@@ -657,7 +729,7 @@ function init(value,target=latestLayout){
   if(campaignChapter()>=2)G.hl.orb=Math.max(1,G.hl.orb||0);
   const compensation=legacyCompensation(d);
   G.m+=compensation.money;G.rp+=compensation.research;
-  G.plans=readPlans(d.plans);
+  G.plans=readPlans(d.plans,d.transportVersion!==2);
   // Retired expansion data is kept in saves without applying its former effects.
   G.epoch=Math.max(0,d.epoch|0);
   G.units=Number.isFinite(d.units)?Math.max(0,d.units):G.made;
@@ -693,16 +765,26 @@ function init(value,target=latestLayout){
  const bridges=compactPortBridges(L,compacted,(x,y,a,b)=>siteAt(a,b)===siteAt(x,y)&&!bchk(x,y,'belt',true,true));
  for(const {x,y,t,r} of bridges)put(x,y,t,r);
  refreshLogisticsPlacement();
+ const oldTunnels=d&&d.transportVersion!==2;
+ const savedPairs=oldTunnels?[]:readTunnelPairs(d?.tunnelPairs);
  if(d?.v>=3)attachYardLinks(readYardLinks(d.yardLinks));
- else if(d&&target>=3)expandSavedYard();
- if(yardLayout.version===3&&target>=4)widenSavedYard();
+ else if(d&&target>=3)expandSavedYard(oldTunnels);
+ if(yardLayout.version===3&&target>=4)widenSavedYard(oldTunnels);
+ if(oldTunnels){
+  for(const o of L)if(o.t==='tunnel'){
+   const to=legacyTunnelExit(o);
+   if(to)rememberTunnel(o,to);
+   else o.legacyTunnelPass=true;
+  }
+  attachYardLinks(yardLinks.filter(link=>!link.tunnel));
+ }else for(const [from,to] of savedPairs)rememberTunnel(from,to);
  if(legacy){
   G.sf={...G.sf,mig:1};
   stQ.push(storyCard('Spielstand übernommen','Deine Fabrik ist wieder da',[
    'Gebäude, Lagerbestände, Guthaben und Freischaltungen wurden aus deinem früheren Spielstand übernommen.'
   ]));
  }
- sb.fill(d&&d.rt?d.rt/60:0);rw=d&&d.rt?60:0;sc=Math.floor(G.tk*TICK);setLv();rfx();transportCycle=cyclesAt(G.tk);recalc()
+ sb.fill(d&&d.rt?d.rt/60:0);rw=d&&d.rt?60:0;sc=Math.floor(G.tk*TICK);setLv();rfx();transportCycle=0;recalc()
 }
 function acc2(o,item){
  const recipe=MD[o.t]?.r;
@@ -723,17 +805,14 @@ function feeders(o){
   const n=cell(x+DX[d],y+DY[d]);
   if(n!==o&&fdn(n,d)&&neighbor(n,(d+2)%4)===o)found.add(n);
  }
- if(o.t=='tunnel')for(let distance=2;distance<=6;distance++){
-  const n=cell(o.x-distance*DX[o.r],o.y-distance*DY[o.r]);
-  if(n?.t=='tunnel'&&tunnelExit(n)==o)found.add(n);
- }
+ for(const from of o.tunnelIn||[])if(tunnelExit(from)===o)found.add(from);
  for(const n of o.yardFeeders||[]){
   if(tunnelExit(n)===o||[0,1,2,3].some(d=>fdn(n,(d+2)%4)&&neighbor(n,d)===o))found.add(n);
  }
  return [...found];
 }
 const ups=q=>{const seen=new Set([q]),st=[q],res=new Set();while(st.length){for(const n of feeders(st.pop()))if(!seen.has(n)){seen.add(n);st.push(n);if(MD[n.t]&&MD[n.t].o!=null)res.add(n)}}return res};
-const mixed=(b,id)=>{const seen=new Set([b]),st=[b];while(st.length&&seen.size<60){for(const n of feeders(st.pop())){if(seen.has(n))continue;seen.add(n);if(isBelt(n.t)){if(n.it==id||n.queue.some(row=>row[0]==id))return true;st.push(n)}else if(n.j){if(n.it==id||(n.xs&&n.xs.includes(id)))return true;st.push(n)}else if(isStorage(n.t)){if(n.q.includes(id))return true;st.push(n)}else if(n.out==id)return true}}return false};
+const mixed=(b,id)=>{const seen=new Set([b]),st=[b];while(st.length&&seen.size<60){for(const n of feeders(st.pop())){if(seen.has(n))continue;seen.add(n);if(isBelt(n.t)){if(n.it==id||n.queue.some(row=>row[0]==id))return true;st.push(n)}else if(n.j){if(n.it==id||n.queue.some(row=>row[0]===id)||n.inQueue.some(row=>row?.[0]===id)||n.xs.includes(id)||n.xQueue.some(row=>row?.[0]===id))return true;st.push(n)}else if(isStorage(n.t)){if(n.q.includes(id))return true;st.push(n)}else if(n.out==id)return true}}return false};
 const activeRamp=()=>campaignChapter()===1?'prj':'orbitRamp';
 const projectPhase=(type=activeRamp())=>type==='prj'?PH[G.sp]:chapters[campaignChapter()]?.phases[G.campaign.stage];
 const projectStock=(type=activeRamp())=>type==='prj'?G.sq:G.campaign.delivery;
@@ -783,11 +862,13 @@ function receiveRecipe(machine,item,quality){
  return true;
 }
 function give(o,d,s,quality=100,jump=null){
+ if(jump&&tunnelExit(o)!==jump)return false;
  const q=jump||neighbor(o,d);
  if(!q||o.needsRelocation||q.needsRelocation||!ITEMS[s]||siteAt(o.x,o.y)!==siteAt(q.x,q.y))return false;
 
  const entry=(d+2)%4;
  if(isBelt(q.t)){
+  if(q.t==='tunnel'&&!jump&&!tunnelSurfaceInput(q))return false;
   if(beltCount(q)>=beltSize(q.t)||q.r==entry)return false;
   const parcel=[s,quality,entry,transportCycle,!!jump];
   if(q.it<0)loadParcel(q,parcel);
@@ -795,14 +876,12 @@ function give(o,d,s,quality=100,jump=null){
   return true;
  }
  if(q.j==1){
-  if(isBelt(o.t)||q.jm[entry]!=1||q.queue.length)return false;
-  const parcel=[s,quality,entry,transportCycle,false];
-  if(q.it>=0)q.queue.push(parcel);
-  else loadParcel(q,parcel);
+  if(q.jm[entry]!==1||q.inQueue[entry])return false;
+  q.inQueue[entry]=[s,quality,entry,transportCycle,false];
   return true;
  }
  if(q.j==2){
-  if(isBelt(o.t)||q.xQueue[entry])return false;
+  if(q.xQueue[entry])return false;
   if(q.xs[entry]>=0)q.xQueue[entry]=[s,quality,transportCycle];
   else{q.xs[entry]=s;q.xq[entry]=quality;q.xm[entry]=transportCycle}
   return true;
@@ -875,8 +954,8 @@ function releaseStorage(o){
 }
 function tick(){
  G.tk++;
- const firstCycle=cyclesAt(G.tk-1),lastCycle=cyclesAt(G.tk);
- transportCycle=firstCycle;
+ transportCycle++;
+ const groups=new Map();
  G.st+=TICK;
  if(G.sp<PH.length&&!G.late&&G.st>=DAYS*DAYSEC)lateStory();
  const second=Math.floor(G.tk*TICK);
@@ -889,13 +968,21 @@ function tick(){
   const wage=Math.min(G.m,WG*TICK/60);
   G.m-=wage;G.wc+=wage;FactoryTelemetry.record(G.recent,G.tk,TICK,'wages',wage);sb[sc%60]-=wage;
  }
- const junctions=[],conveyors=[],stores=[];
  for(const o of L){
   if(o.needsRelocation)continue;
-  if(isBelt(o.t)){if(firstCycle!==lastCycle)conveyors.push(o);continue}
-  if(o.j){if(firstCycle!==lastCycle)junctions.push(o);continue}
+  const key=logisticsPath(o.t);
+  if(key){
+   const rate=logisticsRates[key];
+   let group=groups.get(rate);
+   if(!group){
+    const start=(G.tk-1)*rate%transferScale;
+    group={rate,next:transferScale-start,junctions:[],belts:[],stores:[]};
+    groups.set(rate,group);
+   }
+   if(group.next<=rate)(o.j?group.junctions:isStorage(o.t)?group.stores:group.belts).push(o);
+   continue;
+  }
   if(terminal(o.t))continue;
-  if(isStorage(o.t)){if(firstCycle!==lastCycle)stores.push(o);continue}
   if(MD[o.t].inspect){
    if(o.it>=0&&o.mt!==G.tk){
     o.ag+=TICK;
@@ -911,11 +998,21 @@ function tick(){
   o.es=o.es*.99+(status==2?.01:0);
   o.eb=o.eb*.99+(status==3?.01:0);
  }
- for(let cycle=firstCycle+1;cycle<=lastCycle;cycle++){
-  transportCycle=cycle;
-  for(const o of junctions)jtick(o);
-  for(const o of conveyors)moveBelt(o);
-  for(const o of stores)releaseStorage(o);
+ // Peers at the same instant share a cycle, so ore cannot jump two devices at once.
+ const active=[...groups.values()].filter(group=>group.next<=group.rate);
+ while(active.length){
+  const next=active.reduce((first,group)=>group.next*first.rate<first.next*group.rate?group:first);
+  const numerator=next.next,denominator=next.rate;
+  transportCycle++;
+  for(let i=active.length-1;i>=0;i--){
+   const group=active[i];
+   if(group.next*denominator!==numerator*group.rate)continue;
+   for(const o of group.junctions)jtick(o);
+   for(const o of group.belts)moveBelt(o);
+   for(const o of group.stores)releaseStorage(o);
+   group.next+=transferScale;
+   if(group.next>group.rate)active.splice(i,1);
+  }
  }
  if(G.tk%8===0)workCrews();
 }
@@ -966,7 +1063,7 @@ function ordD(s,ship){
 }
 /* ---- Kurven: Eingangsseite eines Bands bestimmen, Position eines Stücks auf Gerade/Bogen ---- */
 function feed(o){const b=(o.r+2)%4;let sd=-1;for(const d of[b,(o.r+1)%4,(o.r+3)%4]){const q=cell(o.x+DX[d],o.y+DY[d]);if(fdn(q,d)){if(d==b)return b;sd=sd<0?d:-2}}return sd>=0?sd:b}
-function itemPos(o){const b=(o.r+2)%4,e=o.ein==null||o.ein==o.r?b:o.ein,R=TS/2,cx=(o.x+.5)*TS,cy=(o.y+.5)*TS,t=o.wt?.78:transportProgress();
+function itemPos(o){const b=(o.r+2)%4,e=o.ein==null||o.ein==o.r?b:o.ein,R=TS/2,cx=(o.x+.5)*TS,cy=(o.y+.5)*TS,t=o.wt?.78:transportProgress(o.t);
  if(e==b){const f=-R+t*TS;return[cx+DX[o.r]*f,cy+DY[o.r]*f]}
  const a=t*PI/2,u=R*(1-Math.sin(a)),v=R*(1-Math.cos(a));return[cx+DX[e]*u+DX[o.r]*v,cy+DY[e]*u+DY[o.r]*v]}
 /* ---- Speichern ---- */
@@ -1000,9 +1097,10 @@ function backupOriginal(save,suffix){
 }
 function backupBeforeMigration(save){
  if(needsCampaignMigration(save)&&!backupOriginal(save,'before-horizont-expansion'))return false;
- const oldTransport=save.transportVersion!==1&&(Object.values(save.o||{}).some(row=>isBelt(row?.[2])||MD[row?.[2]]?.j||isStorage(row?.[2]))
-  ||Object.values(save.plans||{}).some(plan=>Object.values(plan||{}).some(row=>buildType(row?.[2])!==row?.[2])));
- if(oldTransport&&!backupOriginal(save,'before-logistics-research'))return false;
+ const oldTransport=save.transportVersion!==2&&(Object.values(save.o||{}).some(row=>logisticsPath(row?.[2]))
+  ||Object.values(save.rs||{}).some(id=>logisticsPaths.belt.ids.includes(id))
+  ||Object.values(save.plans||{}).some(plan=>Object.values(plan||{}).some(row=>row?.[2]==='tunnel'||buildType(row?.[2])!==row?.[2])));
+ if(oldTransport&&!backupOriginal(save,'before-logistics-paths'))return false;
  if(save.v===4)return true;
  if(save.v===3)return backupOriginal(save,'before-side-yards');
  if(!backupOriginal(save,'before-logistics-yard'))return false;
@@ -1066,7 +1164,7 @@ async function loadFactory(){
 function snapshot(){
  const ts=Date.now();
  return {
-  v:yardLayout.version,transportVersion:1,ts,rev:ts.toString(36)+'-'+Math.random().toString(36).slice(2,12),base:cloud.base,
+  v:yardLayout.version,transportVersion:2,ts,rev:ts.toString(36)+'-'+Math.random().toString(36).slice(2,12),base:cloud.base,
   carry:Math.max(0,acc),m:G.m,te:G.te,sold:G.sold,made:G.made,units:G.units,productTracks:G.productTracks,pk:G.pk,cost:G.cost,
   tk:G.tk,ord:G.ord,history:G.history,rt:Math.round(rate()*10)/10,
   hl:G.hl,legacyPlots:G.legacyPlots,site:currentSite,campaign:G.campaign,story:G.story,legacyIndustry:G.legacyIndustry,sp:G.sp,sq:G.sq.map(v=>v|0),st:G.st,sd:G.sd,sf:G.sf,late:G.late,end:G.end,
@@ -1077,6 +1175,7 @@ function snapshot(){
   lineCounts:G.lineCounts,recent:G.recent,wins:G.wins,goals:G.goals,contracts:G.contracts,contractWins:G.contractWins,
   supplyOrders:G.supplyOrders,od:G.od.map(q=>[q.s,q.n,q.d,q.r]),rr:G.rr??null,
   ...(yardLayout.east?{yardRows:yardLayout.removed}:{}),
+  ...(tunnelPairs.size?{tunnelPairs:[...tunnelPairs].map(([from,to])=>[from.x,from.y,to.x,to.y])}:{}),
   ...(yardLinks.length?{yardLinks:yardLinks.map(({from,to,d,tunnel,reverse,blocked})=>[
    from.x,from.y,to.x,to.y,tunnel?4:d,!!reverse,!!blocked
   ])}:{}),
@@ -1088,7 +1187,8 @@ function snapshot(){
     wk:!!o.wk,p:o.p,supplyItem:o.supplyItem,supplyStock:o.supplyStock,iq:o.iq,oq:o.oq,pq:o.pq,ivq:o.iv.map((n,i)=>n?o.ivq[i]/n:100),
     ...(o.teamDepot?{teamDepot:true}:{}),
     qq:o.qq,xq:o.xq,ag:o.ag,ein:o.ein,large:o.base.some(n=>n>1),
-    ...(o.j===1?{rr:o.rr,pr:o.pr}:{}),
+    ...(o.legacyTunnelPass?{legacyTunnelPass:true}:{}),
+    ...(o.j===1?{rr:o.rr,pr:o.pr,...(o.inQueue.some(Boolean)?{inQueue:o.inQueue.map(parcel=>parcel?.slice(0,2)||null)}:{})}:{}),
     ...(o.j===2&&o.xQueue.some(Boolean)?{xQueue:o.xQueue.map(parcel=>parcel?.slice(0,2)||null)}:{}),
     queue:o.queue.map(([item,quality,entry,,jumped])=>[item,quality,entry,0,jumped]),
     jumped:o.jumped,sortRule:o.sortRule,smartMode:o.smartMode,stats:o.stats,recent:o.recent
@@ -1315,19 +1415,20 @@ function buyHall(h){const l=hlv(h.id);if(l>=h.rc.length){deny('Diese Halle hat i
  if(G.m<h.c[l]){deny('Nicht genug Geld.');return}G.m-=h.c[l];G.hl[h.id]=l+1;afl[h.id]=1;xp(l?40:90);sfx('unlock');
  refreshIndustrialArea();refreshLogisticsPlacement();toast(l?h.n+' erweitert: jetzt '+hSize(h)+' Felder!':h.n+' freigeschaltet!');sv(1);analyze()}
 function delAt(a,b){const o=cell(a,b);if(!o)return false;const v=Math.floor(cst(o.t)/2);G.m+=v;PO.push({x:(a+.5)*TS,y:b*TS,t:0,v:'+'+v});if(mvO==o)mvO=null;for(const m of G.mg)if(m.x==o.x&&m.y==o.y){m.x=-1;m.y=-1}del(o);sfx('remove');return true}
-function sellAll(){let v=0;for(const o of L)v+=Math.floor(cst(o.t)/2);for(const m of G.mg){m.x=-1;m.y=-1}G.m+=v;attachYardLinks([]);L=[];g=[];resetPlanning();sel=null;mvO=null;delAsk=0;PO.push({x:cam.x,y:cam.y,t:0,v:'+'+fm(v)});sfx('remove');toast('Alles verkauft: +'+fm(v)+' €');recalc();analyze();sv(1)}
+function sellAll(){let v=0;for(const o of L)v+=Math.floor(cst(o.t)/2);for(const m of G.mg){m.x=-1;m.y=-1}G.m+=v;attachYardLinks([]);tunnelPairs.clear();L=[];g=[];resetPlanning();sel=null;mvO=null;delAsk=0;PO.push({x:cam.x,y:cam.y,t:0,v:'+'+fm(v)});sfx('remove');toast('Alles verkauft: +'+fm(v)+' €');recalc();analyze();sv(1)}
 function moveObj(o,x,y){
  const error=placement(o,x,y,o.r,new Set([o]));
  if(error){constructionError(error,{x,y,t:o.t,r:o.r,base:o.base});return false}
  relocate([{o,x,y}]);return true;
 }
 function relocate(positions){
- const positionsByObject=new Map(positions.map(row=>[row.o,row]));
+ const positionsByObject=new Map(positions.map(row=>[row.o,{...row.o,x:row.x,y:row.y}]));
  for(const manager of G.mg){
   const move=positionsByObject.get(cell(manager.x,manager.y));
   if(move){manager.x=move.x;manager.y=move.y}
  }
  forgetYardLinks(new Set(positions.filter(({o,x,y})=>x!==o.x||y!==o.y).map(({o})=>o)));
+ for(const [from,to] of tunnelPairs)if((positionsByObject.has(from)||positionsByObject.has(to))&&!keepsTunnel(from,to,positionsByObject))removeTunnel(from);
  for(const {o} of positions)mapObject(o,null);
  for(const {o,x,y} of positions){o.x=x;o.y=y;o.bt=0;o.needsRelocation=false;mapObject(o,o)}
  sfx('place');analyze();sv(0);
@@ -1532,7 +1633,7 @@ function dm(o,wk){
   if(o.teamDepot&&inG(o.x,o.y)){rr(h-18,-h+4,13,12,3,'#246554');tx('T',h-11.5,-h+13,8,'#d7f9e7','center',800)}
  if(o.lv>1&&o.t!='shp'&&!isProjectRamp(o.t))tx('L'+o.lv,-h+5,h-6,9,'#fff','left',800)}
 function drawPassingItem(o){
- const ratio=MD[o.t].inspect?Math.min(1,(o.ag||0)/.5):transportProgress();
+ const ratio=MD[o.t].inspect?Math.min(1,(o.ag||0)/.5):transportProgress(o.t);
  saveCanvas();c.translate(-8+16*ratio,5);c.scale(.66,.66);di(o.it);restoreCanvas();
 }
 function db(o){const e=feed(o),b=(o.r+2)%4;saveCanvas();c.translate((o.x+.5)*TS,(o.y+.5)*TS);c.rotate(o.r*PI/2);
@@ -1590,7 +1691,7 @@ function dj(o){
   rr(-9,-8,18,2,1,'#a8bac3');rr(-9,6,18,2,1,'#a8bac3');
   for(const x of [-5,0,5])rr(x,-3,1.5,6,.6,'#738995');
   if(o.xs)for(let dir=0;dir<4;dir++)if(o.xs[dir]>=0){
-   const f=transportProgress();
+   const f=transportProgress(o.t);
    ico(o.xs[dir],DX[dir]*8*(1-2*f),DY[dir]*8*(1-2*f),.7);
   }
  }else{
@@ -1828,6 +1929,23 @@ function drawYardLinks(intersects){
   rr(x-5,y-5,10,10,3,'#3b847d');rr(u-5,v-5,10,10,3,'#3b847d');
  }
 }
+function drawTunnelPairs(intersects){
+ for(const [from,to] of tunnelPairs){
+  const x=(from.x+.5)*TS,y=(from.y+.5)*TS,u=(to.x+.5)*TS,v=(to.y+.5)*TS;
+  if(!intersects(Math.min(x,u),Math.min(y,v),Math.abs(x-u)+1,Math.abs(y-v)+1,TS))continue;
+  const colors=['#7dd3fc','#f7c879','#a7f3c2','#dab1ff','#f6a4a8'];
+  const color=colors[(from.x+from.y*7)%colors.length];
+  if(sel===from||sel===to){
+   c.beginPath();c.moveTo(x,y);c.lineTo(u,v);
+   c.setLineDash([8,6]);c.lineWidth=3;c.strokeStyle=color;c.stroke();c.setLineDash([]);
+  }
+  rr(x-5,y-16,10,4,2,color);rr(u-5,v-16,10,4,2,color);
+ }
+ if(buildMode==='tunnel'&&routeSource){
+  c.strokeStyle='#a7f3c2';c.lineWidth=3;
+  c.strokeRect(routeSource.x*TS+2,routeSource.y*TS+2,TS-4,TS-4);
+ }
+}
 function world(){
  const [left,top]=viewToWorld(0,0),[right,bottom]=viewToWorld(FW,FH);
  const intersects=(x,y,w,h,margin=0)=>x+w+margin>left&&x-margin<right&&y+h+margin>top&&y-margin<bottom;
@@ -1892,6 +2010,7 @@ function world(){
   });
  }
  if(yardLinks.length)drawLayer('Unterführungen',()=>drawYardLinks(intersects));
+ if(tunnelPairs.size||buildMode==='tunnel')drawLayer('Tunnelpaare',()=>drawTunnelPairs(intersects));
  if(campaignChapter()>=2&&isVisible(FLEET,2*TS))drawLayer('Flottenbau',drawFleet);
  if(bn&&isBelt(bn.t)&&visible.includes(bn)){
   c.strokeStyle='#ef4444';c.lineWidth=3;c.strokeRect(bn.x*TS+1,bn.y*TS+1,TS-2,TS-2);
@@ -2553,41 +2672,64 @@ function pnPanel([X,Y,W,H]){
  }
 
 }
-let advancedResearch=false;
-function rsPanel(){const [X,Y,W,H]=MENUS.rs.box,NW=138,NH=32,pos=n=>[X+104+n.x*150,Y+44+n.y*38];
+let researchTab='basic';
+function rsPanel(){const [X,Y,W,H]=MENUS.rs.box;
+ const logistics=researchTab==='logistics',advanced=researchTab==='advanced';
+ const NW=logistics?106:138,NH=logistics?26:32;
+ const pos=n=>logistics?[X+148+n.x*111,Y+44+n.y*30]:[X+104+n.x*150,Y+44+n.y*38];
  btn(X,Y,W,H,()=>{},'#0f141bf8');c.strokeStyle='#ffffff22';c.lineWidth=1;c.beginPath();c.roundRect(X,Y,W,H,12);c.stroke();
  tx('🔬 Forschung',X+16,Y+26,16,'#fff','left',800);
  tx(nf(G.rp)+' FP',X+W-60,Y+26,13,'#fde68a','right',800);
- for(const [label,advanced,x] of [['Grundlagen',false,X+160],['Vertiefung',true,X+270]]){
-  btn(x,Y+8,104,24,()=>{advancedResearch=advanced;rsel=null;sfx('select')},advancedResearch===advanced?'#1d4f82':'#263340',0,advanced?'research_advanced':'research_basic');
+ for(const [i,[label,key]] of [['Grundlagen','basic'],['Vertiefung','advanced'],['Logistik','logistics']].entries()){
+  const x=X+160+i*110;
+  btn(x,Y+8,104,24,()=>{researchTab=key;rsel=null;sfx('select')},researchTab===key?'#1d4f82':'#263340',0,'research_'+key);
   tx(label,x+52,Y+24,11,'#fff','center',700);
  }
- const page=RN.filter(n=>!!n.advanced===advancedResearch);
- const categories=advancedResearch?['Leistung','Lager','Einkauf','Wartung','Logistiktempo']:['Produktion','Leistung','Logistik','Verkauf','Vertrieb','Unternehmen'];
+ const page=RN.filter(n=>logistics?!!n.logistics:!n.logistics&&!!n.advanced===advanced);
  panelClose(X,Y,W,()=>{rsO=false});
- categories.forEach((n,i)=>tx(n,X+16,Y+65+i*38,11,'#94a3b8','left',700));
- for(const n of page)for(const p of n.p){const a=page.find(q=>q.id==p);if(!a)continue;const [x1,y1]=pos(a),[x2,y2]=pos(n);c.strokeStyle=RH(p)?'#4ade80':'#ffffff33';c.lineWidth=2.5;c.beginPath();if(n.x>a.x){c.moveTo(x1+NW,y1+NH/2);c.bezierCurveTo(x1+NW+20,y1+NH/2,x2-20,y2+NH/2,x2,y2+NH/2)}else{c.moveTo(x1+NW/2,y1+NH);c.lineTo(x2+NW/2,y2)}c.stroke()}
+ if(logistics){
+  Object.entries(logisticsPaths).forEach(([key,path],i)=>{
+   const y=Y+44+i*30;
+   tx(path.name,X+16,y+11,10.5,'#e0edf5','left',750);
+   const rate=decimal(logisticsRates[key]/100)+' Waren/s';
+   const extra=key==='tunnel'?' · '+tunnelRange()+' Felder':key==='storage'?' · '+STC+' Plätze':'';
+   tx(rate+extra,X+16,y+23,9,'#9ebdd1');
+  });
+ }else{
+  const categories=advanced?['Leistung','Lager','Einkauf','Wartung']:['Produktion','Leistung','Logistik','Verkauf','Vertrieb','Unternehmen'];
+  categories.forEach((n,i)=>tx(n,X+16,Y+65+i*38,11,'#94a3b8','left',700));
+ }
+ for(const n of page)for(const p of n.p){const a=page.find(q=>q.id==p);if(!a||logistics&&n.y!==a.y)continue;const [x1,y1]=pos(a),[x2,y2]=pos(n);c.strokeStyle=RH(p)?'#4ade80':'#ffffff33';c.lineWidth=2.5;c.beginPath();if(n.x>a.x){c.moveTo(x1+NW,y1+NH/2);c.bezierCurveTo(x1+NW+20,y1+NH/2,x2-20,y2+NH/2,x2,y2+NH/2)}else{c.moveTo(x1+NW/2,y1+NH);c.lineTo(x2+NW/2,y2)}c.stroke()}
  for(const n of page){const[x,y]=pos(n),done=RH(n.id),av=rOK(n),can=av&&G.rp>=researchCost(n),sl=rsel==n.id,fl=rflash[n.id]||0;
   btn(x,y,NW,NH,()=>{rsel=n.id;sfx('select')},done?'#14532d':av?'#1d3b66':'#1b222c',0,'research_'+n.id);
   c.strokeStyle=sl?'#ffd23f':can?`rgba(250,204,21,${.55+.4*Math.sin(tm*5)})`:done?'#4ade80':'#ffffff22';c.lineWidth=sl||can?2.5:1.5;c.beginPath();c.roundRect(x,y,NW,NH,9);c.stroke();
-  c.globalAlpha=done||av?1:.5;tx(n.n,x+9,y+14,11,'#fff','left',700);tx(done?'✓ erforscht':n.ex&&RH(n.ex)?'gesperrt (andere Strategie)':researchCost(n)+' FP',x+9,y+26,10,done?'#86efac':can?'#fde68a':'#94a3b8','left',700);c.globalAlpha=1;
+  c.globalAlpha=done||av?1:.5;
+  if(logistics){
+   tx(logisticsLevels[n.x],x+10,y+17,11,'#fff','left',800);
+   tx(done?'✓':nf(researchCost(n))+' FP',x+NW-9,y+17,10,done?'#86efac':can?'#fde68a':'#94a3b8','right',700);
+  }else{
+   tx(n.n,x+9,y+14,11,'#fff','left',700);
+   tx(done?'✓ erforscht':n.ex&&RH(n.ex)?'gesperrt (andere Strategie)':researchCost(n)+' FP',x+9,y+26,10,done?'#86efac':can?'#fde68a':'#94a3b8','left',700);
+  }
+  c.globalAlpha=1;
   if(fl>0){c.fillStyle=`rgba(255,255,255,${fl*.5})`;c.beginPath();c.roundRect(x,y,NW,NH,9);c.fill()}}
  const n=page.find(q=>q.id==rsel),dy=Y+H-62;rr(X+12,dy,W-24,52,10,'#ffffff0d');
- if(!n)tx('Logistiktempo · '+formatTransportRate()+' je Spur. Weitere Stufen findest du unter Vertiefung.',X+24,dy+31,11.5,'#94a3b8');
+ if(!n)tx(logistics?'Jede Reihe verbessert ihre Geräte. Verteiler umfasst Splitter, Fusionator und Kreuzung.':
+  'Wähle eine Technologie. Transport-Upgrades findest du im Reiter Logistik.',X+24,dy+31,11.5,'#94a3b8');
  else{tx(n.n,X+24,dy+17,13,'#fff','left',800);fitText(n.e,X+24,dy+32,W-227,11,'#cbd5e1','left',600);
   const rq=[...n.p.map(p=>[RN.find(q=>q.id==p).n,RH(p)]),...(n.rq?[[n.rq[0],n.rq[1]()]]:[])];
   tx('Voraussetzung: '+(rq.length?rq.map(r=>(r[1]?'✓ ':'✗ ')+r[0]).join(' · '):'keine'),X+24,dy+46,10.5,'#94a3b8');
-  const done=RH(n.id),ok=rOK(n)&&G.rp>=researchCost(n);if(done)tx('✓ erforscht',X+W-40,dy+31,13,'#86efac','right',800);else{btn(X+W-190,dy+10,166,32,()=>buyR(n),ok?'#2f9e6b':'#475569',0,'research_buy');tx('Erforschen · '+researchCost(n)+' FP',X+W-107,dy+31,12.5,'#fff','center',800)}}}
+  const done=RH(n.id),ok=rOK(n)&&G.rp>=researchCost(n);if(done)tx('✓ erforscht',X+W-40,dy+31,13,'#86efac','right',800);else{btn(X+W-190,dy+10,166,32,()=>buyR(n),ok?'#2f9e6b':'#475569',0,'research_buy');tx('Erforschen · '+nf(researchCost(n))+' FP',X+W-107,dy+31,12.5,'#fff','center',800)}}}
 function rotObj(o,r=(o.r+1)%4){
  const error=placement(o,o.x,o.y,r,new Set([o]));
  if(error){constructionError(error,{x:o.x,y:o.y,t:o.t,r,base:o.base});return false}
- if(r!==o.r)forgetYardLinks(new Set([o]));
+ if(r!==o.r){unpairTunnel(o);forgetYardLinks(new Set([o]));}
  mapObject(o,null);
  if(o.j==1)o.jm=[o.jm[3],o.jm[0],o.jm[1],o.jm[2]];
  o.r=r;o.needsRelocation=false;mapObject(o,o);sfx('rotate');analyze();sv(0);return true;
 }
 function togP(k){const w=MENUS[k].show(),fromAchievements=achievementsOpen;closeP2();if(!w){if(k=='mk')mkO=true;else if(k=='rs')rsO=true;else if(k=='pn')pnO=true;else if(k=='hl')hlO=true;else if(k=='bk'){projectView=campaignChapter();bkO=true}else{acO=true;if(fromAchievements)fTab=0}}sfx('click')}
-const TIPS={hand:['Hand','Tippe ein Gerät an, um Rezept, Upgrades und Einstellungen zu sehen.'],belt:['Förderband','Die Pfeile zeigen die Laufrichtung. Ziehe über mehrere Felder, um eine Strecke zu legen. „Logistiktempo“ verbessert alle bestehenden und neuen Bänder automatisch.'],rot:['Richtung','Dreht, was du als Nächstes baust oder gerade bewegst.'],mov:['Bewegen','Tippe auf ein Gebäude und anschließend auf das Zielfeld oder ziehe es direkt dorthin. Inhalt und Level bleiben erhalten. Prüfe danach die Anschlüsse.'],del:['Löschen','Tippe ein Gebäude an oder ziehe über mehrere Gebäude. Du erhältst die Hälfte der Baukosten zurück.']};
+const TIPS={hand:['Hand','Tippe ein Gerät an, um Rezept, Upgrades und Einstellungen zu sehen.'],belt:['Förderband','Die Pfeile zeigen die Laufrichtung. Ziehe über mehrere Felder, um eine Strecke zu legen. Unter Forschung → Logistik verbesserst du alle normalen Bänder automatisch.'],rot:['Richtung','Dreht, was du als Nächstes baust oder gerade bewegst.'],mov:['Bewegen','Tippe auf ein Gebäude und anschließend auf das Zielfeld oder ziehe es direkt dorthin. Inhalt und Level bleiben erhalten. Prüfe danach die Anschlüsse.'],del:['Löschen','Tippe ein Gebäude an oder ziehe über mehrere Gebäude. Du erhältst die Hälfte der Baukosten zurück.']};
 function fitText(text,x,y,width,size,color,align='left',weight=700){
  c.font=weight+' '+size+'px system-ui,sans-serif';
  c.fillStyle=color;c.textAlign=align;
@@ -2605,18 +2747,18 @@ function deviceDescription(id,object){
   const duration=seconds.toLocaleString('de-DE',{maximumFractionDigits:1});
   rows.push(['Betrieb',duration+' s pro Stück. '+source+' Der Pfeil zeigt zum Ausgang. Bei vollem Ausgang hält die Maschine an.']);
  }else if(isBelt(id)){
-  rows.push(['Transport',formatTransportRate()+' · '+beltSize(id)+' Pufferplätze. Forschung → Logistiktempo beschleunigt alle Bänder.']);
+  rows.push(['Transport',formatTransportRate(id)+' · '+beltSize(id)+' Pufferplätze. Forschung → Logistik verbessert diesen Bandtyp.']);
   const routing={
-   tunnel:'Zwei Tunnelstücke in derselben Richtung und in einer Reihe platzieren. Bei zwei bis sechs Feldern Abstand kann Ware unter Hindernissen hindurchfahren.',
+   tunnel:'Platziere zwei gleich ausgerichtete Enden auf einer geraden Linie. Tippe im Gerätefenster auf „Tunnel verbinden“ und wähle das zweite Ende. Die aktuelle Reichweite beträgt '+tunnelRange()+' Felder.',
    sort:'Wähle im Gerätefenster eine Ware. Das Band sortiert passende und übrige Waren in getrennte Richtungen.',
    smart:'Im Gerätefenster stellst du ein, welcher benachbarte Anschluss bevorzugt beliefert wird.'
   };
   rows.push(['Anschluss',routing[id]||TIPS[id]?.[1]||model?.d||'Waren entgegen der Pfeilrichtung zuführen. Der Pfeil markiert die Ausgabe. Im Gerätefenster kannst du das Band drehen.']);
  }else if(isStorage(id)){
-  rows.push(['Lagerung',(object?cap(object)+' Lagerplätze. ':'Puffert Waren. ')+'Ausgabe bis zu '+formatTransportRate()+'. Lagerforschung erhöht die Kapazität.']);
+  rows.push(['Lagerung',(object?cap(object)+' Lagerplätze. ':'Puffert Waren. ')+'Ausgabe bis zu '+formatTransportRate(id)+'. Lagerforschung erhöht die Kapazität.']);
   rows.push(['Anschluss','Waren über Förderbänder zuführen. Die Ausgabe erfolgt am Pfeil. Automatische Lagerung und Team-Lager lassen sich am Gerät einstellen.']);
  }else if(model?.j){
-  rows.push(['Transport',formatTransportRate()+(model.j===2?' je unabhängiger Spur.':' für alle Ausgänge zusammen.')+' „Logistiktempo“ erhöht den Durchsatz.']);
+  rows.push(['Transport',formatTransportRate(id)+(model.j===2?' je unabhängiger Spur.':' für alle Ausgänge zusammen.')+' Der Forschungspfad „Verteiler“ erhöht den Durchsatz.']);
   rows.push(['Materialfluss',model.d||(model.j===2?'Zwei Bänder kreuzen sich. Ware fährt auf ihrer Spur geradeaus.':'Leitet Waren zwischen den eingestellten Eingängen und Ausgängen weiter. Konfiguriere die vier Seiten im Gerätefenster.')]);
  }else if(typeShip(id)){
   rows.push(['Versand','Nimmt fertige Produkte vom Band an, verkauft sie und schreibt den Erlös deinem Konto gut.']);
@@ -3005,15 +3147,24 @@ const hasYardBlocks=o=>!!(o.yardBlocked||o.yardBlockedTunnel);
 function objectPanelBox(o){
  const d=MD[o.t],isB=isBelt(o.t);
  let h=104,width=240;
- if(isB)h=o.t==='sorter'?190:o.t==='smart'||o.t==='sort'?175:o.t==='tunnel'?149:163;
+ if(isB)h=o.t==='sorter'?190:o.t==='smart'||o.t==='sort'?175:o.t==='tunnel'?193:163;
  else if(prod(o)){width=Math.min(326,Math.max(266,Math.floor((FW-2*view.inset)/.94)));h=229+recipeHeight(d,width-28,false)}
  else if(typeShip(o.t))h=120;
- else if(isStorage(o.t))h=areaAt(o.x,o.y)?227:190;
+ else if(isStorage(o.t))h=areaAt(o.x,o.y)?256:219;
  else if(d.inspect)h=120;
  else if(d.supply||d.distribution)h=116;
- else if(d.j)h=o.j===1?222:153;
+ else if(d.j)h=o.j===1?251:182;
  else if(isProjectRamp(o.t))h=112+28*(projectPhase(o.t)?.q.length||0);
  return [788-width,96,width,h+(hasYardLinks(o)?33:0)+(hasYardBlocks(o)?33:0)];
+}
+function logisticsResearchButton(o,X,W,y){
+ const key=logisticsPath(o.t),ids=logisticsPaths[key].ids;
+ btn(X+14,y,W-28,25,()=>{
+  closeP2();rsO=true;researchTab='logistics';
+  rsel=ids[Math.min(logisticsStage(key),ids.length-1)];
+ },'#334155',0,'belt_research');
+ tx(logisticsPaths[key].name+' · Forschung öffnen',X+W/2,y+17,10.5,'#fff','center',700);
+ return y+29;
 }
 function panel(o){
  const [X,Y,W,H]=objectPanelBox(o),isB=isBelt(o.t),d=isB?null:MD[o.t],prod=!!d&&d.o!=null,jn=!!d?.j;
@@ -3040,17 +3191,18 @@ function panel(o){
   btn(X+14,y,50,28,()=>{qi=(qi+1)%4;sfx('select')},'#334155');tx(QT[qi]?'×'+QT[qi]:'MAX',X+39,y+19,12,'#fff','center',700);
   btn(X+70,y,76,28,()=>{rotObj(o)},'#334155',0,'turn_machine');tx('↻ Drehen',X+108,y+19,12,'#fff','center',700);delB(152,W-166,'Abbauen')}
  else if(jn){
-  tx(formatTransportRate()+(o.j===2?' je Spur':' insgesamt'),X+14,y,11,'#cbd5e1');y+=16;
+  tx(formatTransportRate(o.t)+(o.j===2?' je Spur':' insgesamt'),X+14,y,11,'#cbd5e1');y+=16;
   if(o.j==1){tx('Tippe eine Seite: Eingang → Ausgang → Aus',X+14,y,10.5,'#94a3b8','left',700);y+=12;const cols=['#334155','#2f9e6b','#c2570c'],nm=['Aus','Eingang','Ausgang'],pos=[[W-82,32],[W/2-34,58],[14,32],[W/2-34,6]];
    for(let dd=0;dd<4;dd++){const[px,py]=pos[dd];btn(X+px,y+py,68,26,()=>{o.jm[dd]=(o.jm[dd]+1)%3;if(o.it>=0&&o.jm[dd]==0)o.wt=0;sfx('select');recalc()},cols[o.jm[dd]]);tx(['→ rechts','↓ unten','← links','↑ oben'][dd],X+px+34,y+py+11,9,'#ffffffcc','center',600);tx(nm[o.jm[dd]],X+px+34,y+py+22,10.5,'#fff','center',800)}
    c.fillStyle='#ffffff22';c.beginPath();c.arc(X+W/2,y+58+13,7,0,PI*2);c.fill();y+=92}
   else{tx('Waren fahren geradeaus durch – zwei Bänder',X+14,y,10.5,'#94a3b8');tx('können sich überqueren, ohne zu mischen.',X+14,y+14,10.5,'#94a3b8');y+=34}
+  y=logisticsResearchButton(o,X,W,y);
   btn(X+14,y,80,28,()=>{rotObj(o)},'#334155');tx('↻ Drehen',X+54,y+19,12,'#fff','center',700);delB(100,W-114,'Abbauen (50 %)')}
  else if(isProjectRamp(o.t)){const q=projectPhase(o.t);tx(q?q.n:'Projekt abgeschlossen',X+14,y,12,'#fde68a','left',800);y+=16;
   if(q)q.q.forEach(([it,n],i)=>{const dn=Math.min(n,projectStock(o.t)[i]||0);ico(it,X+24,y+8,.8);tx(ITEMS[it].n,X+40,y+8,10.5,'#fff','left',700);rr(X+14,y+14,W-28,6,3,'#ffffff18');rr(X+14,y+14,(W-28)*dn/n,6,3,dn>=n?'#4ade80':'#3a7bd5');tx(nf(dn)+'/'+nf(n),X+W-14,y+8,10.5,'#cbd5e1','right',700);y+=28});else y+=8;
   btn(X+14,y,100,28,()=>{closeP2();projectView=campaignChapter();bkO=true;sfx('click')},'#334155');tx('📖 Quests',X+64,y+19,12,'#fff','center',700);delB(120,W-134,'Abbauen (50 %)')}
  else if(isB){
-  tx(formatTransportRate()+' · '+beltCount(o)+'/'+beltSize(o.t)+' Puffer',X+14,y,12,'#cbd5e1');y+=17;
+  tx(formatTransportRate(o.t)+' · '+beltCount(o)+'/'+beltSize(o.t)+' Puffer',X+14,y,12,'#cbd5e1');y+=17;
   tx(perMinute(o,'moves').toFixed(1)+' Transfers/Min · Bauwert '+cst(o.t)+' €',X+14,y,11,'#94a3b8');y+=18;
   if(o.t=='smart'||o.t=='sort'||o.t=='sorter'){
    btn(X+14,y,W-28,25,()=>{
@@ -3065,12 +3217,19 @@ function panel(o){
    const label=o.t=='sorter'?(o.sortRule<0?'Warenfamilie auswählen':sortingGroups[o.sortRule][1]+' nach rechts'):o.t=='smart'?(o.smartMode===2?'Auftragsware nach rechts':'Ausgänge nach Verfügbarkeit'):o.sortRule<0?'Alles geradeaus':ITEMS[o.sortRule].n+' → rechts';
    tx(label,X+W/2,y+17,10,'#fff','center',700);y+=31;
   }
-  if(o.t=='tunnel'){tx(tunnelExit(o)?'Weiterleitung durch Tunnel':'Gleichgerichtetes Tunnelende 2–6 Felder voraus',X+14,y-4,9,'#94a3b8');y+=10}
-  btn(X+14,y,W-28,25,()=>{
-   closeP2();rsO=true;advancedResearch=transportStage()>=2;
-   rsel=transportResearch[Math.min(transportStage(),transportResearch.length-1)];
-  },'#334155',0,'belt_research');
-  tx('Logistiktempo · Forschung öffnen',X+W/2,y+17,10.5,'#fff','center',700);y+=29;
+  if(o.t==='tunnel'){
+   const linked=tunnelPairs.has(o)||o.tunnelIn?.size;
+   const status=tunnelPairs.has(o)?'Einlass':o.tunnelIn?.size?'Auslass':'Kein Partner';
+   const peer=tunnelPairs.get(o)||o.tunnelIn?.values().next().value;
+   const distance=peer?Math.abs(tunnelDistance(o,peer))+' Felder zum Partner':'2–'+tunnelRange()+' Felder Reichweite';
+   tx(status+' · '+distance,X+14,y,10,'#a7cce0');y+=12;
+   btn(X+14,y,W-28,25,()=>{
+    if(linked){unpairTunnel(o);analyze();sv(0);sfx('select');return}
+    beginTunnelLink(o);
+   },'#29504f',0,linked?'unlink_tunnel':'link_tunnel');
+   tx(linked?'Tunnel trennen':'Tunnel verbinden',X+W/2,y+17,10.5,'#e3f6f4','center',700);y+=30;
+  }
+  y=logisticsResearchButton(o,X,W,y);
   btn(X+14,y,80,28,()=>rotObj(o),'#334155');tx('↻ Drehen',X+54,y+19,12,'#fff','center',700);delB(100,W-114,'Abbauen (50 %)')
  }
  else if(d?.inspect){
@@ -3087,7 +3246,7 @@ function panel(o){
  }
  else{tx('Bestand '+o.q.length+' / '+cap(o)+' Stück · FIFO',X+14,y,12,'#94a3b8');y+=24;
   if(isStorage(o.t)){
-   tx('Ausgabe bis '+formatTransportRate(),X+14,y-6,10.5,'#a7cce0');y+=16;
+   tx('Ausgabe bis '+formatTransportRate(o.t),X+14,y-6,10.5,'#a7cce0');y+=16;
    const rates=currentStats(o);
    tx('Eingang '+rates.arrivals.toFixed(1)+' · Ausgang '+rates.moves.toFixed(1)+' Stück/Min',X+14,y,10.5,'#cbd5e1');y+=17;
    const stock=new Map();
@@ -3103,24 +3262,40 @@ function panel(o){
     tx('Team-Lager '+(o.teamDepot?'aktiv':'aktivieren'),X+W/2,y+19,11,'#fff','center',700);y+=34;
    }
   }
+  if(isStorage(o.t))y=logisticsResearchButton(o,X,W,y);
   const two=!isB&&!terminal(o.t);if(two){btn(X+14,y,80,28,()=>{rotObj(o)},'#334155');tx('↻ Drehen',X+54,y+19,12,'#fff','center',700)}
   delB(two?100:14,two?W-114:W-28,'Abbauen (50 %)')}}
 function resetPlanning(){
  buildSelection=new Set();planningOpen=false;buildMode='';routeSource=buildPreview=activePlan=null;
 }
 const planLimit=()=>3+legacyIndustry('storage')+(RH('bau')?3:0);
-function readPlans(raw){
- return Object.values(raw||{}).slice(0,20).map(value=>Object.values(value||{}).slice(0,100)
+function readPlans(raw,legacy){
+ const plans=Object.values(raw||{}).slice(0,20).map(value=>Object.values(value||{}).slice(0,100)
   .filter(e=>e&&Number.isInteger(e[0])&&Number.isInteger(e[1])&&e[0]>=0&&e[0]<FactoryYard.width+2*FactoryYard.sideDepth&&e[1]>=0&&e[1]<FactoryYard.height+2*FactoryYard.oldDepth&&knownType(e[2]))
   .map(e=>[e[0],e[1],buildType(e[2]),e[3]&3,e[4]===true,e[5]||null])).filter(plan=>plan.length);
+ if(legacy)for(const plan of plans){
+  const tiles=new Map(plan.map(([x,y,t,r])=>[x+','+y,{x,y,t,r}]));
+  for(const row of plan){
+   const [x,y,t,r]=row;
+   if(t!=='tunnel')continue;
+   const target=physicalTunnelExit({x,y,t,r},(a,b)=>tiles.get(a+','+b));
+   row[5]={...row[5],legacyTunnelPass:!target,...(target?{tunnel:[target.x-x,target.y-y]}:{})};
+  }
+ }
+ return plans;
 }
 function makePlan(objects){
  const all=[...objects];
  if(!all.length)return [];
  const x=Math.min(...all.map(o=>o.x)),y=Math.min(...all.map(o=>o.y));
- return all.map(o=>[o.x-x,o.y-y,buildType(o.t),o.r,o.base.some(n=>n>1),{
-  ports:o.j==1?o.jm.slice():null,sort:o.sortRule,smart:o.smartMode,threshold:o.threshold
- }]);
+ const selected=new Set(all);
+ return all.map(o=>{
+  const target=tunnelExit(o);
+  const settings={ports:o.j==1?o.jm.slice():null,sort:o.sortRule,smart:o.smartMode,threshold:o.threshold};
+  if(o.legacyTunnelPass)settings.legacyTunnelPass=true;
+  if(selected.has(target))settings.tunnel=[target.x-o.x,target.y-o.y];
+  return [o.x-x,o.y-y,buildType(o.t),o.r,o.base.some(n=>n>1),settings];
+ });
 }
 function previewPlan(plan,x,y){
  const compacted=new Map();
@@ -3153,6 +3328,19 @@ function checkBuild(rows,moving=false){
    reserved.add(key);
   }
  }
+ if(!moving&&!error){
+  const tunnels=new Map(rows.filter(row=>row.t==='tunnel'&&!row.existing).map(row=>[row.x+','+row.y,row]));
+  for(const row of tunnels.values()){
+   const offset=row.settings?.tunnel;
+   if(!offset)continue;
+   if(!Number.isInteger(offset[0])||!Number.isInteger(offset[1])){error='Ungültige Tunnelposition im Bauplan.';break}
+   const target=tunnels.get((row.x+offset[0])+','+(row.y+offset[1]));
+   if(!alignedTunnel(row,target)||tunnelDistance(row,target)<2||siteAt(row.x,row.y)!==siteAt(target.x,target.y)){
+    error='Ein Tunnelpaar im Bauplan braucht zwei gleich ausgerichtete Enden am selben Standort.';break;
+   }
+   if(tunnelDistance(row,target)>tunnelRange()){error='Die Tunnelreichweite reicht für diesen Bauplan noch nicht.';break}
+  }
+ }
  if(!error&&cost>G.m)error='Nicht genug Geld.';
  return {rows,moving,cost,error};
 }
@@ -3178,6 +3366,12 @@ function commitBuild(preview){
    if(t=='sorter'?!!sortingGroups[settings?.sort]:!!ITEMS[settings?.sort])o.sortRule=settings.sort;
    if(settings?.smart>=0&&settings.smart<=2)o.smartMode=settings.smart;
    if([90,105,120].includes(settings?.threshold))o.threshold=settings.threshold;
+   if(t==='tunnel'&&settings?.legacyTunnelPass===true)o.legacyTunnelPass=true;
+  }
+  for(const {x,y,t,settings,existing} of result.rows){
+   if(t!=='tunnel'||existing||!settings?.tunnel)continue;
+   const [dx,dy]=settings.tunnel;
+   rememberTunnel(cell(x,y),cell(x+dx,y+dy));
   }
   analyze();sv(0);sfx('place');
  }
@@ -3185,7 +3379,7 @@ function commitBuild(preview){
 }
 function planRoute(from,to){
  if(!from||!to||!L.includes(from)||!L.includes(to)||from===to||terminal(from.t))return null;
- if(from.needsRelocation||to.needsRelocation||from.yardOutputs?.[from.r]||from.yardTunnel)return null;
+ if(from.needsRelocation||to.needsRelocation||from.yardOutputs?.[from.r]||tunnelExit(from))return null;
  const site=siteAt(from.x,from.y);
  if(site!==siteAt(to.x,to.y))return null;
  return FactoryGrid.planRoute(from,to,{
@@ -3198,9 +3392,18 @@ function planRoute(from,to){
 function startBuildMode(mode){
  tool='hand';sel=null;planningOpen=false;buildMode=mode;buildPreview=null;routeSource=null;sfx('select');
 }
+function beginTunnelLink(o){
+ startBuildMode('tunnel');routeSource=o;
+}
 function buildTap(x,y){
  const o=cell(x,y);
- if(buildMode=='group'){
+ if(buildMode==='tunnel'){
+  if(!routeSource)return;
+  const error=pairTunnels(routeSource,o);
+  if(error){deny(error);return}
+  const entry=tunnelPairs.has(o)?o:routeSource;
+  resetPlanning();sel=entry;analyze();sv(0);sfx('place');toast('Tunnelpaar verbunden');
+ }else if(buildMode=='group'){
   if(o){if(buildSelection.has(o))buildSelection.delete(o);else if(buildSelection.size<100)buildSelection.add(o);sfx('select')}
  }else if(buildMode=='copy'){
   if(o){activePlan=makePlan([o]);buildMode='place';buildPreview=null}
@@ -3223,7 +3426,8 @@ function buildTap(x,y){
 const displayPlanningError=error=>error.startsWith('LOCK:')?hallOf(error.slice(5)).n+' ist gesperrt.':error;
 function planningControls(box){
  const preview=buildPreview,{x,y,w,h}=box;
- let label={group:'Gebäude antippen · '+buildSelection.size+' ausgewählt',copy:'Gebäude zum Kopieren antippen',move:'Neue Position für die Gruppe antippen',place:'Bauplatz antippen, um den Bauplan zu prüfen',route:routeSource?'Ziel antippen':'Ausgangsgebäude antippen'}[buildMode];
+ let label={group:'Gebäude antippen · '+buildSelection.size+' ausgewählt',copy:'Gebäude zum Kopieren antippen',move:'Neue Position für die Gruppe antippen',place:'Bauplatz antippen, um den Bauplan zu prüfen',route:routeSource?'Ziel antippen':'Ausgangsgebäude antippen',
+  tunnel:'Zweites gleich ausgerichtetes Tunnelende antippen · 2–'+tunnelRange()+' Felder'}[buildMode];
  if(preview)label=preview.error?displayPlanningError(preview.error):preview.moving?(preview.disconnected?preview.disconnected+' externe Anschlüsse beim Verschieben prüfen':'Gruppe kann verschoben werden'):'Baukosten '+fm(preview.cost)+' € · '+preview.rows.length+' Felder';
  rr(x,y,w,h,8,'#0f141bf2');fitText(label,x+8,y+16,w-16,11,'#fff');
  if(preview&&!preview.error){
@@ -3232,8 +3436,9 @@ function planningControls(box){
   tx(preview.moving?'Verschieben':'Bauen',box.x+42,box.y+16,10.5,'#fff','center',800);
  }
  const back={x:x+w-81,y:y+22,w:75,h:23};
- uiButton(back,()=>{buildMode='';buildPreview=null;routeSource=null;planningOpen=true},'#334155','open_plan');
- tx('Planung',back.x+37.5,back.y+16,10.5,'#fff','center',800);
+ const pairing=buildMode==='tunnel';
+ uiButton(back,()=>{sel=pairing?routeSource:null;buildMode='';buildPreview=null;routeSource=null;planningOpen=!pairing},'#334155',pairing?'cancel_tunnel':'open_plan');
+ tx(pairing?'Abbrechen':'Planung',back.x+37.5,back.y+16,10.5,'#fff','center',800);
 }
 function planningPanel(){
  const [X,Y,W,H]=MENUS.planning.box;
@@ -3379,14 +3584,15 @@ function compatiblePort(from,target,direction){
  if(prod(target)&&prod(from))return uses(target,MD[from.t].o);
  return true;
 }
-function outgoing(o,lookup=cell,keepLink=()=>true){
+function outgoing(o,lookup=cell,keepLink=()=>true,exit=tunnelExit(o)){
  const outputs=[0,1,2,3].filter(d=>fdn(o,(d+2)%4));
  const targets=new Set();
- for(const d of outputs){
-  const q=yardNeighbor(o,d,lookup(...port(o,d)),keepLink);
-  if(compatiblePort(o,q,d))targets.add(q);
+ if(o.t!=='tunnel'||o.legacyTunnelPass&&!exit||o.tunnelIn?.size){
+  for(const d of outputs){
+   const q=yardNeighbor(o,d,lookup(...port(o,d)),keepLink);
+   if(compatiblePort(o,q,d)&&(q.t!=='tunnel'||tunnelSurfaceInput(q)))targets.add(q);
+  }
  }
- const exit=tunnelExit(o,lookup,keepLink);
  if(exit)targets.add(exit);
  return targets;
 }
@@ -3428,7 +3634,8 @@ function lineMetrics(line,wages=companyRates().wages,totalMachines=L.filter(prod
  result.profit-=wages*machines.length/Math.max(1,totalMachines);
  result.capacity=machines.reduce((sum,o)=>sum+60/tme(o),0);
  result.load=machines.length?machines.reduce((sum,o)=>sum+o.ew,0)/machines.length:0;
- result.transport=line.some(o=>isBelt(o.t)||o.j||isStorage(o.t))?beltCapacity():0;
+ const transport=line.filter(o=>logisticsPath(o.t));
+ result.transport=transport.length?Math.min(...transport.map(beltCapacity)):0;
  result.machines=machines;result.belts=belts;
  return result;
 }
@@ -3446,7 +3653,9 @@ function lostConnections(positions){
  };
  let count=0;
  for(const o of L){
-  const next=outgoing(replacements.get(o)||o,lookup,target=>!moved.has(o)&&!moved.has(target));
+  const to=tunnelExit(o);
+  const futureExit=to&&keepsTunnel(o,to,replacements)?replacements.get(to)||to:null;
+  const next=outgoing(replacements.get(o)||o,lookup,target=>!moved.has(o)&&!moved.has(target),futureExit);
   for(const target of outgoing(o)){
    if(!moved.has(o)&&!moved.has(target))continue;
    if(!next.has(replacements.get(target)||target))count++;
@@ -3631,8 +3840,8 @@ function practiceHighlight(stage){
 const TOUR=[
  {ti:'Karte und Standorte',tx:'Ziehe zum Verschieben. Zoome mit +/−, Mausrad oder zwei Fingern. Das Haussymbol zentriert den Standort. Andere Standorte findest du unter Firma → Werkzeuge.',hl:()=>[['u','camera_home']]},
  {ti:'Bauen und Ausrichten',tx:'Wähle unten eine Gerätegruppe und dann die Maschine. Die Pfeile neben den Reihen zeigen weitere Einträge. „Richtung“ dreht den Ausgang. Tippe zum Bauen auf ein freies Feld.',hl:()=>[['r','dock']]},
- {ti:'Förderbänder',tx:'Wähle „Band“ und ziehe über mehrere Felder, um eine Strecke zu legen. Die Pfeile zeigen die Warenrichtung. Forschung → Logistiktempo macht alle Bänder schneller.',hl:()=>[['u','tl_belt']]},
- {ti:'Verteilen und Unterführen',tx:'Splitter teilen, Fusionatoren bündeln. Eine Kreuzung hält zwei Ströme getrennt. Sortierbänder lenken gewählte Ware um. Zwei gleich ausgerichtete Tunnelstücke verbinden sich bei 2–6 Feldern Abstand. Das Logistiktempo gilt auch für Verteiler und Lagerausgänge.',hl:()=>[['u','pg_l']]},
+ {ti:'Förderbänder',tx:'Wähle „Band“ und ziehe über mehrere Felder, um eine Strecke zu legen. Die Pfeile zeigen die Warenrichtung. Forschung → Logistik hat für jeden Bandtyp eine eigene Reihe.',hl:()=>[['u','tl_belt']]},
+ {ti:'Verteilen und Unterführen',tx:'Splitter teilen, Fusionatoren bündeln. Eine Kreuzung hält zwei Ströme getrennt. Sortierbänder lenken gewählte Ware um. Tunnelenden werden im Gerätefenster fest verbunden. Tunnel-Forschung erhöht Tempo und Reichweite. Verteiler und Lager haben eigene Forschungspfade.',hl:()=>[['u','pg_l']]},
  {ti:'Maschinen und Rezepte',tx:'Mit Hand öffnest du eine Maschine. Das Fenster zeigt Rezept, Puffer, Stückpreis und das nächste Upgrade. Das Info-Symbol erklärt jedes Gerät mit Bildern und Anschlüssen.',hl:()=>[['u','tl_hand']]},
  {ti:'Bewegen und Abbauen',tx:'Tippe mit „Bewegen“ ein Gebäude und dann sein Zielfeld an. Der Inhalt bleibt im Gerät. Prüfe danach die Anschlüsse. Beim Abbauen erhältst du die Hälfte der Baukosten zurück.',hl:()=>[['u','tl_mov']]},
  {ti:'Engpässe und Lager',tx:'„Wartet“ heißt: Material fehlt. „Gestaut“ heißt: Ware kommt am Ausgang nicht weg. Zwischenlager puffern Ware. Prüfe Richtungen und Zutaten, bevor du mehr Tempo kaufst.',hl:()=>[['r','warning']]},
@@ -3778,7 +3987,7 @@ function demo(){init(null);stQ=[];G.tu=-1;G.th=[];G.hl={gar:1,met:1};L=[];g=[];p
   [12,8,'belt',2],[13,8,'belt',2],[14,8,'belt',2],[15,8,'mil',2,2],[16,8,'sme',2,2],[17,8,'ers',2,2]].forEach(([x,y,t,r,l])=>put(x,y,t,r,l,[1,1]));
  G.m=4820;G.sold=312;G.pk=64;G.ord=2;Object.assign(G.sl,[0,60,40,30,22,64,0,18,30,48]);G.tk=2900;refreshIndustrialArea();recalc();fs=1;for(let i=0;i<640;i++)tick();fs=0;sb.fill(2.3);rw=60;ready=1;cam={x:12*TS,y:6.2*TS,z:1};analyze();lr=Date.now()}
 const {loadParcel,clearBelt,beltDirections,moveBelt,jtick,sortingGroups}=createFactoryTransport({
- MD,PR,isBelt,currentCycle:()=>transportCycle,neighbor,inputNeighbor,tunnelExit,
+ MD,PR,currentCycle:()=>transportCycle,neighbor,tunnelExit,tunnelSurfaceOutput,
  give,record,prod,uses,prjNeed,isProjectRamp,orderFor
 });
 const audio=createFactoryAudio({
@@ -3958,4 +4167,4 @@ update(dt){
  for(const o of L){if(o.bt<1)o.bt=Math.min(1,o.bt+dt*3);if(o.fl>0)o.fl=Math.max(0,o.fl-dt*1.6);o.dv+=(o.ew-o.dv)*.1}
  for(const k in afl)afl[k]=Math.max(0,afl[k]-dt*1.2);for(const k in rflash)rflash[k]=Math.max(0,rflash[k]-dt*1.5);pfl=Math.max(0,pfl-dt*1.2);PO=PO.filter(p=>(p.t+=dt)<1.2);tl+=dt;if(tl>1){tl=0;analyze();warnChk()}at+=dt;if(at>20){at=0;sv(0)}if(storyOnScreen()&&!ff)updateStory(dt);tuUpd(dt);stShow();if(!storyOnScreen())audMach(dt);audCloudSync();},
 draw:drawFrame,pointerPosition,
-dbg:()=>({AUD:audio.getContext,ASg:()=>AS,audStart:audioStart,audTick:musTick,musFill,audMach,sfxAt:sfx,mshot,SFX,MS,MOODS,audSetK:(k,v)=>{AS[k]=v;audApply();audSave()},aud,audCloudSync,audFlush:audio.clearPending,pcfSet:v=>{pcf=v},fTabSet:v=>{fTab=v},del,xp,setLv,lv:()=>LV,AC,chkAc,acOpen:v=>{acO=v},pnOpen:v=>{pnO=v},RN,rOK,buyR,rfx,RH,rsOpen:v=>{rsO=v},rsel:id=>{rsel=id},fx:()=>({STC,BTv,SPm,RM,PM,OS,WG,OFFE,KOF,RCm,KUC}),MG,hireE,setCrew,hireM,lvlM,specM,recalc,cap,assignTo:(id,x,y)=>assignManager(G.mg.find(q=>q.id===id),areaAt(x,y),cell(x,y)),salePrice,rawCost,mkOpen:v=>{mkO=v},ITEMS,MD,acc2,view:(x,y,z)=>{cam={x:x*TS,y:y*TS,z}},fm,cst,nf,uc,tme,rrLeft,fillOrders,get ff(){return ff},get lr(){return lr},HL,PH,STX,hlv,hReq,hNext,buyHall,bchk,delAt,sellAll,moveObj,prjIn,phaseDone,get stQ(){return stQ},bProg,dLeft,hallOf,hrect,areaAt,inG,jtick,put,setTool:t=>{tool=t},mvSet:o=>{mvO=o},hselGet:()=>hsel,togP,rotObj,storyIntro,beginNextChapter,currentStoryId,finishStory,replayStory,updateStory,feed,itemPos,rate,G,L,g,tick,analyze,place,plan,buy,sb,give,sv,init,inputCap,currentStats,lineMetrics,allProductionLines,lostConnections,recipeTree,beltCapacity,cell,footprint,placement,makePlan,previewPlan,commitBuild,planRoute,checkBuild,connectedLine,REGIONS,SITE,FLEET,projectTrucks,get industrial(){return industrial},switchSite,companyValue,cloud,flushCloud,chooseSave,applySave,get msg(){return msg},get bn(){return bn},sel:o=>{sel=o},tuD:()=>({HB,view,panelSurface,panelScroll,dockTracks,dockOffsets,cur:tuCur(),TU,TOUR,HNT,tuHn,tuTour,tuTI,tuG,rot,tool,pg,sel,cam,fTab,acO,hlO,bkO,mkO,mvO,delAsk})})}};
+dbg:()=>({AUD:audio.getContext,ASg:()=>AS,audStart:audioStart,audTick:musTick,musFill,audMach,sfxAt:sfx,mshot,SFX,MS,MOODS,audSetK:(k,v)=>{AS[k]=v;audApply();audSave()},aud,audCloudSync,audFlush:audio.clearPending,pcfSet:v=>{pcf=v},fTabSet:v=>{fTab=v},del,xp,setLv,lv:()=>LV,AC,chkAc,acOpen:v=>{acO=v},pnOpen:v=>{pnO=v},RN,rOK,buyR,rfx,RH,rsOpen:v=>{rsO=v},rsel:id=>{rsel=id},fx:()=>({STC,BTv,SPm,RM,PM,OS,WG,OFFE,KOF,RCm,KUC}),MG,hireE,setCrew,hireM,lvlM,specM,recalc,cap,assignTo:(id,x,y)=>assignManager(G.mg.find(q=>q.id===id),areaAt(x,y),cell(x,y)),salePrice,rawCost,mkOpen:v=>{mkO=v},ITEMS,MD,acc2,view:(x,y,z)=>{cam={x:x*TS,y:y*TS,z}},fm,cst,nf,uc,tme,rrLeft,fillOrders,get ff(){return ff},get lr(){return lr},HL,PH,STX,hlv,hReq,hNext,buyHall,bchk,delAt,sellAll,moveObj,prjIn,phaseDone,get stQ(){return stQ},bProg,dLeft,hallOf,hrect,areaAt,inG,jtick,put,setTool:t=>{tool=t},mvSet:o=>{mvO=o},hselGet:()=>hsel,togP,rotObj,storyIntro,beginNextChapter,currentStoryId,finishStory,replayStory,updateStory,feed,itemPos,rate,G,L,g,tick,analyze,place,plan,buy,sb,give,sv,init,inputCap,currentStats,pairTunnels,unpairTunnel,tunnelExit,tunnelRange,lineMetrics,allProductionLines,lostConnections,recipeTree,beltCapacity,cell,footprint,placement,makePlan,previewPlan,commitBuild,planRoute,checkBuild,connectedLine,REGIONS,SITE,FLEET,projectTrucks,get industrial(){return industrial},switchSite,companyValue,cloud,flushCloud,chooseSave,applySave,get msg(){return msg},get bn(){return bn},sel:o=>{sel=o},tuD:()=>({HB,view,panelSurface,panelScroll,dockTracks,dockOffsets,cur:tuCur(),TU,TOUR,HNT,tuHn,tuTour,tuTI,tuG,rot,tool,pg,sel,cam,fTab,acO,hlO,bkO,mkO,mvO,delAsk})})}};

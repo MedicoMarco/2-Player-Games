@@ -1,6 +1,32 @@
+const FactoryLogistics=(()=>{
+ const speeds=[2,4,8,16,32,64];
+ const ranges=[6,8,11,15,20,28];
+ const storage=[0,20,60,120,220,360];
+ const paths={
+  belt:{name:'Förderband',ids:['bel','bel2','logistics1','logistics2','logistics3'],cost:[12,26,160,550,1700]},
+  sort:{name:'Sortierband',requires:'lag',cost:[12,28,150,500,1450]},
+  smart:{name:'Intelligentes Band',requires:'spd3',cost:[16,36,170,540,1600]},
+  sorter:{name:'Sortieranlage',requires:'spd3',cost:[16,38,190,590,1750]},
+  tunnel:{name:'Tunnel',requires:'bel2',cost:[18,42,210,650,1850],factor:.9},
+  junction:{name:'Verteiler',cost:[10,25,140,460,1350]},
+  storage:{name:'Lager',requires:'lag',cost:[14,32,180,620,1800]}
+ };
+ for(const [key,path] of Object.entries(paths))path.ids??=path.cost.map((_,i)=>key+'Tempo'+(i+1));
+ const typePaths={belt:'belt',fast:'belt',express:'belt',sort:'sort',smart:'smart',sorter:'sorter',tunnel:'tunnel',
+  spl:'junction',fus:'junction',kre:'junction',sto:'storage',depot:'storage'};
+ const pathFor=type=>typePaths[type];
+ const stage=(ids,has)=>ids.reduce((value,id,i)=>has(id)?i+1:value,0);
+ function upgradeSavedResearch(research){
+  const oldStage=stage(paths.belt.ids,id=>research.includes(id));
+  return [...new Set([...research,...Object.values(paths).flatMap(path=>path.ids.slice(0,oldStage))])];
+ }
+ const baseSpeed=(key,stage)=>speeds[stage]*(paths[key].factor||1);
+ return {paths,pathFor,stage,upgradeSavedResearch,baseSpeed,ranges,storage};
+})();
+
 /* Parcel queues, splitters, crossings, sorters and tunnel transfers. */
 function createFactoryTransport({
- MD,PR,isBelt,currentCycle,neighbor,inputNeighbor,tunnelExit,
+ MD,PR,currentCycle,neighbor,tunnelExit,tunnelSurfaceOutput,
  give,record,prod,uses,prjNeed,isProjectRamp=t=>t==='prj',orderFor
 }){
 function loadParcel(o,[item,quality,entry,tick,jumped]){
@@ -25,6 +51,7 @@ function beltDirections(o){
 function moveBelt(o){
  if(!ready(o))return;
  const jump=o.jumped?null:tunnelExit(o),dirs=jump?[o.r]:beltDirections(o);
+ if(o.t==='tunnel'&&!jump&&!tunnelSurfaceOutput(o)){o.wt=1;return}
  if(dirs.some(d=>give(o,d,o.it,o.iq,jump))){
   record(o,'moves');
   clearBelt(o);
@@ -35,20 +62,10 @@ function moveBelt(o){
  const target=jump||neighbor(o,dirs[0]);
  o.bad=!!target&&(isProjectRamp(target.t)?!prjNeed(o.it,target.t):prod(target)&&!uses(target,o.it));
 }
-const ready=o=>o.it>=0&&o.mt!==currentCycle()&&o.movedAt!==currentCycle();
-/* Verteiler behalten Produkt und Qualität gemeinsam und ziehen abwechselnd von ihren Eingängen. */
+const ready=o=>o.it>=0&&o.mt!==currentCycle();
+/* Each input can wait independently. A busy input cannot starve the others. */
 function jtick(o){
  const cycle=currentCycle();
- const pull=d=>{
-  const n=inputNeighbor(o,d);
-  const output=(d+2)%4;
-  if(!n||n.needsRelocation||!isBelt(n.t)||!ready(n)||!beltDirections(n).includes(output))return null;
-  if(n.yardBlocked?.[output]===o)return null;
-  if(n.yardOutputs?.[output]&&n.yardOutputs[output]!==o||n.t=='tunnel'&&!n.jumped&&tunnelExit(n))return null;
-  const parcel=[n.it,n.iq];
-  record(n,'moves');n.movedAt=cycle;clearBelt(n);
-  return parcel;
- };
  if(o.j==1){
   if(o.it>=0&&o.mt!==cycle){
    o.wt=1;
@@ -60,10 +77,10 @@ function jtick(o){
   }
   if(o.it<0)for(let i=0;i<4;i++){
    const d=(o.pr+i)%4;
-   if(o.jm[d]!=1)continue;
-   const parcel=pull(d);
+   const parcel=o.inQueue[d];
    if(!parcel)continue;
-   [o.it,o.iq]=parcel;o.mt=cycle;o.ein=d;o.pr=(d+1)%4;break;
+   o.inQueue[d]=null;
+   loadParcel(o,parcel);o.pr=(d+1)%4;break;
   }
   o.st=o.it<0?2:o.wt?3:1;
   return;
@@ -77,10 +94,6 @@ function jtick(o){
     record(o,'moves');
    }
    else blocked=true;
-  }
-  if(o.xs[d]<0){
-   const parcel=pull(d);
-   if(parcel){[o.xs[d],o.xq[d]]=parcel;o.xm[d]=cycle}
   }
   active ||= o.xs[d]>=0;
  }

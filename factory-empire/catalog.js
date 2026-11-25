@@ -81,7 +81,7 @@ Object.assign(MD,{
  express:{n:'Förderband',s:'Band',c:48,w:0,k:'#545a9e',g:'l',belt:4},
  sort:{n:'Sortierband',s:'Sortieren',c:120,w:0,k:'#2d8875',g:'l',belt:2,unlock:()=>RH('lag'),need:'Hochregal-Lagerung erforschen'},
  smart:{n:'Intelligentes Förderband',s:'Intelligent',c:290,w:0,k:'#8d539c',g:'l',belt:3,unlock:()=>RH('spd3'),need:'Vollautomatisierung erforschen'},
- tunnel:{n:'Unterirdisches Transportband',s:'Tunnel',c:98,w:0,k:'#665745',g:'l',belt:5,unlock:()=>RH('bel2'),need:'Logistiktempo II erforschen'},
+ tunnel:{n:'Unterirdisches Transportband',s:'Tunnel',c:98,w:0,k:'#665745',g:'l',belt:5,unlock:()=>RH('bel2'),need:'Förderband II unter Forschung → Logistik erforschen'},
  depot:{n:'Zwischenlager',s:'Lager',c:950,w:0,k:'#8d7141',g:'u',storage:true,legacyOnly:true},
  drill:{n:'Bohrmaschine',s:'Bohren',c:370,w:5,k:'#526f8b',g:'h',a:'gar',r:[[1,1]],o:46,dp:2,art:'prs',ac:'#a4dded'},
  label:{n:'Etikettiermaschine',s:'Etikett',c:1250,w:6,k:'#7766ad',g:'h',goodsGroup:'u',a:'gar',r:[[5,1]],o:47,dp:6,art:'pk',ac:'#d9ccfc'},
