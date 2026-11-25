@@ -2,15 +2,15 @@
   const {create,score,stakes,initialChips}=BlackjackRules;
 
   window.createBlackjackGame=()=>{
-    let count=1,engine=null,state=null,controls=null,timer=null,dealAt=0;
-    const actionLabels={hit:'Ziehen',stand:'Halten',double:'Verdoppeln',split:'Teilen'};
+    let count=1,engine=null,state=null,controls=null,timer=null,dealAt=0,dealerFlipAt=0,hadHole=false,handAnimations=new Map();
+    const actionLabels={hit:'Hit',stand:'Stand',double:'Double',split:'Split'};
 
     function setup() {
-      showOv(`<div class="luwrap poker-setup"><div class=kick>Mit Spielchips</div><h2>Blackjack</h2>
-        <div class=lusetup><b>Computer-Mitspieler</b><div class=seg>
+      showOv(`<div class="luwrap poker-setup"><div class=kick>Play chips</div><h2>Blackjack</h2>
+        <div class=lusetup><b>Other players</b><div class=seg>
         ${Array.from({length:10},(_,i)=>`<button data-lu=bj-count data-v=${i+1} class="${i+1===count?'on':''}">${i}</button>`).join('')}
-        </div></div><button class=btn data-lu=bj-start>An den Tisch</button>
-        <p class=luhint>Du und bis zu neun Computer-Mitspieler tretet jeweils gegen den Dealer an. Du beginnst mit ${initialChips} Spielchips.</p></div>`);
+        </div></div><button class=btn data-lu=bj-start>Take a seat</button>
+        <p class=luhint>You and up to nine bots each play against the dealer. You start with ${initialChips} play chips.</p></div>`);
     }
 
     function action(key) {
@@ -18,8 +18,13 @@
       if(key==='restart'){
         engine=create(count,()=>mmDeck(4));
         renderState();
-      }else if(key.startsWith('stake:')){
-        if(engine.open(Number(key.slice(6)))){dealAt=now();renderState();}
+      }else if(key==='custom'||key==='all-in'){
+        const amount=key==='all-in'?state.seats[0].chips:controls.querySelector('[data-bj-amount]')?.valueAsNumber;
+        if(!engine.open(amount)){
+          controls.querySelector('[data-bj-amount]')?.reportValidity();
+          return;
+        }
+        dealAt=now();renderState();
       }else if(state.turn===0&&engine.act(key))renderState();
     }
 
@@ -28,8 +33,11 @@
       engine=create(count,()=>mmDeck(4));
       $('#ov').style.display='none';
       controls=document.createElement('div');
-      controls.className='card-table-controls';
-      controls.setAttribute('aria-label','Blackjack-Aktionen');
+      controls.className='card-table-controls blackjack-controls';
+      controls.setAttribute('aria-label','Blackjack actions');
+      controls.addEventListener('keydown',event=>{
+        if(event.key==='Enter'&&event.target.matches('[data-bj-amount]')){event.preventDefault();action('custom');}
+      });
       controls.addEventListener('click',event=>{
         const key=event.target.closest('[data-bj]')?.dataset.bj;
         if(key)action(key);
@@ -40,15 +48,26 @@
 
     function renderState() {
       clearTimeout(timer);
+      const previousRound=state?.round;
       state=engine.snapshot();
+      if(previousRound!==state.round){handAnimations.clear();hadHole=false;dealerFlipAt=0;}
+      if(hadHole&&!state.dealer.includes(-1))dealerFlipAt=now();
+      hadHole=state.dealer.includes(-1);
+      const updateCards=(key,hand)=>{
+        const existing=handAnimations.get(key)||[];
+        while(existing.length<hand.length)existing.push(now());
+        handAnimations.set(key,existing.slice(0,hand.length));
+      };
+      if(state.round){updateCards('dealer',state.dealer);state.seats[0].hands.forEach((h,i)=>updateCards(i,h.cards));}
       const human=state.turn===0, betting=state.phase==='ready'||state.phase==='result';
       controls.hidden=!human&&!betting;
-      const announced=human?'Du bist dran. Wert deiner Hand '+score(state.seats[0].hands[state.handIndex].cards).total
-        :betting?'Wähle deinen Einsatz. '+state.seats[0].chips+' Chips verfügbar.':'';
+      const announced=human?'Your turn. Hand total '+score(state.seats[0].hands[state.handIndex].cards).total
+        :betting?'Choose your bet. '+state.seats[0].chips+' chips available.':'';
       let buttons='';
-      if(betting)buttons=state.seats[0].chips<stakes[0]
-        ?'<button class=btn data-bj=restart>Neues Spiel</button>'
-        :stakes.map(stake=>`<button class=btn data-bj="stake:${stake}" ${stake>state.seats[0].chips?'disabled':''}>${stake} setzen</button>`).join('');
+      if(betting)buttons=state.seats[0].chips<1
+        ?'<button class=btn data-bj=restart>New game</button>'
+        :`<input data-bj-amount type=number inputmode=numeric min=1 max=${state.seats[0].chips} step=1 value=${Math.min(stakes[0],state.seats[0].chips)} required aria-label="Bet amount">
+          <button class=btn data-bj=custom>Bet</button><button class=btn data-bj=all-in>All-in</button>`;
       if(human)buttons=Object.entries(actionLabels).map(([key,name])=>
         `<button class=btn data-bj="${key}" ${state.actions[key]?'':'disabled'}>${name}</button>`).join('');
       const focused=controls.contains(document.activeElement)?document.activeElement.dataset.bj:null;
@@ -70,16 +89,25 @@
       c.fillText(text,x,y,width);
     }
 
-    function cards(hand,x,y,width,maxSpacing,animate=false) {
+    function cards(hand,x,y,width,maxSpacing,key=null) {
       const spacing=Math.min(width*.8,maxSpacing/Math.max(1,hand.length-1));
       const left=x-(width+spacing*(hand.length-1))/2;
-      const motion=animate&&S.anim&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const motion=key!==null&&S.anim&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
       hand.forEach((card,i)=>{
         let cardX=left+i*spacing,cardY=y;
-        if(motion&&i<2){
-          const f=Math.min(1,Math.max(0,(now()-dealAt-i*110)/300));
+        const started=handAnimations.get(key)?.[i]??dealAt;
+        if(motion){
+          const f=Math.min(1,Math.max(0,(now()-Math.max(started,dealAt+i*70))/270));
           if(!f)return;
           cardX=400+(cardX-400)*f;cardY=160+(y-160)*f;
+        }
+        if(motion&&key==='dealer'&&i===1&&dealerFlipAt){
+          const f=(now()-dealerFlipAt)/260;
+          if(f>=0&&f<1){
+            const scale=Math.max(.06,Math.abs(1-2*f));
+            c.save();c.translate(cardX+width/2,0);c.scale(scale,1);drawCard(-width/2,cardY,width,f<.5?-1:card,{sh:true});c.restore();
+            return;
+          }
         }
         drawCard(cardX,cardY,width,card,{sh:true});
       });
@@ -93,10 +121,11 @@
       if(!state||!state.round){
         cards([12,21],400,140,105,96);
         label('Blackjack',400,322,40);
-        if(state)label(state.seats[0].chips+' Chips · Wähle deinen Einsatz',400,375,20);
+        if(state)label(state.seats[0].chips+' chips · Enter a bet',400,375,20);
         return;
       }
       const {seats,dealer,turn,phase,handIndex}=state;
+      rr(25,193,142,49,9,'#102c29');label('BANKROLL',96,211,12,'#91c5b4');label(seats[0].chips+' chips',96,231,19);
       for(const [i,p] of seats.slice(1).entries()){
         const row=Math.floor(i/5),col=i%5,total=Math.min(5,seats.length-1-row*5),x=400+(col-(total-1)/2)*146;
         const y=11+row*53,active=turn===i+1;
@@ -107,12 +136,12 @@
       }
       const shown=dealer.includes(-1)?'Dealer · '+score([dealer[0]]).total: 'Dealer · '+score(dealer).total;
       label(shown,400,136,18);
-      cards(dealer,400,148,68,320,phase==='players');
+      cards(dealer,400,148,68,320,'dealer');
       const player=seats[0];
-      label('Du · '+player.chips+' Chips'+(phase==='players'&&turn>0?' · '+seats[turn].name+' ist dran':''),400,270,19);
+      label('You · '+player.chips+' Chips'+(phase==='players'&&turn>0?' · '+seats[turn].name+' is playing':''),400,270,19);
       player.hands.forEach((h,i)=>{
         const x=player.hands.length===1?400:252+i*296;
-        cards(h.cards,x,282,64,222,true);
+        cards(h.cards,x,282,64,222,i);
         const active=turn===0&&handIndex===i,profit=h.returned-h.stake;
         const name=score(h.cards).total+' · '+(h.outcome?h.outcome+(profit?' ('+(profit>0?'+':'')+profit+')':''):h.stake+' Chips');
         label(name,x,400,16,active?'#ffdda6':'#e3f0e8',282);
@@ -125,8 +154,8 @@
         if(button.dataset.lu==='bj-start')startTable();
       },
       key(code){
-        if(controls?.contains(document.activeElement))return;
-        const keys={KeyZ:'hit',KeyH:'stand',KeyV:'double',KeyT:'split'};
+        if(controls?.contains(document.activeElement)||document.activeElement?.matches('input,textarea,select'))return;
+        const keys={KeyH:'hit',KeyS:'stand',KeyD:'double',KeyP:'split'};
         if(keys[code])action(keys[code]);
       },
       leave(){clearTimeout(timer);engine=null;state=null;controls?.remove();controls=null;}

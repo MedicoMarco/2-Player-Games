@@ -13,10 +13,14 @@
       if(controls)return;
       controls=document.createElement('div');
       controls.className='card-table-controls';
-      controls.innerHTML='<span class="card-table-announcement" role="status"></span><button class="btn" data-poker="fold">Aussteigen</button><button class="btn" data-poker="call">Check</button><button class="btn" data-poker="raise">Setzen</button><button class="btn" data-poker="next">Nächste Hand</button>';
+      controls.innerHTML='<span class="card-table-announcement" role="status"></span><button class="btn" data-poker="fold">Fold</button><button class="btn" data-poker="call">Check</button><input class=poker-raise-amount data-poker-amount type=number inputmode=numeric step=1 aria-label="Raise to chips"><button class="btn" data-poker="raise">Raise</button><button class="btn" data-poker="all-in">All-in</button><button class="btn" data-poker="next">Nächste Hand</button>';
       controls.addEventListener('click', event=>{
         const action=event.target.closest('[data-poker]')?.dataset.poker;
         if(action==='next')nextHand();
+        else if(action==='raise'){
+          const input=controls.querySelector('[data-poker-amount]');
+          if(input.reportValidity())act(action,input.valueAsNumber);
+        }
         else if(action)act(action);
       });
       $('#game .stage').append(controls);
@@ -31,15 +35,17 @@
       controls.hidden=!localTurn&&!ready;
       next.hidden=!ready;
       next.disabled=pending;
-      for(const name of ['fold','call','raise']){
+      for(const name of ['fold','call','raise','all-in']){
         const button=controls.querySelector('[data-poker='+name+']');
         button.hidden=!localTurn;
-        button.disabled=pending||!localTurn||name==='raise'&&!options?.raise;
+        button.disabled=pending||!localTurn||name==='raise'&&!options?.raise||name==='all-in'&&!options?.allIn;
       }
-      const call=options?.call||0;
-      const allIn=localTurn&&call===players[mySeat].chips;
-      controls.querySelector('[data-poker=call]').textContent=call?(allIn?'All-in ':'Mitgehen ')+call:'Schieben';
-      controls.querySelector('[data-poker=raise]').textContent=options?.raise?(snapshot.players[mySeat].bet+options.call?'Erhöhen auf ':'Setzen ')+options.raise:'Erhöhen';
+      const amount=controls.querySelector('[data-poker-amount]');
+      amount.hidden=!localTurn||!options?.raise;amount.disabled=pending;amount.required=!amount.hidden;
+      const min=String(options?.raise||0),max=String(options?.max||0);
+      if(amount.min!==min||amount.max!==max){amount.min=min;amount.max=max;amount.value=min;}
+      controls.querySelector('[data-poker=call]').textContent=options?.call?'Call '+options.call:'Check';
+      controls.querySelector('[data-poker=raise]').textContent=snapshot.players[mySeat].bet+Number(options?.call||0)?'Raise':'Bet';
       controls.querySelector('[role=status]').textContent=localTurn?'Du bist dran.':result;
     }
 
@@ -136,8 +142,8 @@
       const {turn,seq}=state, bot=state.players[turn].bot;
       turnTimer=setTimeout(()=>{
         if(!alive()||!engine||snapshot?.seq!==seq)return;
-        const action=bot?engine.botAction(turn):state.options.call?'fold':'call';
-        play(turn,action);
+        const choice=bot?engine.botAction(turn):{action:state.options.call?'fold':'call'};
+        play(turn,choice.action,choice.amount);
       },bot?650+Math.random()*420:turnMs);
     }
 
@@ -146,20 +152,21 @@
       publish();
     }
 
-    function play(seat,action) {
-      if(engine?.act(seat,action))publish();
+    function play(seat,action,amount) {
+      if(engine?.act(seat,action,amount))publish();
     }
 
-    function act(action) {
+    function act(action,amount) {
       if(!snapshot||pending||snapshot.ph!=='play'||snapshot.turn!==mySeat||snapshot.players[mySeat].bot)return;
-      if(action==='raise'&&!snapshot.options.raise)return;
+      if(action==='raise'&&(!snapshot.options.raise||!Number.isSafeInteger(amount)||amount<snapshot.options.raise||amount>snapshot.options.max))return;
+      if(action==='all-in'&&!snapshot.options.allIn)return;
       if(mode==='guest'){
         const ref=LUN.ref,seq=snapshot.seq;
         pending=true;refreshControls();
-        ref.child('act/'+OL.me).set(JSON.stringify({n:++LUN.actN,seq,a:action})).catch(error=>{
+        ref.child('act/'+OL.me).set(JSON.stringify({n:++LUN.actN,seq,a:action,amount})).catch(error=>{
           if(alive()&&snapshot?.seq===seq){pending=false;refreshControls();toast(luErr(error));}
         });
-      }else play(mySeat,action);
+      }else play(mySeat,action,amount);
     }
 
     async function createRoom() {
@@ -233,7 +240,7 @@
             if(!Number.isSafeInteger(input.n)||input.n<=(seen.get(uid)||0))continue;
             seen.set(uid,input.n);
             const i=players.findIndex(p=>p.k==='p'&&p.uid===uid);
-            if(i>0&&input.seq===snapshot.seq)play(i,input.a);
+            if(i>0&&input.seq===snapshot.seq)play(i,input.a,input.amount);
           }
         }
       },error=>{if(LUN.ref===ref&&!LUN.left)exit(luErr(error));});
@@ -344,7 +351,7 @@
       draw,update(){},click(){},key(code){
         if(document.activeElement?.matches('input,select,textarea,button')||$('#ov').style.display!=='none')return;
         const actions={KeyF:'fold',KeyC:'call',KeyR:'raise'};
-        if(actions[code])act(actions[code]);
+        if(actions[code])act(actions[code],snapshot?.options?.raise);
       },
       showSetup:setup,luClick:setupClick,joinCode:joinRoom,canJoin:()=>!LUN.ref&&(mode==='setup'||mode==='local'),
       chatAnchors:()=>snapshot?positions(snapshot):{},

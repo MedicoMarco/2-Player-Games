@@ -410,11 +410,11 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
      if(start===panel*4){c.moveTo(start+.025,y);c.lineTo(start+.025,y+1)}
      for(let i=start;i<end;i++){
       const value=hash(i,y,12),u=i+.13+hash(i,y,13)*.57,v=y+.17+hash(i,y,14)*.62;
-      c.fillStyle=value>.45?'#dadfd938':'#444e552e';
+      c.fillStyle=value>.45?'#dadfd924':'#444e5524';
       c.fillRect(u,v,.02+value*.046,.022);
       c.fillRect(i+.15+(1-value)*.55,y+.77-value*.54,.035,.02);
      }
-     if(y%4!==2||panel*4+2<start||panel*4+2>=end)continue;
+     if(y%8!==2||panel%2!==0||panel*4+2<start||panel*4+2>=end)continue;
      const u=panel*4+2.35,v=y+.56;
      oval(u,v,.27,.25,'#4e5c6680',0);
      oval(u-.02,v-.025,.197,.18,'#778488',0);
@@ -464,7 +464,7 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
    c.scale(tile,tile);
    const l=left/tile,t=top/tile,r=right/tile,b=bottom/tile;
    const ground=c.createLinearGradient(0,-12,columns*.39,rows+13);
-   ground.addColorStop(0,'#82946a');ground.addColorStop(.45,'#758b5b');ground.addColorStop(1,'#4e734f');
+   ground.addColorStop(0,'#848b7c');ground.addColorStop(.45,'#737d70');ground.addColorStop(1,'#536858');
    c.fillStyle=ground;c.fillRect(l-1,t-1,r-l+2,b-t+2);
    const visible=(x,y,w,h)=>intersects(x*tile,y*tile,w*tile,h*tile);
    const slabs=industrial.slabs.filter(([x,y,w])=>visible(x-.3,y-.3,w+.6,1.6));
@@ -475,7 +475,7 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
     shape(outline.map(([a,b])=>[x+(a-x)*.78-1.1,y+(b-y)*.72-1.1]),'#a8b3803b');
     shape(outline.map(([a,b])=>[x+(a-x)*.52-1.8,y+(b-y)*.53-2]),'#bac38b36');
    }
-   paintFields(visible);
+   if(detail)withState(()=>{c.globalAlpha=.34;paintFields(visible)});
    paintIndustrial(industrial,slabs,visible,detail);
    paintWater(visible,time,detail);
    const drives=plots.flatMap(plot=>plot.drive?[plot.drive]:[]);

@@ -30,22 +30,22 @@ function floorRoute(start,finish,width,walkable){
  }
  return [];
 }
-function industrialArea(plots,{width,height,usable,protectedTile}){
- const tiles=new Uint8Array(width*height);
+function industrialArea(plots,{width,height,usable,protectedTile,apron=4,corridor=1,previous}){
+ const tiles=previous?previous.slice():new Uint8Array(width*height);
  const inside=(x,y)=>x>=0&&y>=0&&x<width&&y<height;
  const get=(x,y)=>inside(x,y)?tiles[y*width+x]:0;
  function stamp(x,y,site,connector=false){
   if(!inside(x,y)||!usable(x,y,site))return;
   const protectedGround=protectedTile(x,y);
-  if(!protectedGround||connector)tiles[y*width+x]=protectedGround?2:1;
+  if((!protectedGround||connector)&&tiles[y*width+x]!==1)tiles[y*width+x]=protectedGround?2:1;
  }
  for(const {rect:[left,top,right,bottom],site} of plots){
-  for(let y=top-4;y<=bottom+4;y++)for(let x=left-4;x<=right+4;x++){
+  for(let y=top-apron;y<=bottom+apron;y++)for(let x=left-apron;x<=right+apron;x++){
    if(x>=left&&x<=right&&y>=top&&y<=bottom&&inside(x,y))tiles[y*width+x]=1;
    else stamp(x,y,site);
   }
  }
- // Join plots at their closest sides. Only a three-tile-wide corridor is paved.
+ // Join plots at their closest sides and pave the surrounding transport lanes.
  function facing(a,b){
   if(a[1]<b[0])return [a[1],b[0]];
   if(b[1]<a[0])return [a[0],b[1]];
@@ -68,7 +68,7 @@ function industrialArea(plots,{width,height,usable,protectedTile}){
   const route=floorRoute(from,to,width,(x,y)=>inside(x,y)&&usable(x,y,site));
   if(!route.length)continue;
   joined[b]=a;
-  for(const [x,y] of route)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+  for(const [x,y] of route)for(let dy=-corridor;dy<=corridor;dy++)for(let dx=-corridor;dx<=corridor;dx++){
    if(get(x+dx,y+dy)!==1)stamp(x+dx,y+dy,site,true);
   }
  }
@@ -87,7 +87,7 @@ function industrialArea(plots,{width,height,usable,protectedTile}){
   if(get(x,y-1)!==1)curbs.push([x,y,x+1,y]);
   if(get(x,y+1)!==1)curbs.push([x,y+1,x+1,y+1]);
  }
- return {get,slabs,curbs,crossings};
+ return {get,slabs,curbs,crossings,tiles};
 }
 function planRoute(from,to,{width,cell,canUse,canEnter,validate}){
  const direction=from.r,[x,y]=port(from,direction);

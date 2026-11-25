@@ -323,16 +323,16 @@ scope.toast=message=>notifications.push(message);
 scope.c.strokeRect=(...rect)=>{if(scope.c.strokeStyle==='#fb7185')redFootprints.push(rect)};
 for(const pointerType of ['mouse','touch']){
  const y=pointerType==='mouse'?6:5;
- play.click(screenX(20),screenY(y),0,1,pointerType);
- play.dragMove(screenX(21),screenY(y),0,1);
- play.dragMove(screenX(22),screenY(y),0,1);
- play.dragEnd(screenX(22),screenY(y),0,1);
- assert(d.cell(20,y)&&d.cell(21,y),pointerType);
- assert(!d.cell(22,y),pointerType);
+ play.click(screenX(24),screenY(y),0,1,pointerType);
+ play.dragMove(screenX(25),screenY(y),0,1);
+ play.dragMove(screenX(26),screenY(y),0,1);
+ play.dragEnd(screenX(26),screenY(y),0,1);
+ assert(d.cell(24,y)&&d.cell(25,y),pointerType);
+ assert(!d.cell(26,y),pointerType);
 }
 play.draw();
-assert(notifications.some(message=>message.includes('Werksboden')));
-assert(redFootprints.some(([x,y])=>x===22*48+2&&y===5*48+2));
+assert(notifications.some(message=>message.includes('Metallhalle')));
+assert(redFootprints.some(([x,y])=>x===26*48+2&&y===5*48+2));
 scope.toast=previousToast;
 delete scope.c.strokeRect;
 d=load([[67,44,'sto',0,1]],{hl:{gar:1,bnk:3},sp:6});
@@ -354,6 +354,21 @@ assert.equal(d.cell(65,44)?.t,'sto');
 assert(!d.cell(67,44));
 play.draw();
 assert(!d.tuD().HB.some(hit=>hit.id==='move_saved_logistics'));
+const yardLine=[[16,6,'src',0,3],...Array.from({length:9},(_,i)=>[17+i,6,'belt',0,1]),[26,6,'sto',0,2]];
+const connectedSave={v:2,ts:clock,m:6000,hl:{gar:1,met:1},sp:1,o:yardLine};
+d=load(yardLine,connectedSave);
+assert.equal(d.bchk(19,7,'saw'),'','the existing hall extends without relocating old machines');
+assert(d.industrial.get(6,18),'the widened yard provides additional space');
+assert.equal(d.L.length,yardLine.length);
+assert(d.L.every(o=>!o.needsRelocation));
+ticks(120);
+const connectedRoundTrip=save(), storageBefore=d.cell(26,6).q.length;
+assert(storageBefore>0);
+d=load(connectedRoundTrip.o,connectedRoundTrip);
+assert.equal(d.cell(26,6).q.length,storageBefore);
+assert(d.L.every((o,i)=>o.x===yardLine[i][0]&&o.y===yardLine[i][1]&&o.r===yardLine[i][3]&&!o.needsRelocation));
+ticks(160);
+assert(d.cell(26,6).q.length>storageBefore);
 console.log('Yard logistics, two-input production, site boundaries, old equipment and drag placement passed.');
 
 const retiredContracts=[{id:'premium',items:[{item:1,total:8,done:2}]}];
@@ -478,8 +493,8 @@ const worldLabels=[];
 let floorGrids=0,quietGrids=0,terrainEllipses=0,supportPiers=0,riverStrokes=0,roadStrokes=0,yardLanes=0;
 scope.c.fillText=label=>worldLabels.push(String(label));
 scope.c.stroke=()=>{
- if(scope.c.strokeStyle==='#31453d55')floorGrids++;
- if(scope.c.strokeStyle==='#36404c24')quietGrids++;
+ if(scope.c.strokeStyle==='#293d495a')floorGrids++;
+ if(scope.c.strokeStyle==='#35434b33')quietGrids++;
  if(scope.c.strokeStyle==='#315e65')riverStrokes++;
  if(scope.c.strokeStyle==='#41494b'){
   if(scope.c.lineWidth<.6)yardLanes++;
@@ -501,7 +516,7 @@ for(const name of ['METALLHALLE','ELEKTRONIKHALLE','VERSORGUNGSWERK','MODULWERK'
  assert(!worldLabels.some(label=>label.includes(name)),name);
 }
 assert.equal(floorGrids,0,'world view does not draw the global grid');
-assert.equal(quietGrids,1,'an owned hall shows a subtle grid in normal view');
+assert.equal(quietGrids,1,'an owned hall shows subtle expansion joints in normal view');
 assert(riverStrokes>0&&roadStrokes>0,'roads and the river draw beside the industrial lot');
 assert(yardLanes>0,'the narrow freight entrance draws beside the garage');
 assert(terrainEllipses>20&&terrainEllipses<1400,'visible terrain is detailed and culled');
@@ -525,14 +540,14 @@ play.click(stage.cx,stage.cy,0,1,'mouse');
 play.dragEnd(stage.cx,stage.cy,0,1);
 play.draw();
 assert.equal(d.cell(18,8)?.t,'belt');
-assert.equal(floorGrids,1,'construction shows the grid of the hall at the pointer');
+assert.equal(floorGrids,0,'after first placement the hall returns to quiet floor joints');
 assert.equal(supportPiers,0,'indoor belts sit on the hall floor');
-drawWorldAt(22.5,8.5,1.3);
+drawWorldAt(24.5,8.5,1.3);
 play.click(stage.cx,stage.cy,0,1,'mouse');
 play.dragEnd(stage.cx,stage.cy,0,1);
 floorGrids=0;
 play.draw();
-assert.equal(d.cell(22,8)?.t,'belt');
+assert.equal(d.cell(24,8)?.t,'belt');
 assert.equal(floorGrids,0,'the ground outside a hall has no construction grid');
 assert(supportPiers>0,'outdoor belts render visible footings');
 
@@ -577,7 +592,9 @@ assert(trip.route.distance>50);
 drawWorldAt(11.5,11.5,1.3);
 assert(worldLabels.includes('2× Holzbalken'));
 assert(worldLabels.includes('ARCHE'),'the truck uses a marked freight entrance');
-assert(trip.route.points.some(([x,y])=>Math.abs(x-12)<.5&&y>=12.2&&y<=18.2));
+const [garageLeft,,,garageBottom]=d.hrect(d.hallOf('gar'));
+const garageGate=(garageLeft+d.hrect(d.hallOf('gar'))[2]+1)/2;
+assert(trip.route.points.some(([x,y])=>Math.abs(x-garageGate)<.5&&y>=garageBottom+.5&&y<=18.5));
 assert.equal(d.G.sd,2);
 const receipt=save();
 d=load(receipt.o,receipt);
@@ -635,15 +652,15 @@ for(const [width,height,rotated] of viewports){
   const {HB,view,panelSurface}=core().tuD();
   assert.equal(view.width,width,label);
   assert.equal(view.height,height,label);
-  assert(view.status.x>=50&&view.status.y>=8&&view.status.y+view.status.h<=view.headerBottom,label);
-  assert(view.status.h>=34&&view.status.h<=60,label+' header size');
+  assert(view.status.x>=47&&view.status.y>=8&&view.status.y+view.status.h<=view.headerBottom,label);
+  assert(view.status.h>=31&&view.status.h<=60,label+' header size');
   if(width>=1280&&height>=650)assert(view.status.h>=50&&view.dockLabelScale>=1.2,label+' desktop targets');
   if(Math.min(width,height)>=640&&width<=1180)assert(view.status.h>=46,label+' tablet targets');
   if(width<=430&&height>=550){
-   assert(view.status.h>=39&&view.status.h<=40&&view.shortcuts[0].h>=60&&view.machines.h>=78,label+' phone targets');
+   assert(view.status.h>=35&&view.status.h<=40&&view.shortcuts[0].h>=53&&view.machines.h>=65,label+' phone targets');
   }
   assert(view.navigation.every(box=>box.h===view.status.h),label+' header alignment');
-  assert(view.machines.h>=60&&view.machines.h<=82,label+' measures of machine buttons');
+  assert(view.machines.h>=45&&view.machines.h<=82,label+' measures of machine buttons');
   assert.equal(view.dock.w,width-2*view.inset,label+' available dock width');
   assert.equal(view.dock.x,view.inset,label+' dock begins on the left');
   const toolEnd=view.shortcuts.at(-1),machines=view.machines;
@@ -712,7 +729,7 @@ for(const [width,height,rotated] of viewports){
   tap('pg_'+id);
   const {shop}=d.tuD().dockTracks;
   assert.equal(shop.clip.x,d.tuD().view.machines.x,label+' model row starts on the left');
-  assert(shop.buttonWidth>=96&&shop.buttonWidth<=108,label+' large fixed card width');
+  assert(shop.buttonWidth>=83&&shop.buttonWidth<=108,label+' responsive card width');
   const built=new Set();
   for(let page=0;page<20;page++){
    for(const hit of hits())if(hit.id?.startsWith('tl_'))built.add(hit.id.slice(3));
@@ -729,6 +746,10 @@ for(const [width,height,rotated] of viewports){
  d.sel(d.cell(9,6));
  play.draw();
  assert(core().tuD().panelSurface,label+' machine panel');
+ assert(hits().some(hit=>hit.id==='device_info'),label+' device info beside the navigation');
+ tap('device_info');
+ assert(core().tuD().panelScroll.id==='device',label+' device info opens');
+ tap('panel_close');
  for(let step=0;step<20&&!hits().some(hit=>hit.id==='upg')&&core().tuD().panelSurface.maxY;step++)tap('panel_scroll_↓');
  assert(hits().some(hit=>hit.id==='upg'),label+' machine upgrade');
  tap('panel_close');

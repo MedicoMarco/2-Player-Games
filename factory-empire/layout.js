@@ -18,11 +18,12 @@ const FactoryLayout=(()=>{
  function create(width,height){
   const available=width-inset*2;
   const touchRoom=clamp((height-270)/200,1);
+  const phone=clamp((520-width)/130,1);
   const tablet=clamp((Math.min(width,height)-420)/220,1);
   const desktop=clamp(Math.min((width-1050)/230,(height-470)/210),1);
   const largeDesktop=desktop*clamp((width-1440)/900,1);
   const labelScale=1+.1*tablet+.18*desktop+.12*largeDesktop;
-  const navHeight=34+5*touchRoom+7*tablet+8*desktop+6*largeDesktop;
+  const navHeight=34+5*touchRoom+7*tablet+8*desktop+6*largeDesktop-3*phone;
   const homeEnd=navHeight+8,navPreferred=450*labelScale,statusMin=286*labelScale;
   const together=available>=homeEnd+statusMin+gap+416*labelScale;
   const navW=Math.min(navPreferred,together?available-homeEnd-statusMin-gap:available);
@@ -32,8 +33,8 @@ const FactoryLayout=(()=>{
   const navigation=row({x:together?width-inset-navW:inset,y:navY,w:navW,h:navHeight},7);
   const headerBottom=Math.max(status.y+status.h,navigation[0].y+navigation[0].h)+gap;
   const dockRoom=clamp((height-295)/285,1),combineTools=available>=690;
-  const categoryHeight=32+10*dockRoom,toolHeight=60+22*dockRoom;
-  const shortcutHeight=combineTools?toolHeight:44+18*dockRoom;
+  const categoryHeight=32+10*dockRoom-5*phone,toolHeight=60+22*dockRoom-14*phone;
+  const shortcutHeight=combineTools?toolHeight:44+18*dockRoom-7*phone;
   const toolGap=10,rowGap=9;
   const dockY=height-inset-categoryHeight-rowGap-toolHeight-(combineTools?0:shortcutHeight+toolGap);
   const dock={x:inset,y:dockY,w:available,h:height-inset-dockY};
@@ -43,18 +44,22 @@ const FactoryLayout=(()=>{
   const machines=combineTools
    ?{x:inset+shortcutW+toolGap,y:toolY,w:available-shortcutW-toolGap,h:toolHeight}
    :{x:inset,y:toolY+shortcutHeight+toolGap,w:available,h:toolHeight};
-  const dockLabelScale=1+.08*tablet+.16*desktop,machineWidth=96+12*desktop,categoryWidth=86+12*desktop;
-  const cameraSize=34+6*touchRoom+4*tablet+5*desktop+5*largeDesktop;
+  const dockLabelScale=1+.08*tablet+.16*desktop,machineWidth=96+12*desktop-13*phone,categoryWidth=86+12*desktop-9*phone;
+  const cameraSize=34+6*touchRoom+4*tablet+5*desktop+5*largeDesktop-4*phone;
   const cameraW=3*cameraSize+2*gap,cameraY=dockY-cameraSize-rowGap;
   const cameraInHeader=!together&&cameraY<headerBottom;
   const cameraX=cameraInHeader?status.x:inset;
   if(cameraInHeader){status.x+=cameraW+gap;status.w=Math.min(status.w,width-inset-status.x)}
   const camera=row({x:cameraX,y:cameraInHeader?inset:cameraY,w:cameraW,h:cameraInHeader?navHeight:cameraSize},3);
+  const info=camera[0].y-camera[0].h-gap>=headerBottom
+   ?{...camera[0],y:camera[0].y-camera[0].h-gap}
+   :{...camera[0],x:camera.at(-1).x+camera[0].w+gap};
+  if(cameraInHeader){status.x+=info.w+gap;status.w=Math.max(0,Math.min(status.w,width-inset-status.x))}
   const worldScale=Math.min(1,width/640,height/480);
   const panelScale=1.07+.10*tablet+.30*desktop+.20*largeDesktop;
   const warningHeight=24*labelScale;
   return {width,height,cx:width/2,cy:height/2+10,worldScale,labelScale,panelScale,warningHeight,status,navigation,headerBottom,
-   dock,categories,shortcuts,machines,camera,dockLabelScale,machineWidth,categoryWidth,wide:combineTools,inset};
+   dock,categories,shortcuts,machines,camera,info,dockLabelScale,machineWidth,categoryWidth,wide:combineTools,inset};
  }
 
  function point(event,canvas,width,height,rotated=false){

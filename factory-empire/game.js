@@ -230,9 +230,22 @@ HL.push(
 );
 const siteAvailable=site=>(site.chapter||1)<=campaignChapter()&&(!site.retired||hlv(site.hall));
 const hallAvailable=hall=>(hall.chapter||1)<=campaignChapter()&&(!hall.retired||hlv(hall.id));
-const siteAt=(x,y)=>REGIONS.find(site=>inR(site.rect,x,y)&&siteAvailable(site));
+const regionTiles=new Array(GW*GH);
+for(const site of REGIONS){
+ const [left,top,right,bottom]=site.rect;
+ for(let y=top;y<=bottom;y++)for(let x=left;x<=right;x++)regionTiles[y*GW+x]=site;
+}
+const siteAt=(x,y)=>{
+ const site=x>=0&&y>=0&&x<GW&&y<GH?regionTiles[y*GW+x]:null;
+ return site&&siteAvailable(site)?site:undefined;
+};
 let currentSite='main';
-const hlv=id=>(G&&G.hl&&G.hl[id])|0,hallOf=id=>HL.find(h=>h.id==id),inR=(r,x,y)=>x>=r[0]&&x<=r[2]&&y>=r[1]&&y<=r[3],hrect=h=>h.rc[Math.max(1,hlv(h.id))-1],SITE=[66,42,81,61];
+const hlv=id=>(G&&G.hl&&G.hl[id])|0,hallOf=id=>HL.find(h=>h.id==id),inR=(r,x,y)=>x>=r[0]&&x<=r[2]&&y>=r[1]&&y<=r[3],SITE=[66,42,81,61];
+const originalHallRect=h=>h.rc[Math.max(1,hlv(h.id))-1];
+// Extend the existing floors without reindexing a single tile in saved factories.
+const hallExtensions={gar:[2,2],met:[2,1],vrs:[2,2],elk:[2,1],ene:[2,2],fzg:[0,2],hit:[2,2],bnk:[0,2],nor:[2,2],lab:[2,2],prt:[2,2],orb:[0,2]};
+const extendedHallRects=new Map(HL.map(h=>[h.id,h.rc.map(([x,y,r,b])=>[x,y,r+hallExtensions[h.id][0],b+hallExtensions[h.id][1]])]));
+const hrect=h=>hlv(h.id)?extendedHallRects.get(h.id)[hlv(h.id)-1]:originalHallRect(h);
 const FLEET=[179,29,186,48];
 const isProjectRamp=t=>t==='prj'||t==='orbitRamp';
 const mapWidth=()=>campaignChapter()>=2?GW:144;
@@ -258,7 +271,8 @@ const terminal=t=>typeShip(t)||isProjectRamp(t)||!!(MD[t]?.supply||MD[t]?.distri
 const prod=o=>MD[o.t]?.o!=null;
 const cap=o=>Math.floor((STC+(o.extraStorage||0))*(1+(o.cb||0)));
 const inputCap=(o,i)=>MD[o.t].r[i][1]*2;
-const spd=(o,level=o.lv)=>Math.pow(1.18,Math.min(60,level)-1)*SPm*(o.sb||1)*xsp(o);
+const levelSpeed=Array.from({length:61},(_,level)=>Math.pow(1.18,level-1));
+const spd=(o,level=o.lv)=>levelSpeed[Math.min(60,level)]*SPm*(o.sb||1)*xsp(o);
 const tme=(o,level=o.lv)=>MD[o.t].w/spd(o,level);
 const defaultSize=t=>MD[t]?.size||[1,1];
 const {dimensions,footprint,port}=FactoryGrid;
@@ -267,8 +281,9 @@ function mapObject(o,value){
  for(const [x,y] of footprint(o))g[y*GW+x]=value;
 }
 function neighbor(o,d){
- const next=cell(...port(o,d));
- return o.needsRelocation||next?.needsRelocation?null:next;
+ if(o.needsRelocation)return null;
+ const next=o.base[0]===1&&o.base[1]===1?cell(o.x+DX[d],o.y+DY[d]):cell(...port(o,d));
+ return next?.needsRelocation?null:next;
 }
 function tunnelExit(o,lookup=cell){
  if(o.t!='tunnel'||o.needsRelocation)return null;
@@ -303,21 +318,23 @@ const logisticsSiteError='Baue Logistik auf dem Werksboden rund um deine Hallen.
 let industrial;
 function refreshIndustrialArea(){
  teamPaths.clear();
- const plots=HL.filter(hall=>hlv(hall.id)>0).map(hall=>{
-  const rect=hrect(hall);
+ const halls=HL.filter(hall=>hlv(hall.id)>0);
+ const plots=rectFor=>halls.map(hall=>{
+  const rect=rectFor(hall);
   return {rect,site:siteAt(rect[0],rect[1])};
- });
- for(const plot of legacyPlots)if(G.legacyPlots.includes(plot.id)){
-  plots.push({rect:plot.rect,site:siteAt(plot.rect[0],plot.rect[1])});
- }
- industrial=FactoryGrid.industrialArea(plots,{
+ }).concat(legacyPlots.filter(plot=>G.legacyPlots.includes(plot.id)).map(plot=>({
+  rect:plot.rect,site:siteAt(plot.rect[0],plot.rect[1])
+ })));
+ const options={
   width:GW,height:GH,protectedTile:worldArt.protectedTile,
   usable:(x,y,site)=>{
    if(!site||siteAt(x,y)!==site||inR(SITE,x,y)||campaignChapter()>=2&&inR(FLEET,x,y))return false;
    const hall=areaAt(x,y);
    return !hall||hlv(hall.id)>0||logisticsHall(x,y);
   }
- });
+ };
+ const previous=FactoryGrid.industrialArea(plots(originalHallRect),options).tiles;
+ industrial=FactoryGrid.industrialArea(plots(hrect),{...options,apron:6,corridor:2,previous});
 }
 function compactPortBridges(objects,compacted,canBridge){
  if(!compacted.size)return [];
@@ -1525,9 +1542,9 @@ function world(){
   if(!level)continue;
   const rect=hrect(hall);
   plots.push({id:hall.id,name:hall.n,rect,floor:hall.f,drive:worldArt.driveway(hall.id,rect),
-   level,previous:hall.rc[level-2],flash:afl[hall.id]});
+   level,previous:extendedHallRects.get(hall.id)[level-2],flash:afl[hall.id]});
  }
- const editing=!!MD[tool]||tool==='belt'||tool==='mov'&&!!mvO||['place','move','route'].includes(buildMode);
+ const editing=(!!MD[tool]||tool==='belt')&&!G.bt.includes(tool)||tool==='mov'&&!!mvO||['place','move','route'].includes(buildMode);
  const gridIn=rect=>editing&&(hv&&inR(rect,...hv)||buildPreview?.rows.some(row=>inR(rect,row.x,row.y)));
  const time=reducedMotion?0:tm,detail=cameraZoom()>=.38,moving=tm-lastCameraMotion<.12;
  saveCanvas();applyCamera();
@@ -2238,6 +2255,62 @@ function fitText(text,x,y,width,size,color,align='left',weight=700){
  c.fillStyle=color;c.textAlign=align;
  c.fillText(text,x,y,width);
 }
+let deviceInfo=null;
+function deviceDescription(id,object){
+ const model=MD[id], size=(object?.base||defaultSize(id)).join(' × ');
+ const rows=[['Aufstellung',size+' Felder · '+(model?.a?hallOf(model.a).n:'Halle oder Werksboden')+' · '+fm(cst(id))+' €']];
+ if(model?.o!=null){
+  const inputs=model.r?.map(([i,n])=>n+' × '+ITEMS[i].n+(MD[PR[i]]?' aus '+MD[PR[i]].n:'')).join(' · ');
+  rows.push(['Eingang',inputs||'Kauft Rohstoffe automatisch für '+fm(model.rc)+' € pro Stück.']);
+  rows.push(['Ausgang',ITEMS[model.o].n+' · '+(object?tme(object).toFixed(1):model.w)+' s pro Stück']);
+  rows.push(['Arbeitsweise','Per Förderband zuführen. Den Ausgang in Pfeilrichtung an ein Band, eine weitere Maschine oder einen Versand anschließen. Bei Rückstau wartet die Produktion.']);
+ }else if(isBelt(id)){
+  rows.push(['Transport',beltSize(id)+' Waren gleichzeitig · bis zu '+Math.round(beltCapacity({t:id}))+' Waren pro Minute']);
+  const routing={
+   tunnel:'Zwei Tunnelstücke in derselben Richtung und in einer Reihe platzieren. Bei zwei bis sechs Feldern Abstand kann Ware unter Hindernissen hindurchfahren.',
+   sort:'Wähle im Gerätefenster eine Ware. Das Band sortiert passende und übrige Waren in getrennte Richtungen.',
+   smart:'Im Gerätefenster stellst du ein, welcher benachbarte Anschluss bevorzugt beliefert wird.'
+  };
+  rows.push(['Anschluss',routing[id]||TIPS[id]?.[1]||model?.d||'Waren entgegen der Pfeilrichtung zuführen. Der Pfeil markiert die Ausgabe. Im Gerätefenster kannst du das Band drehen.']);
+ }else if(isStorage(id)){
+  rows.push(['Lagerung',object?cap(object)+' Lagerplätze':'Lagert Waren zwischen Produktion und Abnahme.']);
+  rows.push(['Anschluss','Waren über Förderbänder zuführen. Die Ausgabe erfolgt am Pfeil. Automatische Lagerung und Team-Lager lassen sich am Gerät einstellen.']);
+ }else if(model?.j){
+  rows.push(['Materialfluss',model.d||(model.j===2?'Zwei Bänder kreuzen sich. Ware fährt auf ihrer Spur geradeaus.':'Leitet Waren zwischen den eingestellten Eingängen und Ausgängen weiter. Konfiguriere die vier Seiten im Gerätefenster.')]);
+ }else if(typeShip(id)){
+  rows.push(['Versand','Nimmt fertige Produkte vom Band an, verkauft sie und schreibt den Erlös deinem Konto gut.']);
+ }else if(isProjectRamp(id)){
+  const required=projectPhase(id)?.q.map(([item,count])=>count+' × '+ITEMS[item].n).join(' · ');
+  rows.push(['Aufgabe',required||'Nimmt Waren für das aktive Bauprojekt entgegen.']);
+  rows.push(['Anschluss','Förderband zur Rampe legen. Waren werden automatisch dem laufenden Bauabschnitt angerechnet.']);
+ }else rows.push(['Arbeitsweise',model?.d||(model?.inspect?'Prüft und transportiert Ware in Pfeilrichtung.':'Historisches Gerät aus einem bestehenden Werk. Die Anschlüsse und Einstellungen stehen im Gerätefenster.')]);
+ if(model?.need)rows.push(['Freischaltung',model.need]);
+ return rows;
+}
+function deviceInfoPanel(){
+ const [X,Y,W,H]=MENUS.device.box,{id,object}=deviceInfo;
+ pnlBox(X,Y,W,H,MD[id]?.n||'Förderband',()=>{deviceInfo=null});
+ let y=Y+55;
+ for(const [label,text] of deviceDescription(id,object)){
+  tx(label,X+16,y,12,'#a8d4ea','left',800);
+  for(const line of tuWrap(text,W-32,'600 13px system-ui,sans-serif')){y+=18;tx(line,X+16,y,13,'#edf4f7','left',600)}
+  y+=23;
+ }
+}
+function recipePreview(id,x,y,width){
+ const model=MD[id], ingredients=model.r||[], items=[...ingredients,[model.o,1]];
+ const step=width/items.length;
+ items.forEach(([item,count],i)=>{
+  const left=x+i*step, producer=PR[item];
+  rr(left,y-10,step-3,26,5,'#1b2934');
+  ico(item,left+11,y+1,.63);
+  if(MD[producer])withCanvasState(()=>{
+   c.translate(left+step-14,y+2);c.scale(.3,.3);dm({t:producer,r:0,lv:1,st:0,base:[1,1]});
+  });
+  const label=(i<ingredients.length?count+'× ':'')+ITEMS[item].n;
+  fitText(label,left+24,y+6,Math.max(9,step-53),9.5,'#eaf0f3');
+ });
+}
 function infoCard(id,box){
  const {x,y,w,h}=box,tip=TIPS[id],m=MD[id];
  if(!tip&&!m)return;
@@ -2261,6 +2334,7 @@ function infoCard(id,box){
  hitbox(x,y,w-actionW-4,h,()=>{},null);
 }
 const MENUS={
+ device:{box:[64,62,640,337],show:()=>!!deviceInfo,draw:deviceInfoPanel},
  mk:{box:[70,62,660,330],show:()=>mkO,draw:mkPanel},
  rs:{box:[40,64,720,330],show:()=>rsO,draw:rsPanel},
  pn:{box:teamBox,show:()=>pnO,draw:pnPanel},
@@ -2455,6 +2529,12 @@ function drawWorldControls(){
   uiButton(box,fn,'#1f2630ee',id);
   tx(label,box.x+box.w/2,box.y+box.h/2+6,18*view.labelScale,'#fff','center',800);
  });
+ const selected=tool==='hand'&&sel&&L.includes(sel)?sel:null;
+ const device=selected?.t||(MD[tool]||tool==='belt'?tool:null);
+ if(device&&view.info.x+view.info.w<=FW-view.inset){
+  uiButton(view.info,()=>{closeP2();deviceInfo={id:device,object:selected};sfx('select')},'#1f2630ee','device_info');
+  tx('ⓘ',view.info.x+view.info.w/2,view.info.y+view.info.h/2+5,17*view.labelScale,'#b7e5f7','center',800);
+ }
  const lastCamera=view.camera.at(-1),cameraRight=lastCamera.x+lastCamera.w+8;
  const besideCamera=lastCamera.y>=view.headerBottom&&FW-view.inset-cameraRight>=290;
  const aboveCamera=lastCamera.y>=view.headerBottom&&!besideCamera;
@@ -2472,7 +2552,7 @@ function drawWorldControls(){
  else{
   const hover=mp&&hitAt(...mp);
   const id=hover?.id?.startsWith('tl_')?hover.id.slice(3):tool;
-  if(id!=='hand'||hover?.id==='tl_hand')infoCard(id,box);
+  if(!G.bt.includes(id)&&(id!=='hand'||hover?.id==='tl_hand'))infoCard(id,box);
  }
 }
 function warningBox(){
@@ -2528,7 +2608,7 @@ function panel(o){
  btn(X,Y,W,H,()=>{},'#0f141bf0');c.strokeStyle='#ffffff22';c.lineWidth=1;c.beginPath();c.roundRect(X,Y,W,H,12);c.stroke();
  tx(isB?MD[o.t]?.n||'Förderband':d.n,X+14,Y+24,isB&&o.t!='belt'||prod&&d.n.length>17?12:16,'#fff','left',800);if(prod)tx('Level '+o.lv,X+W-14,Y+24,13,'#fde68a','right',700);
  let y=Y+46;const delB=(bx,bw,lab)=>{btn(X+bx,y,bw,28,()=>{delAt(o.x,o.y);sel=null;sv(0);analyze()},'#7f1d1d',0,'del');tx(lab,X+bx+bw/2,y+19,12,'#fff','center',700)};
- if(prod){rcpRow(o.t,X+14,y+4,false);y+=22;
+ if(prod){recipePreview(o.t,X+12,y-3,W-22);y+=22;
   const t0=tme(o),p=plan(o),t1=tme(o,o.lv+p.n);
   tx('Zeit pro Stück',X+14,y,12,'#94a3b8');tx(t0.toFixed(1)+' s → '+t1.toFixed(1)+' s',X+W-14,y,12,'#fff','right',700);y+=18;
   tx('Stück pro Minute',X+14,y,12,'#94a3b8');tx((60/t0).toFixed(1)+' → '+(60/t1).toFixed(1),X+W-14,y,12,'#fff','right',700);y+=22;
@@ -3002,7 +3082,7 @@ function lossPoint(objects){
  }
  return best;
 }
-function closeP2(){teamSpecialty=null;mkO=rsO=pnO=hlO=bkO=acO=planningOpen=lineOpen=growthOpen=saveOpen=statsOpen=achievementsOpen=false}
+function closeP2(){teamSpecialty=null;deviceInfo=null;mkO=rsO=pnO=hlO=bkO=acO=planningOpen=lineOpen=growthOpen=saveOpen=statsOpen=achievementsOpen=false}
 
 /* ===== Tutorial & Hilfe: interaktive Einführung direkt in der Fabrik, Kurztour (Hilfe), einmalige Kontext-Tipps ===== */
 let tuTour=0,tuTI=0,tuHn=null,tuHT=-99,tuG=null,tuA=0,tuKey='',tuC=0;
@@ -3315,14 +3395,14 @@ function drawFrame(){
   c.fillStyle='#14181e';c.fillRect(0,0,FW,FH);
   if(!ready){tx('Lade deine Fabrik …',FW/2,FH/2,22,'#cbd5e1','center',700);return}
 
-  if(storyOnScreen()&&!ff){drawLayer('Filmszene',drawStory);return}
+  if(ff){drawLayer('Offline-Fortschritt',drawOfflineProgress);return}
+  if(storyOnScreen()){drawLayer('Filmszene',drawStory);return}
   if(!acO&&!achievementsOpen)drawLayer('Kartenansicht',world);
   if(!drawLayer('Bedienelemente',ui)){
    HB=[];closeP2();
   }
   drawLayer('Tutorial',tuDraw);
   if(pfl>0){c.fillStyle='rgba(255,255,255,'+(pfl*.85)+')';c.fillRect(0,0,FW,FH)}
-  if(ff)drawLayer('Offline-Fortschritt',drawOfflineProgress);
  });
 }
 
@@ -3427,7 +3507,7 @@ update(dt){
  if(!ff&&(r0>120||acc>20))ff=offlineStart(r0);
  const steps=Math.floor((acc+1e-9)/TICK);
  fs=steps>40?1:0;
- const ran=FactoryRuntime.step(steps,tick);
+ const ran=FactoryRuntime.step(steps,tick,ff?28:14);
  fs=0;
  acc=Math.max(0,acc-ran*TICK);
  if(saveAfterTick){saveAfterTick=false;sv(true)}
@@ -3437,6 +3517,7 @@ update(dt){
    const report=ff;ff=null;analyze();offlineReport(report);sv(false);
   }
  }
+ if(ff)return;
  if(projectCargo.size||projectTrucks.length)launchProjectTrucks();
  for(const o of L){if(o.bt<1)o.bt=Math.min(1,o.bt+dt*3);if(o.fl>0)o.fl=Math.max(0,o.fl-dt*1.6);o.dv+=(o.ew-o.dv)*.1}
  for(const k in afl)afl[k]=Math.max(0,afl[k]-dt*1.2);for(const k in rflash)rflash[k]=Math.max(0,rflash[k]-dt*1.5);pfl=Math.max(0,pfl-dt*1.2);PO=PO.filter(p=>(p.t+=dt)<1.2);tl+=dt;if(tl>1){tl=0;analyze();warnChk()}at+=dt;if(at>20){at=0;sv(0)}if(storyOnScreen()&&!ff)updateStory(dt);tuUpd(dt);stShow();if(!storyOnScreen())audMach(dt);audCloudSync();},

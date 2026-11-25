@@ -53,7 +53,7 @@
       folded:false, paid:0, bet:0, won:0, seat:i
     }));
     let dealer=-1, smallBlind=-1, bigBlind=-1, turn=-1, street=0, handNumber=0, seq=0;
-    let board=[], deck=[], target=0, raises=0, pending=new Set(), phase='ready', result='', shown={};
+    let board=[], deck=[], target=0, lastRaise=10, actedAt=new Map(), pending=new Set(), phase='ready', result='', shown={};
 
     const after = (seat, predicate) => {
       for(let offset=1;offset<=players.length;offset++){
@@ -70,7 +70,6 @@
     };
     const alive = p=>p.inHand&&!p.folded;
     const canAct = p=>alive(p)&&p.chips>0;
-    const betSize = ()=>street<2?10:20;
     const pot = ()=>players.reduce((sum,p)=>sum+p.paid,0);
 
     function start() {
@@ -81,7 +80,7 @@
       dealer=after(dealer,p=>p.chips>0);
       smallBlind=funded.length===2?dealer:after(dealer,p=>p.chips>0);
       bigBlind=after(smallBlind,p=>p.chips>0);
-      deck=shuffledDeck();board=[];street=0;raises=0;
+      deck=shuffledDeck();board=[];street=0;lastRaise=10;actedAt.clear();
       phase='play';result='';shown={};
       for(const p of players){
         p.inHand=p.chips>0;p.hand=[];p.folded=false;p.paid=p.bet=p.won=0;
@@ -155,7 +154,7 @@
         if(street===3){finish();return;}
         revealStreet();
         for(const p of players)p.bet=0;
-        target=0;raises=0;from=dealer;
+        target=0;lastRaise=10;actedAt.clear();from=dealer;
         pending=new Set(active.map(p=>p.seat));
       }
     }
@@ -168,35 +167,85 @@
         ? Math.min(target,Math.max(...players.filter(q=>q.seat!==seat).map(q=>q.bet)))
         : target;
       const due=Math.max(0,price-p.bet);
-      const raiseTo=target+betSize();
-      return {call:Math.min(due,p.chips),raise:active.length>1&&raises<4&&p.chips>=raiseTo-p.bet?raiseTo:0};
+      const max=p.bet+p.chips, oldTarget=actedAt.get(seat);
+      const mayRaise=active.length>1&&(oldTarget===undefined||target-oldTarget>=lastRaise);
+      const minimum=target<10?10:target+lastRaise;
+      return {call:Math.min(due,p.chips),raise:mayRaise&&max>=minimum?minimum:0,max,
+        allIn:mayRaise||p.chips<=due};
     }
 
-    function act(seat, action) {
+    function act(seat, action, amount) {
       const options=actions(seat);
-      if(!options||!['fold','call','raise'].includes(action)||action==='raise'&&!options.raise)return false;
+      if(!options||!['fold','call','raise','all-in'].includes(action))return false;
       const p=players[seat];
+      let betTo=0;
+      if(action==='raise'){
+        betTo=amount??options.raise;
+        if(!options.raise||!Number.isSafeInteger(betTo)||betTo<options.raise||betTo>options.max)return false;
+      }else if(action==='all-in'){
+        if(!options.allIn)return false;
+        betTo=options.max;
+      }
       pending.delete(seat);
       if(action==='fold')p.folded=true;
       else if(action==='call')pay(p,options.call);
       else {
-        pay(p,options.raise-p.bet);target=options.raise;raises++;
-        pending=new Set(players.filter(q=>q!==p&&canAct(q)).map(q=>q.seat));
+        pay(p,betTo-p.bet);
+        if(betTo>target){
+          const increase=betTo-target;
+          if(betTo>=10&&increase>=lastRaise)lastRaise=increase;
+          target=betTo;
+          pending=new Set(players.filter(q=>q!==p&&canAct(q)).map(q=>q.seat));
+        }
       }
+      actedAt.set(seat,target);
       advance(seat);seq++;
       return true;
     }
 
+    function estimateEquity(hand,opponents,random) {
+      const visible=new Set([...hand,...board]);
+      const unseen=Array.from({length:52},(_,i)=>i).filter(card=>!visible.has(card));
+      let points=0;
+      const samples=16, count=Math.min(opponents,3);
+      for(let i=0;i<samples;i++){
+        const pool=unseen.slice();
+        const card=()=>{
+          const index=Math.floor(random()*pool.length);
+          const selected=pool[index];
+          pool[index]=pool.at(-1);pool.pop();
+          return selected;
+        };
+        const community=board.slice();
+        while(community.length<5)community.push(card());
+        const rank=bestRank([...hand,...community]);
+        let tied=1, beaten=false;
+        for(let n=0;n<count;n++){
+          const difference=compare(rank,bestRank([card(),card(),...community]));
+          if(difference<0){beaten=true;break;}
+          if(difference===0)tied++;
+        }
+        if(!beaten)points+=1/tied;
+      }
+      return points/samples*Math.pow(.92,opponents-count);
+    }
+
     function botAction(seat,random=Math.random) {
       const p=players[seat], options=actions(seat);
-      const [a,b]=p.hand;
-      const category=street?bestRank([...p.hand,...board])[0]:0;
-      const high=Math.max(a%13,b%13);
-      const strong=street?category>=2:a%13===b%13||high>=11&&Math.min(a%13,b%13)>=8;
-      const confidence=random();
-      if(options.raise && strong && confidence<.42)return 'raise';
-      if(options.call && !strong && confidence < (options.call>=p.chips?.65:high<7&&category===0?.26:.1))return 'fold';
-      return 'call';
+      const opponents=players.filter(q=>q!==p&&alive(q)).length;
+      const equity=estimateEquity(p.hand,opponents,random);
+      const odds=options.call/(pot()+options.call||1);
+      const style=random();
+      if(options.call&&equity<odds-(style<.15?.05:0))return {action:'fold'};
+      const strong=equity>Math.max(.35,1/(opponents+1)+.13);
+      const valueBet=strong&&style<.67;
+      const bluff=!options.call&&opponents<=2&&style<.13;
+      if(options.raise&&(valueBet||bluff)){
+        const increment=Math.round((pot()+options.call)*(.35+style*.7));
+        return {action:'raise',amount:Math.min(options.max,Math.max(options.raise,target+increment))};
+      }
+      if(options.allIn&&options.max>target&&!options.raise&&strong&&style<.5)return {action:'all-in'};
+      return {action:'call'};
     }
 
     function snapshot() {

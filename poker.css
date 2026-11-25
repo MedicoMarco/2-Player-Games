@@ -5,7 +5,12 @@
 .card-table-controls{position:absolute;z-index:2;left:5%;right:5%;bottom:3%;display:flex;align-items:center;justify-content:center;gap:clamp(.24rem,1vw,.8rem);font-size:clamp(.72rem,2vw,1rem)}
 .card-table-controls[hidden],.card-table-controls button[hidden]{display:none}
 .card-table-controls .btn{box-shadow:none;padding:.57em .88em;border:1px solid #ead8ab7a;border-radius:.7em;background:#153f38;color:#fff5dd;font-weight:750;white-space:nowrap}
-.card-table-controls .btn[data-poker=call],.card-table-controls .btn[data-poker=next],.card-table-controls .btn[data-bj=hit],.card-table-controls .btn[data-bj^="stake:"]{background:#efd099;color:#2e2118}
+.card-table-controls .btn[data-poker=call],.card-table-controls .btn[data-poker=next],.card-table-controls .btn[data-bj=custom],.card-table-controls .btn[data-bj=hit],.card-table-controls .btn[data-bj^="stake:"]{background:#efd099;color:#2e2118}
 .card-table-controls .btn:disabled{opacity:.44;cursor:default}
 .card-table-announcement{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 @media(max-width:480px){.card-table-controls{bottom:1%}.card-table-controls .btn{padding:.4em .55em}}
+
+.card-table-controls input[type=number]{box-sizing:border-box;width:4.7em;min-width:0;border:1px solid #ead8ab7a;border-radius:.6em;background:#102e29;color:#fff5dd;padding:.46em .4em;font:inherit;text-align:center;font-variant-numeric:tabular-nums}
+.card-table-controls input[hidden]{display:none}
+.card-table-controls .btn[data-poker=all-in],.card-table-controls .btn[data-bj=all-in]{border-color:#edab71;color:#ffd9b5}
+@media(max-width:365px){.card-table-controls{font-size:.69rem;gap:.15rem}.card-table-controls .btn{padding:.4em .39em}}

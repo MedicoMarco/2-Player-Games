@@ -44,12 +44,12 @@ function createFactoryWorldArt(c,tile,columns,rows,bunker,{rr,tx,withState}){
    }
   });
  }
- function hall({rect,name,floor,drive,level=1,previous,flash=0,grid=false,detail,intersects}){
+ function hall({rect,name,drive,level=1,previous,flash=0,grid=false,detail,intersects}){
   const [left,top,right,bottom]=rect,x=left*tile,y=top*tile,w=(right-left+1)*tile,h=(bottom-top+1)*tile;
   rr(x-13,y-12,w+35,h+36,12,'#2236304a');
   rr(x-8,y-10,w+16,h+21,7,'#4b5149');
   const base=c.createLinearGradient(x,y,x+w*.25,y+h);
-  base.addColorStop(0,floor[0]);base.addColorStop(.76,floor[1]);base.addColorStop(1,'#91978a');
+  base.addColorStop(0,'#a0a6aa');base.addColorStop(.76,'#929a9f');base.addColorStop(1,'#879197');
   c.fillStyle=base;c.fillRect(x,y,w,h);
   c.fillStyle='#37474121';c.fillRect(x,y,w,13);c.fillRect(x,y,14,h);
   c.fillStyle='#f9f1ca21';c.fillRect(x+w-16,y,16,h);
@@ -85,9 +85,10 @@ function createFactoryWorldArt(c,tile,columns,rows,bunker,{rr,tx,withState}){
    rr(doorX-30,doorY-6,60,12,3,'#363f3c');rr(doorX-26,doorY-3,52,6,2,'#9ca796');
    for(const side of [-1,1])rr(doorX+side*27-3,doorY-9,6,18,2,'#e1ab50');
   }
-  c.strokeStyle=grid?'#31453d55':'#36404c24';c.lineWidth=1;c.beginPath();
-  for(let i=1;i*tile<w;i++){c.moveTo(x+i*tile,y);c.lineTo(x+i*tile,y+h)}
-  for(let i=1;i*tile<h;i++){c.moveTo(x,y+i*tile);c.lineTo(x+w,y+i*tile)}
+  c.strokeStyle=grid?'#293d495a':'#35434b33';c.lineWidth=1;c.beginPath();
+  const spacing=grid?tile:tile*4;
+  for(let i=spacing;i<w;i+=spacing){c.moveTo(x+i,y);c.lineTo(x+i,y+h)}
+  for(let i=spacing;i<h;i+=spacing){c.moveTo(x,y+i);c.lineTo(x+w,y+i)}
   c.stroke();
   if(flash>0){
    c.fillStyle='rgba(255,228,154,'+(flash*.29)+')';

@@ -15,7 +15,7 @@
   }
 
   function create(count, shuffle) {
-    const seats=Array.from({length:count},(_,seat)=>({name:seat?'Computer '+seat:'Du',chips:initialChips,hands:[]}));
+    const seats=Array.from({length:count},(_,seat)=>({name:seat?'Bot '+seat:'You',chips:initialChips,hands:[]}));
     let deck=[],dealer=[],turn=-1,handIndex=0,round=0,phase='ready',dealerVisible=false;
     const draw=()=>deck.pop();
     const newHand=(cards,stake,split=false)=>({cards,stake,split,done:false,outcome:'',returned:0});
@@ -23,7 +23,7 @@
     const current=()=>seats[turn]?.hands[handIndex];
 
     function open(stake) {
-      if(!['ready','result'].includes(phase)||!stakes.includes(stake)||stake>seats[0].chips)return false;
+      if(!['ready','result'].includes(phase)||!Number.isSafeInteger(stake)||stake<1||stake>seats[0].chips)return false;
       round++;deck=shuffle();dealer=[];dealerVisible=false;
       for(const p of seats){
         const amount=p===seats[0]?stake:stakes.findLast(n=>n<=stake&&n<=p.chips);
@@ -96,14 +96,14 @@
       phase='result';dealerVisible=true;turn=-1;
       for(const p of seats)for(const h of p.hands){
         const {total}=score(h.cards);
-        if(total>21)h.outcome='Überkauft';
+        if(total>21)h.outcome='Bust';
         else if(dealerBlackjack){
-          if(natural(h)){h.outcome='Unentschieden';h.returned=h.stake;}
-          else h.outcome='Dealer gewinnt';
-        }else if(natural(h)){h.outcome='Blackjack';h.returned=h.stake*2.5;}
-        else if(dealerTotal>21||total>dealerTotal){h.outcome='Gewonnen';h.returned=h.stake*2;}
-        else if(total===dealerTotal){h.outcome='Unentschieden';h.returned=h.stake;}
-        else h.outcome='Dealer gewinnt';
+          if(natural(h)){h.outcome='Push';h.returned=h.stake;}
+          else h.outcome='Dealer wins';
+        }else if(natural(h)){h.outcome='Blackjack';h.returned=Math.floor(h.stake*2.5);}
+        else if(dealerTotal>21||total>dealerTotal){h.outcome='Won';h.returned=h.stake*2;}
+        else if(total===dealerTotal){h.outcome='Push';h.returned=h.stake;}
+        else h.outcome='Dealer wins';
         p.chips+=h.returned;
       }
     }
