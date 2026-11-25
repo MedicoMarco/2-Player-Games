@@ -2,7 +2,7 @@
 const fabrik=({preview=false}={})=>{
 const canvasScope=createFactoryCanvasScope(c);
 const {save:saveCanvas,restore:restoreCanvas,withState:withCanvasState}=canvasScope;
-const TS=48,TICK=.125,DAYSEC=300,DAYS=1500,BELT=.25,RRC=1920,DX=[1,0,-1,0],DY=[0,1,0,-1],PI=Math.PI;
+const TS=48,TICK=.125,DAYSEC=300,DAYS=1500,RRC=1920,DX=[1,0,-1,0],DY=[0,1,0,-1],PI=Math.PI;
 let view=FactoryLayout.create(800,480),FW=view.width,FH=view.height,CX=view.cx,CY=view.cy;
 let uiTransform={x:0,y:0,scale:1,clip:null},panelSurface=null;
 let panelScroll={id:null,x:0,y:0},layoutRotated=false;
@@ -45,6 +45,11 @@ const orderReward=order=>Math.round(order.r*RM);
 const rawCost=i=>{const m=MD[PR[i]];return!m?0:m.r?m.r.reduce((a,x)=>a+x[1]*rawCost(x[0]),0):m.rc};
 const offlineLimits={regular:{seconds:1200,efficiency:.15},night:{seconds:1800,efficiency:.20}};
 const offlineThreshold=60;
+const transportResearch=['bel','bel2','logistics1','logistics2','logistics3'];
+const transportSpeeds=[2,4,8,16,32,64];
+const transportResearchText=stage=>transportSpeeds[stage]+' Waren/s je Band und Logistikspur';
+const transportStage=()=>transportResearch.reduce((stage,id,i)=>RH(id)?i+1:stage,0);
+const formatTransportRate=()=>((transportRate/10).toLocaleString('de-DE',{maximumFractionDigits:1}))+' Waren/s';
 /* ---- Forschung: Technologiebaum, jeder Knoten hat einen echten Effekt ---- */
 const RN=[
  {id:'met',n:'Materialkunde',c:4,p:[],x:0,y:0,e:'Rohstofflager (Holz, Erz, Granulat, Getreide, Wasser) arbeiten 20 % schneller.',rq:['2 Aufträge erfüllt',()=>G.ord>=2]},
@@ -56,9 +61,9 @@ const RN=[
  {id:'spd3',n:'Vollautomatisierung',c:30,p:['spd2','wrk'],x:2,y:1,e:'Alle Maschinen arbeiten weitere 20 % schneller.'},
  {id:'lean',n:'Lean Management',c:24,p:['spd3'],x:3,y:1,e:'Maschinen-Upgrades kosten 12 % weniger.'},
  {id:'lag',n:'Hochregal-Lagerung',c:6,p:[],x:0,y:2,e:'Zwischenlager fassen 40 statt 20 Stück.'},
- {id:'bel',n:'Schnellband-Antrieb',c:12,p:['lag','spd1'],x:1,y:2,e:'Förderbänder transportieren doppelt so schnell.'},
+ {id:'bel',n:'Logistiktempo I',c:12,p:['lag','spd1'],x:1,y:2,e:transportResearchText(1)},
  {id:'lag2',n:'Automatisches Lager',c:18,p:['bel'],x:2,y:2,e:'Zwischenlager fassen 80 statt 40 Stück.'},
- {id:'bel2',n:'Magnetbänder',c:26,p:['lag2'],x:3,y:2,e:'Förderbänder transportieren dreimal so schnell wie zu Beginn.'},
+ {id:'bel2',n:'Logistiktempo II',c:26,p:['lag2'],x:3,y:2,e:transportResearchText(2)+' · schaltet Tunnel frei.'},
  {id:'mkt',n:'Verkaufsverträge',c:6,p:[],x:0,y:3,e:'Alle Verkaufspreise +5 %.'},
  {id:'hnd',n:'Handelsbeziehungen',c:10,p:['mkt'],x:1,y:3,e:'Auftragsprämien +25 %.'},
  {id:'brd',n:'Markenaufbau',c:18,p:['hnd'],x:2,y:3,e:'Alle Verkaufspreise +8 %.'},
@@ -74,13 +79,15 @@ const researchSeries=[
  {id:'tools',n:'Präzisionslinien',p:'spd3',cost:[90,240,680],effect:'Maschinen arbeiten pro Stufe 4 % schneller.'},
  {id:'depots',n:'Modulare Depots',p:'lag2',cost:[65,180,500],effect:'Zwischenlager fassen pro Stufe 20 Stück mehr.'},
  {id:'sourcing',n:'Direktbeschaffung',p:'wrk',cost:[75,210,580],effect:'Rohstoffe kosten pro Stufe weitere 4 % weniger.'},
- {id:'service',n:'Planbare Wartung',p:'lean',cost:[80,225,640],effect:'Maschinen-Upgrades kosten pro Stufe weitere 4 % weniger.'}
+ {id:'service',n:'Planbare Wartung',p:'lean',cost:[80,225,640],effect:'Maschinen-Upgrades kosten pro Stufe weitere 4 % weniger.'},
+ {id:'logistics',n:'Logistiktempo',p:'bel2',cost:[65,160,350],offset:2,effect:stage=>transportResearchText(stage+3)}
 ];
 const baseResearchCount=RN.length;
 for(const [row,series] of researchSeries.entries()){
  for(const [stage,cost] of series.cost.entries()){
-  RN.push({id:series.id+(stage+1),n:series.n+' '+['I','II','III'][stage],c:cost,
-   p:[stage?series.id+stage:series.p],x:stage,y:row,e:series.effect,advanced:true});
+  RN.push({id:series.id+(stage+1),n:series.n+' '+['I','II','III','IV','V'][stage+(series.offset||0)],c:cost,
+   p:[stage?series.id+stage:series.p],x:stage,y:row,
+   e:typeof series.effect==='function'?series.effect(stage):series.effect,advanced:true});
  }
 }
 const researchTier=id=>Number(RH(id+'1'))+Number(RH(id+'2'))+Number(RH(id+'3'));
@@ -219,7 +226,9 @@ function auTab(X,Y,W,H){tx('Audio',X+26,Y+68,15,'#fff','left',800);
  btn(X+26,Y+256,304,32,()=>{AS.ma=AS.ma?0:1;audApply();audSave()},AS.ma?'#b91c1c':'#334155');tx(AS.ma?'🔇 Ton ist aus – tippen zum Einschalten':'🔊 Alles stumm schalten',X+178,Y+276,12.5,'#fff','center',800);
  tx('Der Ton startet nach dem ersten Klick (Browser-Vorgabe). Einstellungen werden im Konto gespeichert.',X+26,Y+306,10,'#94a3b8')}
 const rOK=n=>!RH(n.id)&&n.p.every(p=>RH(p))&&(!n.rq||n.rq[1]());
-function rfx(){const arche=G.sp===PH.length;SPm=(1+(RH('spd1')?.1:0)+(RH('spd2')?.15:0)+(RH('spd3')?.2:0)+(RH('mas')?.2:0)-(RH('prm')?.05:0))*(1+.01*Math.min(24,LV-1))*(1+.05*legacyIndustry('speed'))*(chapters[campaignChapter()]?.speed||1)*(1+.04*researchTier('tools'));STC=(RH('lag2')?80:RH('lag')?40:20)+10*legacyIndustry('storage')+20*researchTier('depots')+(arche?archeUpgrade.storage:0);BTv=(RH('bel2')?BELT/3:RH('bel')?BELT/2:BELT)/(arche?archeUpgrade.beltSpeed:1);RM=RH('hnd')?1.25:1;
+function rfx(){const arche=G.sp===PH.length;SPm=(1+(RH('spd1')?.1:0)+(RH('spd2')?.15:0)+(RH('spd3')?.2:0)+(RH('mas')?.2:0)-(RH('prm')?.05:0))*(1+.01*Math.min(24,LV-1))*(1+.05*legacyIndustry('speed'))*(chapters[campaignChapter()]?.speed||1)*(1+.04*researchTier('tools'));STC=(RH('lag2')?80:RH('lag')?40:20)+10*legacyIndustry('storage')+20*researchTier('depots')+(arche?archeUpgrade.storage:0);RM=RH('hnd')?1.25:1;
+ transportRate=Math.round(transportSpeeds[transportStage()]*10*(arche?archeUpgrade.beltSpeed:1));
+ BTv=10/transportRate;
  PM=(RH('mkt')?1.05:1)*(RH('brd')?1.08:1)*(RH('exp')?1.08:1)*(RH('vtr')?1.05:1)*
   (RH('prm')?1.12:1)*(RH('mas')?.95:1)*(1+.02*legacyIndustry('experience'))*(1+.02*legacyIndustry('sales'));
  OS=RH('off')?4:3;WG=crewRoles.reduce((sum,role)=>sum+assignedCrew(role.id),0)*WAGE*(1-.1*legacyIndustry('wages'));KUC=(RH('lean')?.88:1)*(1-.04*researchTier('service'));KBC=(RH('bau')?.85:1)*(arche?archeUpgrade.construction:1);
@@ -277,7 +286,11 @@ const mapWidth=()=>campaignChapter()>=2?GW:144+yardLayout.east;
 const hSize=h=>{const r=hrect(h);return(r[2]-r[0]+1)+'×'+(r[3]-r[1]+1)},hArea=r=>(r[2]-r[0]+1)*(r[3]-r[1]+1);
 const ORD=['saw','frm','asm','pnt','pck'],QT=[1,10,25,0];
 const fm=n=>{n=Math.floor(n);for(const[v,s]of[[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'K']])if(n>=v)return(n/v).toFixed(n>=v*100?0:n>=v*10?1:2).replace(/(\.\d*?)0+$/,'$1').replace(/\.$/,'').replace('.',',')+' '+s;return n.toLocaleString('de-DE')};
-let STC=20,BTv=BELT,SPm=1,RM=1,PM=1,OS=3,KUC=1,KBC=1,KOF=offlineLimits.regular.seconds,OFFE=offlineLimits.regular.efficiency,RCm=1,stQ=[],stOpen=0,hlO=false,bkO=false,hsel=null,mvO=null,mvT=null,delAsk=0,mp=null,mkTab=0,mkPg=0,WG=0,LV=1,XB=0,XN=60,acO=false,pfl=0,fTab=0,pcf=false,rsel=null,rsO=false,rflash={},pnO=false,asg=null;
+let STC=20,BTv=1/transportSpeeds[0],SPm=1,RM=1,PM=1,OS=3,KUC=1,KBC=1,KOF=offlineLimits.regular.seconds,OFFE=offlineLimits.regular.efficiency,RCm=1,stQ=[],stOpen=0,hlO=false,bkO=false,hsel=null,mvO=null,mvT=null,delAsk=0,mp=null,mkTab=0,mkPg=0,WG=0,LV=1,XB=0,XN=60,acO=false,pfl=0,fTab=0,pcf=false,rsel=null,rsO=false,rflash={},pnO=false,asg=null;
+let transportRate=transportSpeeds[0]*10,transportCycle=0;
+// Integer arithmetic keeps the shared logistics clock deterministic for offline replay.
+const cyclesAt=tick=>Math.floor(tick*transportRate/80);
+const transportProgress=()=>Math.min(1,((G.tk*transportRate)%80)/80+acc/BTv);
 let G,L=[],g=[],ready=0,cam={x:11.5*TS,y:6.5*TS,z:1.3},tool='hand',rot=0,sel=null,hv=null,HB=[],PO=[],tm=0,acc=0,lr=Date.now(),KEY,ld=0,wt=0,at=0,pdn=null,mv=0,lt=null,msg='',tl=0,bn=null,qi=0,fs=0,sc=0,rw=0,selA=null,afl={},pg='h',ff=null,mkO=false;
 const sb=new Array(60).fill(0),cell=(x,y)=>x<0||y<0||x>=GW||y>=GH?null:g[y*GW+x],areaAt=(x,y)=>HL.find(h=>inR(hrect(h),x,y)&&hallAvailable(h)),inG=(x,y)=>{const h=areaAt(x,y);return!!h&&hlv(h.id)>0};
 /* Maschinenparameter. Waren behalten ihre Qualitätswerte entlang der Transportkette. */
@@ -287,11 +300,12 @@ const typeShip=t=>t=='shp'||!!MD[t]?.ship;
 const visibleModel=m=>!m?.chapter||m.chapter<=campaignChapter();
 const knownType=t=>t=='belt'||Object.hasOwn(MD,t);
 const isBelt=t=>t=='belt'||!!MD[t]?.belt;
+const buildType=t=>t==='fast'||t==='express'?'belt':t;
 const isLogistics=t=>isBelt(t)||MD[t]?.g==='l'||isStorage(t)||typeShip(t)||!!MD[t]?.inspect;
-const beltSize=t=>MD[t]?.belt?.[1]||1;
-const beltTime=t=>BTv*(MD[t]?.belt?.[0]||1);
+const beltSize=t=>Math.max(2,MD[t]?.belt||1,Math.ceil(TICK/BTv)+1);
+const maxBeltBuffer=Math.ceil(TICK*transportSpeeds.at(-1)*archeUpgrade.beltSpeed)+1;
 const beltCount=o=>o.it<0?0:1+o.queue.length;
-const beltCapacity=o=>Math.min(60/beltTime(o.t),60*beltSize(o.t)/TICK);
+const beltCapacity=()=>60/BTv;
 const terminal=t=>typeShip(t)||isProjectRamp(t)||!!(MD[t]?.supply||MD[t]?.distribution);
 const prod=o=>MD[o.t]?.o!=null;
 const cap=o=>Math.floor((STC+(o.extraStorage||0))*(1+(o.cb||0)));
@@ -344,8 +358,8 @@ const companyRates=()=>FactoryTelemetry.rates(G.recent,G.tk,TICK);
 const uc=(o,l)=>Math.ceil(MD[o.t].c*.55*(Math.pow(1.5,l-1))*(o.ub||1)*KUC),cst=t=>Math.max(1,Math.round((t=='belt'?2:MD[t].c)*(1-.03*legacyIndustry('construction'))*KBC));
 const xsp=o=>{const m=MD[o.t];return(RH('met')&&m.rc!=null?1.2:1)*(RH('elk')&&(m.a=='elk'||m.a=='ene'||m.a=='hit'&&o.t!=='mobile')?1.12:1)};
 function put(x,y,t,r,lv,base=defaultSize(t)){const m=MD[t],o={t,x,y,r,lv:lv||1,it:-1,ein:(r+2)%4,wt:0,q:[],iv:(m&&m.r||[]).map(()=>0),wk:0,out:-1,p:0,ag:0,st:2,ew:0,es:0,eb:0,dv:0,fl:0,bt:1,bad:0};
- if(m&&m.j){o.j=m.j;o.rr=0;o.pr=0;o.xs=[-1,-1,-1,-1];o.xa=[0,0,0,0];o.jm=m.j==1?jpre(t,r):[0,0,0,0]}
- Object.assign(o,{up:{},spec:'',paused:false,priority:false,control:0,supplyItem:-1,supplyStock:0,credits:o.iv.map(()=>0),ivq:o.iv.map(()=>0),oq:100,pq:100,iq:100,qq:[],xq:[100,100,100,100],threshold:105,base,queue:[],beltCarry:0,carryTick:-2,jumped:false,sortRule:-1,smartMode:0,stats:newStats(),recent:FactoryTelemetry.create(G.tk,TICK)});
+ if(m&&m.j){o.j=m.j;o.rr=0;o.pr=0;o.xs=[-1,-1,-1,-1];o.xm=[];o.xQueue=[];o.jm=m.j==1?jpre(t,r):[0,0,0,0]}
+ Object.assign(o,{up:{},spec:'',paused:false,priority:false,control:0,supplyItem:-1,supplyStock:0,credits:o.iv.map(()=>0),ivq:o.iv.map(()=>0),oq:100,pq:100,iq:100,qq:[],xq:[100,100,100,100],threshold:105,base,queue:[],jumped:false,sortRule:-1,smartMode:0,stats:newStats(),recent:FactoryTelemetry.create(G.tk,TICK)});
  L.push(o);mapObject(o,o);return o}
 function del(o){forgetYardLinks(new Set([o]));L=L.filter(q=>q!=o);mapObject(o,null);buildSelection.delete(o);if(routeSource===o){routeSource=null;buildPreview=null}if(sel==o)sel=null}
 const legacyPlots=[
@@ -594,18 +608,23 @@ function init(value,target=latestLayout){
     o.iq=qvalue(extra.iq);o.oq=qvalue(extra.oq);o.pq=qvalue(extra.pq);
     o.jumped=extra.jumped===true;
     o.teamDepot=isStorage(t)&&extra.teamDepot===true;
-    o.beltCarry=Math.max(0,Math.min(TICK,Number(extra.beltCarry)||0));
-    o.carryTick=Number.isInteger(extra.carryTick)?extra.carryTick:-2;
+    if(o.j===1){o.rr=extra.rr&3;o.pr=extra.pr&3}
     o.sortRule=Number.isInteger(extra.sortRule)&&(t=='sorter'?!!sortingGroups[extra.sortRule]:!!ITEMS[extra.sortRule])?extra.sortRule:-1;
     o.smartMode=Math.max(0,Math.min(2,extra.smartMode|0));o.stats=newStats(extra.stats);
     o.recent=FactoryTelemetry.create(G.tk,TICK,extra.recent);
-    if(isBelt(t))o.queue=Object.values(extra.queue||{}).filter(row=>ITEMS[row[0]]).slice(0,beltSize(t)-1).map(row=>[row[0],qvalue(row[1]),row[2]&3,0,row[4]===true]);
+    if(isBelt(t)||o.j===1){
+     const limit=o.j===1?1:maxBeltBuffer-1;
+     o.queue=Object.values(extra.queue||{}).filter(row=>ITEMS[row?.[0]]).slice(0,limit).map(row=>[row[0],qvalue(row[1]),row[2]&3,-1,row[4]===true]);
+    }
+    if(o.j===2)for(let dir=0;dir<4;dir++){
+     const parcel=extra.xQueue?.[dir];
+     if(ITEMS[parcel?.[0]])o.xQueue[dir]=[parcel[0],qvalue(parcel[1]),-1];
+    }
     o.ivq=o.iv.map((n,i)=>n*qvalue(extra.ivq?.[i]));
     o.credits=o.iv.map((_,i)=>Math.max(0,Math.min(9,extra.credits?.[i]|0)));
     o.qq=o.q.map((_,i)=>qvalue(extra.qq?.[i]));o.xq=o.xq.map((_,i)=>qvalue(extra.xq?.[i]));
     o.ag=Number.isFinite(extra.ag)?Math.max(0,Math.min(1,extra.ag)):0;
     o.ein=Number.isInteger(extra.ein)&&extra.ein>=0&&extra.ein<4?extra.ein:o.ein;
-    o.xa=o.xa?.map((_,i)=>Math.max(0,Math.min(1,Number(extra.xa?.[i])||0)));
    }else{
     o.ivq=o.iv.map(n=>n*100);o.qq=o.q.map(()=>100);
    }
@@ -683,7 +702,7 @@ function init(value,target=latestLayout){
    'Gebäude, Lagerbestände, Guthaben und Freischaltungen wurden aus deinem früheren Spielstand übernommen.'
   ]));
  }
- sb.fill(d&&d.rt?d.rt/60:0);rw=d&&d.rt?60:0;sc=Math.floor(G.tk*TICK);setLv();rfx();recalc()
+ sb.fill(d&&d.rt?d.rt/60:0);rw=d&&d.rt?60:0;sc=Math.floor(G.tk*TICK);setLv();rfx();transportCycle=cyclesAt(G.tk);recalc()
 }
 function acc2(o,item){
  const recipe=MD[o.t]?.r;
@@ -752,6 +771,8 @@ function sellProduct(q,item){
 function receiveStorage(store,item,quality){
  if(store.q.length>=cap(store))return false;
  store.q.push(item);store.qq.push(quality);
+ if(store.stockCycle!==transportCycle){store.stockCycle=transportCycle;store.newStock=0}
+ store.newStock++;
  record(store,'arrivals');store.activity=G.tk;store.incoming=item;
  return true;
 }
@@ -768,18 +789,23 @@ function give(o,d,s,quality=100,jump=null){
  const entry=(d+2)%4;
  if(isBelt(q.t)){
   if(beltCount(q)>=beltSize(q.t)||q.r==entry)return false;
-  const parcel=[s,quality,entry,G.tk,!!jump];
+  const parcel=[s,quality,entry,transportCycle,!!jump];
   if(q.it<0)loadParcel(q,parcel);
   else q.queue.push(parcel);
   return true;
  }
  if(q.j==1){
-  if(isBelt(o.t)||q.jm[entry]!=1||q.it>=0)return false;
-  q.it=s;q.iq=quality;q.ag=0;q.ein=entry;return true;
+  if(isBelt(o.t)||q.jm[entry]!=1||q.queue.length)return false;
+  const parcel=[s,quality,entry,transportCycle,false];
+  if(q.it>=0)q.queue.push(parcel);
+  else loadParcel(q,parcel);
+  return true;
  }
  if(q.j==2){
-  if(isBelt(o.t)||q.xs[entry]>=0)return false;
-  q.xs[entry]=s;q.xq[entry]=quality;q.xa[entry]=0;return true;
+  if(isBelt(o.t)||q.xQueue[entry])return false;
+  if(q.xs[entry]>=0)q.xQueue[entry]=[s,quality,transportCycle];
+  else{q.xs[entry]=s;q.xq[entry]=quality;q.xm[entry]=transportCycle}
+  return true;
  }
  if(isProjectRamp(q.t))return prjIn(s,q);
  if(isStorage(q.t))return receiveStorage(q,s,quality);
@@ -838,8 +864,19 @@ function produce(o){
  }
  return status;
 }
+function releaseStorage(o){
+ // A parcel can cross at most one tile per cycle, even between adjacent stores.
+ const ready=o.q.length-(o.stockCycle===transportCycle?o.newStock:0);
+ if(ready>0){
+  const index=o.lv>1?o.q.findIndex((item,i)=>i<ready&&give(o,o.r,item,o.qq[i])):give(o,o.r,o.q[0],o.qq[0])?0:-1;
+  if(index>=0){o.q.splice(index,1);o.qq.splice(index,1);record(o,'moves')}
+ }
+ o.st=o.q.length>=cap(o)?3:o.q.length?1:2;
+}
 function tick(){
  G.tk++;
+ const firstCycle=cyclesAt(G.tk-1),lastCycle=cyclesAt(G.tk);
+ transportCycle=firstCycle;
  G.st+=TICK;
  if(G.sp<PH.length&&!G.late&&G.st>=DAYS*DAYSEC)lateStory();
  const second=Math.floor(G.tk*TICK);
@@ -852,17 +889,13 @@ function tick(){
   const wage=Math.min(G.m,WG*TICK/60);
   G.m-=wage;G.wc+=wage;FactoryTelemetry.record(G.recent,G.tk,TICK,'wages',wage);sb[sc%60]-=wage;
  }
+ const junctions=[],conveyors=[],stores=[];
  for(const o of L){
   if(o.needsRelocation)continue;
-if(isBelt(o.t)){moveBelt(o);continue}
-  if(o.j){jtick(o);continue}
+  if(isBelt(o.t)){if(firstCycle!==lastCycle)conveyors.push(o);continue}
+  if(o.j){if(firstCycle!==lastCycle)junctions.push(o);continue}
   if(terminal(o.t))continue;
-  if(isStorage(o.t)){
-   const release=o.lv>1?o.q.findIndex((item,i)=>give(o,o.r,item,o.qq[i])):o.q.length&&give(o,o.r,o.q[0],o.qq[0])?0:-1;
-   if(release>=0){o.q.splice(release,1);o.qq.splice(release,1);record(o,'moves')}
-   o.st=o.q.length>=cap(o)?3:o.q.length?1:2;
-   continue;
-  }
+  if(isStorage(o.t)){if(firstCycle!==lastCycle)stores.push(o);continue}
   if(MD[o.t].inspect){
    if(o.it>=0&&o.mt!==G.tk){
     o.ag+=TICK;
@@ -877,6 +910,12 @@ if(isBelt(o.t)){moveBelt(o);continue}
   o.ew=o.ew*.99+(status==1?.01:0);
   o.es=o.es*.99+(status==2?.01:0);
   o.eb=o.eb*.99+(status==3?.01:0);
+ }
+ for(let cycle=firstCycle+1;cycle<=lastCycle;cycle++){
+  transportCycle=cycle;
+  for(const o of junctions)jtick(o);
+  for(const o of conveyors)moveBelt(o);
+  for(const o of stores)releaseStorage(o);
  }
  if(G.tk%8===0)workCrews();
 }
@@ -927,7 +966,7 @@ function ordD(s,ship){
 }
 /* ---- Kurven: Eingangsseite eines Bands bestimmen, Position eines Stücks auf Gerade/Bogen ---- */
 function feed(o){const b=(o.r+2)%4;let sd=-1;for(const d of[b,(o.r+1)%4,(o.r+3)%4]){const q=cell(o.x+DX[d],o.y+DY[d]);if(fdn(q,d)){if(d==b)return b;sd=sd<0?d:-2}}return sd>=0?sd:b}
-function itemPos(o){const b=(o.r+2)%4,e=o.ein==null||o.ein==o.r?b:o.ein,R=TS/2,cx=(o.x+.5)*TS,cy=(o.y+.5)*TS;let t=Math.min(1,(o.ag+acc)/beltTime(o.t));if(o.wt)t=Math.min(t,.78);
+function itemPos(o){const b=(o.r+2)%4,e=o.ein==null||o.ein==o.r?b:o.ein,R=TS/2,cx=(o.x+.5)*TS,cy=(o.y+.5)*TS,t=o.wt?.78:transportProgress();
  if(e==b){const f=-R+t*TS;return[cx+DX[o.r]*f,cy+DY[o.r]*f]}
  const a=t*PI/2,u=R*(1-Math.sin(a)),v=R*(1-Math.cos(a));return[cx+DX[e]*u+DX[o.r]*v,cy+DY[e]*u+DY[o.r]*v]}
 /* ---- Speichern ---- */
@@ -961,6 +1000,9 @@ function backupOriginal(save,suffix){
 }
 function backupBeforeMigration(save){
  if(needsCampaignMigration(save)&&!backupOriginal(save,'before-horizont-expansion'))return false;
+ const oldTransport=save.transportVersion!==1&&(Object.values(save.o||{}).some(row=>isBelt(row?.[2])||MD[row?.[2]]?.j||isStorage(row?.[2]))
+  ||Object.values(save.plans||{}).some(plan=>Object.values(plan||{}).some(row=>buildType(row?.[2])!==row?.[2])));
+ if(oldTransport&&!backupOriginal(save,'before-logistics-research'))return false;
  if(save.v===4)return true;
  if(save.v===3)return backupOriginal(save,'before-side-yards');
  if(!backupOriginal(save,'before-logistics-yard'))return false;
@@ -1024,7 +1066,7 @@ async function loadFactory(){
 function snapshot(){
  const ts=Date.now();
  return {
-  v:yardLayout.version,ts,rev:ts.toString(36)+'-'+Math.random().toString(36).slice(2,12),base:cloud.base,
+  v:yardLayout.version,transportVersion:1,ts,rev:ts.toString(36)+'-'+Math.random().toString(36).slice(2,12),base:cloud.base,
   carry:Math.max(0,acc),m:G.m,te:G.te,sold:G.sold,made:G.made,units:G.units,productTracks:G.productTracks,pk:G.pk,cost:G.cost,
   tk:G.tk,ord:G.ord,history:G.history,rt:Math.round(rate()*10)/10,
   hl:G.hl,legacyPlots:G.legacyPlots,site:currentSite,campaign:G.campaign,story:G.story,legacyIndustry:G.legacyIndustry,sp:G.sp,sq:G.sq.map(v=>v|0),st:G.st,sd:G.sd,sf:G.sf,late:G.late,end:G.end,
@@ -1045,8 +1087,11 @@ function snapshot(){
     up:o.up,spec:o.spec,paused:o.paused,priority:o.priority,control:o.control,credits:o.credits,threshold:o.threshold,
     wk:!!o.wk,p:o.p,supplyItem:o.supplyItem,supplyStock:o.supplyStock,iq:o.iq,oq:o.oq,pq:o.pq,ivq:o.iv.map((n,i)=>n?o.ivq[i]/n:100),
     ...(o.teamDepot?{teamDepot:true}:{}),
-    qq:o.qq,xq:o.xq,ag:o.ag,ein:o.ein,xa:o.xa||[],large:o.base.some(n=>n>1),
-    queue:o.queue,beltCarry:o.beltCarry,carryTick:o.carryTick,jumped:o.jumped,sortRule:o.sortRule,smartMode:o.smartMode,stats:o.stats,recent:o.recent
+    qq:o.qq,xq:o.xq,ag:o.ag,ein:o.ein,large:o.base.some(n=>n>1),
+    ...(o.j===1?{rr:o.rr,pr:o.pr}:{}),
+    ...(o.j===2&&o.xQueue.some(Boolean)?{xQueue:o.xQueue.map(parcel=>parcel?.slice(0,2)||null)}:{}),
+    queue:o.queue.map(([item,quality,entry,,jumped])=>[item,quality,entry,0,jumped]),
+    jumped:o.jumped,sortRule:o.sortRule,smartMode:o.smartMode,stats:o.stats,recent:o.recent
    }
   ])
  };
@@ -1251,9 +1296,10 @@ function addBuild(x,y,t,r,base=defaultSize(t)){
  return o;
 }
 function place(x,y,t,r){
+ t=buildType(t);
  if(MD[t]?.legacyOnly)return false;
  const existing=cell(x,y),shape={t,x,y,r,base:defaultSize(t)};
- if(isBelt(t)&&existing?.t==t)return rotObj(existing,r);
+ if(isBelt(t)&&buildType(existing?.t)===t)return rotObj(existing,r);
  const error=placement(shape);
  if(error){constructionError(error,shape);return false}
  const cost=cst(t);
@@ -1486,8 +1532,7 @@ function dm(o,wk){
   if(o.teamDepot&&inG(o.x,o.y)){rr(h-18,-h+4,13,12,3,'#246554');tx('T',h-11.5,-h+13,8,'#d7f9e7','center',800)}
  if(o.lv>1&&o.t!='shp'&&!isProjectRamp(o.t))tx('L'+o.lv,-h+5,h-6,9,'#fff','left',800)}
 function drawPassingItem(o){
- const duration=MD[o.t].inspect ? .5 : beltTime(o.t);
- const ratio=Math.min(1,(o.ag||0)/duration);
+ const ratio=MD[o.t].inspect?Math.min(1,(o.ag||0)/.5):transportProgress();
  saveCanvas();c.translate(-8+16*ratio,5);c.scale(.66,.66);di(o.it);restoreCanvas();
 }
 function db(o){const e=feed(o),b=(o.r+2)%4;saveCanvas();c.translate((o.x+.5)*TS,(o.y+.5)*TS);c.rotate(o.r*PI/2);
@@ -1545,7 +1590,7 @@ function dj(o){
   rr(-9,-8,18,2,1,'#a8bac3');rr(-9,6,18,2,1,'#a8bac3');
   for(const x of [-5,0,5])rr(x,-3,1.5,6,.6,'#738995');
   if(o.xs)for(let dir=0;dir<4;dir++)if(o.xs[dir]>=0){
-   const f=Math.min(1,o.xa[dir]/BTv);
+   const f=transportProgress();
    ico(o.xs[dir],DX[dir]*8*(1-2*f),DY[dir]*8*(1-2*f),.7);
   }
  }else{
@@ -1827,7 +1872,7 @@ function world(){
   drawLayer(belt?'Förderband':'Gebäude '+o.t,()=>{
    if(belt){
     db(o);
-    if(o.t!='belt'){c.fillStyle=MD[o.t].k;c.fillRect(o.x*TS+4,o.y*TS+4,TS-8,3)}
+    if(buildType(o.t)!=='belt'){c.fillStyle=MD[o.t].k;c.fillRect(o.x*TS+4,o.y*TS+4,TS-8,3)}
     return;
    }
    const [w,h]=dimensions(o),s=Math.min(1,o.bt),sp=s<1?1+Math.sin(s*PI)*.18:1;
@@ -2518,7 +2563,7 @@ function rsPanel(){const [X,Y,W,H]=MENUS.rs.box,NW=138,NH=32,pos=n=>[X+104+n.x*1
   tx(label,x+52,Y+24,11,'#fff','center',700);
  }
  const page=RN.filter(n=>!!n.advanced===advancedResearch);
- const categories=advancedResearch?['Leistung','Logistik','Einkauf','Wartung']:['Produktion','Leistung','Logistik','Verkauf','Vertrieb','Unternehmen'];
+ const categories=advancedResearch?['Leistung','Lager','Einkauf','Wartung','Logistiktempo']:['Produktion','Leistung','Logistik','Verkauf','Vertrieb','Unternehmen'];
  panelClose(X,Y,W,()=>{rsO=false});
  categories.forEach((n,i)=>tx(n,X+16,Y+65+i*38,11,'#94a3b8','left',700));
  for(const n of page)for(const p of n.p){const a=page.find(q=>q.id==p);if(!a)continue;const [x1,y1]=pos(a),[x2,y2]=pos(n);c.strokeStyle=RH(p)?'#4ade80':'#ffffff33';c.lineWidth=2.5;c.beginPath();if(n.x>a.x){c.moveTo(x1+NW,y1+NH/2);c.bezierCurveTo(x1+NW+20,y1+NH/2,x2-20,y2+NH/2,x2,y2+NH/2)}else{c.moveTo(x1+NW/2,y1+NH);c.lineTo(x2+NW/2,y2)}c.stroke()}
@@ -2528,11 +2573,11 @@ function rsPanel(){const [X,Y,W,H]=MENUS.rs.box,NW=138,NH=32,pos=n=>[X+104+n.x*1
   c.globalAlpha=done||av?1:.5;tx(n.n,x+9,y+14,11,'#fff','left',700);tx(done?'✓ erforscht':n.ex&&RH(n.ex)?'gesperrt (andere Strategie)':researchCost(n)+' FP',x+9,y+26,10,done?'#86efac':can?'#fde68a':'#94a3b8','left',700);c.globalAlpha=1;
   if(fl>0){c.fillStyle=`rgba(255,255,255,${fl*.5})`;c.beginPath();c.roundRect(x,y,NW,NH,9);c.fill()}}
  const n=page.find(q=>q.id==rsel),dy=Y+H-62;rr(X+12,dy,W-24,52,10,'#ffffff0d');
- if(!n)tx('Wähle eine Technologie. FP gibt es für Entdeckungen, Meilensteine und ausgewählte Aufträge.',X+24,dy+31,11.5,'#94a3b8');
- else{tx(n.n,X+24,dy+17,13,'#fff','left',800);tx(n.e,X+24,dy+32,11,'#cbd5e1');
+ if(!n)tx('Logistiktempo · '+formatTransportRate()+' je Spur. Weitere Stufen findest du unter Vertiefung.',X+24,dy+31,11.5,'#94a3b8');
+ else{tx(n.n,X+24,dy+17,13,'#fff','left',800);fitText(n.e,X+24,dy+32,W-227,11,'#cbd5e1','left',600);
   const rq=[...n.p.map(p=>[RN.find(q=>q.id==p).n,RH(p)]),...(n.rq?[[n.rq[0],n.rq[1]()]]:[])];
   tx('Voraussetzung: '+(rq.length?rq.map(r=>(r[1]?'✓ ':'✗ ')+r[0]).join(' · '):'keine'),X+24,dy+46,10.5,'#94a3b8');
-  const done=RH(n.id),ok=rOK(n)&&G.rp>=researchCost(n);if(done)tx('✓ erforscht',X+W-40,dy+31,13,'#86efac','right',800);else{btn(X+W-190,dy+10,166,32,()=>buyR(n),ok?'#2f9e6b':'#475569');tx('Erforschen · '+researchCost(n)+' FP',X+W-107,dy+31,12.5,'#fff','center',800)}}}
+  const done=RH(n.id),ok=rOK(n)&&G.rp>=researchCost(n);if(done)tx('✓ erforscht',X+W-40,dy+31,13,'#86efac','right',800);else{btn(X+W-190,dy+10,166,32,()=>buyR(n),ok?'#2f9e6b':'#475569',0,'research_buy');tx('Erforschen · '+researchCost(n)+' FP',X+W-107,dy+31,12.5,'#fff','center',800)}}}
 function rotObj(o,r=(o.r+1)%4){
  const error=placement(o,o.x,o.y,r,new Set([o]));
  if(error){constructionError(error,{x:o.x,y:o.y,t:o.t,r,base:o.base});return false}
@@ -2542,7 +2587,7 @@ function rotObj(o,r=(o.r+1)%4){
  o.r=r;o.needsRelocation=false;mapObject(o,o);sfx('rotate');analyze();sv(0);return true;
 }
 function togP(k){const w=MENUS[k].show(),fromAchievements=achievementsOpen;closeP2();if(!w){if(k=='mk')mkO=true;else if(k=='rs')rsO=true;else if(k=='pn')pnO=true;else if(k=='hl')hlO=true;else if(k=='bk'){projectView=campaignChapter();bkO=true}else{acO=true;if(fromAchievements)fTab=0}}sfx('click')}
-const TIPS={hand:['Hand','Tippe ein Gerät an, um Rezept, Upgrades und Einstellungen zu sehen.'],belt:['Förderband','Die Pfeile zeigen die Laufrichtung. Ziehe über mehrere Felder, um eine Strecke zu legen. Forschung und der ARCHE-Abschluss erhöhen das Bandtempo.'],rot:['Richtung','Dreht, was du als Nächstes baust oder gerade bewegst.'],mov:['Bewegen','Tippe auf ein Gebäude und anschließend auf das Zielfeld oder ziehe es direkt dorthin. Inhalt und Level bleiben erhalten. Prüfe danach die Anschlüsse.'],del:['Löschen','Tippe ein Gebäude an oder ziehe über mehrere Gebäude. Du erhältst die Hälfte der Baukosten zurück.']};
+const TIPS={hand:['Hand','Tippe ein Gerät an, um Rezept, Upgrades und Einstellungen zu sehen.'],belt:['Förderband','Die Pfeile zeigen die Laufrichtung. Ziehe über mehrere Felder, um eine Strecke zu legen. „Logistiktempo“ verbessert alle bestehenden und neuen Bänder automatisch.'],rot:['Richtung','Dreht, was du als Nächstes baust oder gerade bewegst.'],mov:['Bewegen','Tippe auf ein Gebäude und anschließend auf das Zielfeld oder ziehe es direkt dorthin. Inhalt und Level bleiben erhalten. Prüfe danach die Anschlüsse.'],del:['Löschen','Tippe ein Gebäude an oder ziehe über mehrere Gebäude. Du erhältst die Hälfte der Baukosten zurück.']};
 function fitText(text,x,y,width,size,color,align='left',weight=700){
  c.font=weight+' '+size+'px system-ui,sans-serif';
  c.fillStyle=color;c.textAlign=align;
@@ -2560,7 +2605,7 @@ function deviceDescription(id,object){
   const duration=seconds.toLocaleString('de-DE',{maximumFractionDigits:1});
   rows.push(['Betrieb',duration+' s pro Stück. '+source+' Der Pfeil zeigt zum Ausgang. Bei vollem Ausgang hält die Maschine an.']);
  }else if(isBelt(id)){
-  rows.push(['Transport',beltSize(id)+' Waren gleichzeitig · bis zu '+Math.round(beltCapacity({t:id}))+' Waren pro Minute']);
+  rows.push(['Transport',formatTransportRate()+' · '+beltSize(id)+' Pufferplätze. Forschung → Logistiktempo beschleunigt alle Bänder.']);
   const routing={
    tunnel:'Zwei Tunnelstücke in derselben Richtung und in einer Reihe platzieren. Bei zwei bis sechs Feldern Abstand kann Ware unter Hindernissen hindurchfahren.',
    sort:'Wähle im Gerätefenster eine Ware. Das Band sortiert passende und übrige Waren in getrennte Richtungen.',
@@ -2568,9 +2613,10 @@ function deviceDescription(id,object){
   };
   rows.push(['Anschluss',routing[id]||TIPS[id]?.[1]||model?.d||'Waren entgegen der Pfeilrichtung zuführen. Der Pfeil markiert die Ausgabe. Im Gerätefenster kannst du das Band drehen.']);
  }else if(isStorage(id)){
-  rows.push(['Lagerung',object?cap(object)+' Lagerplätze':'Lagert Waren zwischen Produktion und Abnahme.']);
+  rows.push(['Lagerung',(object?cap(object)+' Lagerplätze. ':'Puffert Waren. ')+'Ausgabe bis zu '+formatTransportRate()+'. Lagerforschung erhöht die Kapazität.']);
   rows.push(['Anschluss','Waren über Förderbänder zuführen. Die Ausgabe erfolgt am Pfeil. Automatische Lagerung und Team-Lager lassen sich am Gerät einstellen.']);
  }else if(model?.j){
+  rows.push(['Transport',formatTransportRate()+(model.j===2?' je unabhängiger Spur.':' für alle Ausgänge zusammen.')+' „Logistiktempo“ erhöht den Durchsatz.']);
   rows.push(['Materialfluss',model.d||(model.j===2?'Zwei Bänder kreuzen sich. Ware fährt auf ihrer Spur geradeaus.':'Leitet Waren zwischen den eingestellten Eingängen und Ausgängen weiter. Konfiguriere die vier Seiten im Gerätefenster.')]);
  }else if(typeShip(id)){
   rows.push(['Versand','Nimmt fertige Produkte vom Band an, verkauft sie und schreibt den Erlös deinem Konto gut.']);
@@ -2743,7 +2789,7 @@ const NAV=[['mk','📊','Verkauf'],['rs','🔬','Forschung'],['pn','👥','Team'
 const GROUPS=[['h','Holz','gar'],['m','Metall','met'],['v','Versorg.','vrs'],['e','Elektro','elk'],
  ['n','Energie','ene'],['f','Fahrzeug','fzg'],['t','Hightech','hit'],['b','Module','bnk'],['l','Logistik']];
 const dockGroups=()=>campaignChapter()>=2?[...GROUPS,['o','Werft','orb']]:GROUPS;
-const dockModels=()=>Object.keys(MD).filter(t=>MD[t].g===pg&&!MD[t].legacyOnly&&visibleModel(MD[t]));
+const dockModels=()=>Object.keys(MD).filter(t=>buildType(t)===t&&MD[t].g===pg&&!MD[t].legacyOnly&&visibleModel(MD[t]));
 const TOOLS=[['hand','✋','Hand'],['belt','','Band'],['rot','↻','Richtung'],['mov','✥','Bewegen'],['del','🗑','Löschen']];
 const dockOffsets={group:0,shop:0};
 let dockTracks={};
@@ -2962,10 +3008,10 @@ function objectPanelBox(o){
  if(isB)h=o.t==='sorter'?190:o.t==='smart'||o.t==='sort'?175:o.t==='tunnel'?149:163;
  else if(prod(o)){width=Math.min(326,Math.max(266,Math.floor((FW-2*view.inset)/.94)));h=229+recipeHeight(d,width-28,false)}
  else if(typeShip(o.t))h=120;
- else if(isStorage(o.t))h=areaAt(o.x,o.y)?211:174;
+ else if(isStorage(o.t))h=areaAt(o.x,o.y)?227:190;
  else if(d.inspect)h=120;
  else if(d.supply||d.distribution)h=116;
- else if(d.j)h=o.j===1?208:150;
+ else if(d.j)h=o.j===1?222:153;
  else if(isProjectRamp(o.t))h=112+28*(projectPhase(o.t)?.q.length||0);
  return [788-width,96,width,h+(hasYardLinks(o)?33:0)+(hasYardBlocks(o)?33:0)];
 }
@@ -2994,6 +3040,7 @@ function panel(o){
   btn(X+14,y,50,28,()=>{qi=(qi+1)%4;sfx('select')},'#334155');tx(QT[qi]?'×'+QT[qi]:'MAX',X+39,y+19,12,'#fff','center',700);
   btn(X+70,y,76,28,()=>{rotObj(o)},'#334155',0,'turn_machine');tx('↻ Drehen',X+108,y+19,12,'#fff','center',700);delB(152,W-166,'Abbauen')}
  else if(jn){
+  tx(formatTransportRate()+(o.j===2?' je Spur':' insgesamt'),X+14,y,11,'#cbd5e1');y+=16;
   if(o.j==1){tx('Tippe eine Seite: Eingang → Ausgang → Aus',X+14,y,10.5,'#94a3b8','left',700);y+=12;const cols=['#334155','#2f9e6b','#c2570c'],nm=['Aus','Eingang','Ausgang'],pos=[[W-82,32],[W/2-34,58],[14,32],[W/2-34,6]];
    for(let dd=0;dd<4;dd++){const[px,py]=pos[dd];btn(X+px,y+py,68,26,()=>{o.jm[dd]=(o.jm[dd]+1)%3;if(o.it>=0&&o.jm[dd]==0)o.wt=0;sfx('select');recalc()},cols[o.jm[dd]]);tx(['→ rechts','↓ unten','← links','↑ oben'][dd],X+px+34,y+py+11,9,'#ffffffcc','center',600);tx(nm[o.jm[dd]],X+px+34,y+py+22,10.5,'#fff','center',800)}
    c.fillStyle='#ffffff22';c.beginPath();c.arc(X+W/2,y+58+13,7,0,PI*2);c.fill();y+=92}
@@ -3003,7 +3050,7 @@ function panel(o){
   if(q)q.q.forEach(([it,n],i)=>{const dn=Math.min(n,projectStock(o.t)[i]||0);ico(it,X+24,y+8,.8);tx(ITEMS[it].n,X+40,y+8,10.5,'#fff','left',700);rr(X+14,y+14,W-28,6,3,'#ffffff18');rr(X+14,y+14,(W-28)*dn/n,6,3,dn>=n?'#4ade80':'#3a7bd5');tx(nf(dn)+'/'+nf(n),X+W-14,y+8,10.5,'#cbd5e1','right',700);y+=28});else y+=8;
   btn(X+14,y,100,28,()=>{closeP2();projectView=campaignChapter();bkO=true;sfx('click')},'#334155');tx('📖 Quests',X+64,y+19,12,'#fff','center',700);delB(120,W-134,'Abbauen (50 %)')}
  else if(isB){
-  tx((1/beltTime(o.t)).toFixed(1)+' Felder/s · '+beltCount(o)+'/'+beltSize(o.t)+' Stück',X+14,y,12,'#cbd5e1');y+=17;
+  tx(formatTransportRate()+' · '+beltCount(o)+'/'+beltSize(o.t)+' Puffer',X+14,y,12,'#cbd5e1');y+=17;
   tx(perMinute(o,'moves').toFixed(1)+' Transfers/Min · Bauwert '+cst(o.t)+' €',X+14,y,11,'#94a3b8');y+=18;
   if(o.t=='smart'||o.t=='sort'||o.t=='sorter'){
    btn(X+14,y,W-28,25,()=>{
@@ -3019,12 +3066,11 @@ function panel(o){
    tx(label,X+W/2,y+17,10,'#fff','center',700);y+=31;
   }
   if(o.t=='tunnel'){tx(tunnelExit(o)?'Weiterleitung durch Tunnel':'Gleichgerichtetes Tunnelende 2–6 Felder voraus',X+14,y-4,9,'#94a3b8');y+=10}
-  const next=nextBelt(o);
-  if(next){
-   const cost=beltUpgradeCost(o,next),ready=MD[next].unlock();
-   btn(X+14,y,W-28,25,()=>upgradeBelt(o),ready&&G.m>=cost?'#2f6d54':'#334155');
-   tx(ready?MD[next].n+' · '+cost+' €':MD[next].need,X+W/2,y+17,10,'#fff','center',700);y+=29;
-  }
+  btn(X+14,y,W-28,25,()=>{
+   closeP2();rsO=true;advancedResearch=transportStage()>=2;
+   rsel=transportResearch[Math.min(transportStage(),transportResearch.length-1)];
+  },'#334155',0,'belt_research');
+  tx('Logistiktempo · Forschung öffnen',X+W/2,y+17,10.5,'#fff','center',700);y+=29;
   btn(X+14,y,80,28,()=>rotObj(o),'#334155');tx('↻ Drehen',X+54,y+19,12,'#fff','center',700);delB(100,W-114,'Abbauen (50 %)')
  }
  else if(d?.inspect){
@@ -3041,6 +3087,7 @@ function panel(o){
  }
  else{tx('Bestand '+o.q.length+' / '+cap(o)+' Stück · FIFO',X+14,y,12,'#94a3b8');y+=24;
   if(isStorage(o.t)){
+   tx('Ausgabe bis '+formatTransportRate(),X+14,y-6,10.5,'#a7cce0');y+=16;
    const rates=currentStats(o);
    tx('Eingang '+rates.arrivals.toFixed(1)+' · Ausgang '+rates.moves.toFixed(1)+' Stück/Min',X+14,y,10.5,'#cbd5e1');y+=17;
    const stock=new Map();
@@ -3058,18 +3105,6 @@ function panel(o){
   }
   const two=!isB&&!terminal(o.t);if(two){btn(X+14,y,80,28,()=>{rotObj(o)},'#334155');tx('↻ Drehen',X+54,y+19,12,'#fff','center',700)}
   delB(two?100:14,two?W-114:W-28,'Abbauen (50 %)')}}
-const nextBelt=o=>o.t=='belt'?'fast':o.t=='fast'?'express':null;
-const beltUpgradeCost=(o,next)=>Math.max(1,cst(next)-Math.floor(cst(o.t)/2));
-function upgradeBelt(o){
- const next=nextBelt(o);
- if(!next||!L.includes(o)||!MD[next].unlock())return false;
- if(o.needsRelocation){deny(logisticsSiteError);return false}
- const cost=beltUpgradeCost(o,next);
- if(G.m<cost){deny('Nicht genug Geld für den Bandumbau.');return false}
- G.m-=cost;o.t=next;o.fl=1;
- if(!G.bt.includes(next))G.bt.push(next);
- analyze();sv(0);sfx('upgrade');return true;
-}
 function resetPlanning(){
  buildSelection=new Set();planningOpen=false;buildMode='';routeSource=buildPreview=activePlan=null;
 }
@@ -3077,19 +3112,20 @@ const planLimit=()=>3+legacyIndustry('storage')+(RH('bau')?3:0);
 function readPlans(raw){
  return Object.values(raw||{}).slice(0,20).map(value=>Object.values(value||{}).slice(0,100)
   .filter(e=>e&&Number.isInteger(e[0])&&Number.isInteger(e[1])&&e[0]>=0&&e[0]<FactoryYard.width+2*FactoryYard.sideDepth&&e[1]>=0&&e[1]<FactoryYard.height+2*FactoryYard.oldDepth&&knownType(e[2]))
-  .map(e=>[e[0],e[1],e[2],e[3]&3,e[4]===true,e[5]||null])).filter(plan=>plan.length);
+  .map(e=>[e[0],e[1],buildType(e[2]),e[3]&3,e[4]===true,e[5]||null])).filter(plan=>plan.length);
 }
 function makePlan(objects){
  const all=[...objects];
  if(!all.length)return [];
  const x=Math.min(...all.map(o=>o.x)),y=Math.min(...all.map(o=>o.y));
- return all.map(o=>[o.x-x,o.y-y,o.t,o.r,o.base.some(n=>n>1),{
+ return all.map(o=>[o.x-x,o.y-y,buildType(o.t),o.r,o.base.some(n=>n>1),{
   ports:o.j==1?o.jm.slice():null,sort:o.sortRule,smart:o.smartMode,threshold:o.threshold
  }]);
 }
 function previewPlan(plan,x,y){
  const compacted=new Map();
- const rows=plan.map(([dx,dy,t,r,large,settings])=>{
+ const rows=plan.map(([dx,dy,type,r,large,settings])=>{
+  const t=buildType(type);
   const j=MD[t]?.j,row={x:x+dx,y:y+dy,t,r,base:large?defaultSize(t):[1,1],settings,j,
    jm:j===1?(settings?.ports?Object.values(settings.ports):jpre(t,r)):null};
   if(large&&MD[t]?.previousSize)compacted.set(row,MD[t].previousSize);
@@ -3392,7 +3428,7 @@ function lineMetrics(line,wages=companyRates().wages,totalMachines=L.filter(prod
  result.profit-=wages*machines.length/Math.max(1,totalMachines);
  result.capacity=machines.reduce((sum,o)=>sum+60/tme(o),0);
  result.load=machines.length?machines.reduce((sum,o)=>sum+o.ew,0)/machines.length:0;
- result.transport=belts.length?Math.min(...belts.map(beltCapacity)):0;
+ result.transport=line.some(o=>isBelt(o.t)||o.j||isStorage(o.t))?beltCapacity():0;
  result.machines=machines;result.belts=belts;
  return result;
 }
@@ -3507,7 +3543,7 @@ const buildGuide=[
  {id:'first-sale',ti:'Ersten Verkauf beobachten',tx:'Verfolge ein Holzteil bis zum Versand. Der erste Verkauf erhöht oben dein Guthaben.',hl:()=>lessonMark(4),dn:()=>G.sl[1]>G.guide.sales&&(lessonObject(4)?.stats.sold||0)>0},
  {id:'machine-upgrade',ti:'Säge verbessern',tx:'Tippe die Säge mit Hand an und kaufe ein Upgrade. Die Zeit pro Stück sinkt.',hl:()=>sel===lessonObject(2)?[['u','upg']]:tool==='hand'?lessonMark(2):[['u','tl_hand']],dn:()=>(lessonObject(2)?.lv||0)>1},
  buildLesson('spare','Bewegen üben','belt',5,'Setze ein einzelnes Übungsband neben den Versand.'),
- {id:'move-belt',ti:'Übungsband versetzen',tx:'Wähle „Bewegen“. Tippe erst das Übungsband und dann das freie Feld direkt darunter an.',hl:()=>tool!=='mov'?[['u','tl_mov']]:mvO?lessonMark(5,1):lessonMark(5),dn:()=>lessonObject(5,1)?.t==='belt'&&!lessonObject(5)},
+ {id:'move-belt',ti:'Übungsband versetzen',tx:'Wähle „Bewegen“. Tippe erst das Übungsband und dann das freie Feld direkt darunter an.',hl:()=>tool!=='mov'?[['u','tl_mov']]:mvO?lessonMark(5,1):lessonMark(5),dn:()=>buildType(lessonObject(5,1)?.t)==='belt'&&!lessonObject(5)},
  {id:'remove-belt',ti:'Übungsband abbauen',tx:'Wähle „Löschen“ und tippe das versetzte Band an. Der Rest deiner Linie läuft weiter.',hl:()=>tool==='del'?lessonMark(5,1):[['u','tl_del']],dn:()=>!lessonObject(5,1)},
  menuLesson('selling','Verkauf öffnen','Öffne „Verkauf“. Dort stehen Stückpreise, verkaufte Mengen und die erzielten Erlöse.','mk',()=>mkO),
  menuLesson('orders','Aufträge ansehen','Wähle unter „Verkauf“ den Reiter „Aufträge“. Er zeigt Liefermengen und zusätzliche Prämien.','market_tab_2',()=>mkO&&mkTab===2),
@@ -3552,8 +3588,8 @@ const TU=[
  {ti:'Platz schaffen',tx:()=>tool!='hand'?'Wähle unten das Hand-Werkzeug.':'Tippe den Versand an und wähle „Abbauen“. Du erhältst die Hälfte der Baukosten zurück. Du setzt den Versand später am Ende der Linie wieder auf.',hl:()=>tool!='hand'?[['u','tl_hand']]:sel&&sel.t=='shp'?[['u','del']]:[['t',tuG.fx,tuG.fy,1,1]],dn:()=>{const q=cell(tuG.fx,tuG.fy);return!q||q.t!='shp'}},
  {ti:'Maschine wählen',tx:()=>pg!='h'?'Öffne unten den Reiter „Holz“.':'Wähle unten die Maschine „Form“. Sie macht aus Holzteilen Rohlinge.',hl:()=>pg!='h'?[['u','pg_h']]:[['u','tl_frm']],dn:()=>tool=='frm'||hasT('frm')},
  {ti:'Maschine platzieren',tx:()=>cell(tuG.fx,tuG.fy)?.t=='frm'?'Die Formmaschine steht schon. Wähle die Hand, tippe die Maschine an und drehe ihren Ausgang nach rechts.':tool!='frm'?'Wähle unten erneut die Maschine „Form“.':rot?'Der Pfeil zeigt, wohin die Maschine liefert. Drücke „Richtung“, bis er nach rechts → zeigt.':'Tippe auf das leuchtende Feld. Der Pfeil zeigt, wohin die Maschine liefert – hier nach rechts →.',hl:()=>cell(tuG.fx,tuG.fy)?.t=='frm'?(tool!='hand'?[['u','tl_hand']]:[['t',tuG.fx,tuG.fy,1,1]]):tool!='frm'?[['u','tl_frm']]:rot?[['u','tl_rot']]:[['t',tuG.fx,tuG.fy,1,1]],dn:()=>{const q=cell(tuG.fx,tuG.fy);return q?.t=='frm'&&q.r==0}},
- {ti:'Förderband wählen',tx:'Jetzt verbindest du Formmaschine und Versand mit einem Förderband. Wähle unten „Band“.',hl:()=>[['u','tl_belt']],dn:()=>tool=='belt'||!!(cell(tuG.bx,tuG.fy)&&cell(tuG.bx,tuG.fy).t=='belt')},
- {ti:'Band verlegen',tx:()=>tool!='belt'?'Wähle unten wieder „Band“.':rot?'Drücke „Richtung“, bis der Pfeil nach rechts → zeigt.':'Tippe auf das leuchtende Feld rechts der Formmaschine. Tipp: Ziehen verlegt gleich mehrere Stücke.',hl:()=>tool!='belt'?[['u','tl_belt']]:rot?[['u','tl_rot']]:[['t',tuG.bx,tuG.fy,1,1]],dn:()=>{const q=cell(tuG.bx,tuG.fy);return q?.t=='belt'&&q.r==0}},
+ {ti:'Förderband wählen',tx:'Jetzt verbindest du Formmaschine und Versand mit einem Förderband. Wähle unten „Band“.',hl:()=>[['u','tl_belt']],dn:()=>tool=='belt'||!!(cell(tuG.bx,tuG.fy)&&buildType(cell(tuG.bx,tuG.fy).t)==='belt')},
+ {ti:'Band verlegen',tx:()=>tool!='belt'?'Wähle unten wieder „Band“.':rot?'Drücke „Richtung“, bis der Pfeil nach rechts → zeigt.':'Tippe auf das leuchtende Feld rechts der Formmaschine. Tipp: Ziehen verlegt gleich mehrere Stücke.',hl:()=>tool!='belt'?[['u','tl_belt']]:rot?[['u','tl_rot']]:[['t',tuG.bx,tuG.fy,1,1]],dn:()=>{const q=cell(tuG.bx,tuG.fy);return buildType(q?.t)==='belt'&&q.r===0}},
  {ti:'Versand wählen',tx:()=>pg!='l'?'Der Versand liegt im Reiter „Logistik“.':'Wähle unten „Versand“.',hl:()=>pg!='l'?[['u','pg_l']]:[['u','tl_shp']],dn:()=>tool=='shp'||!!(cell(tuG.vx,tuG.fy)&&cell(tuG.vx,tuG.fy).t=='shp')},
  {ti:'Versand aufbauen',tx:()=>tool!='shp'?'Wähle unten „Versand“ im Reiter „Logistik“.':'Setze den Versand ans Ende des Bandes – dort werden die Rohlinge verkauft.',hl:()=>tool!='shp'?[['u','tl_shp']]:[['t',tuG.vx,tuG.fy,1,1]],dn:()=>{const q=cell(tuG.vx,tuG.fy);return!!q&&q.t=='shp'}},
  {ti:'Alles verbunden! ✅',tx:()=>G.sl[2]>=1?'Dein erster Rohling ist verkauft. Grundwert: '+ITEMS[2].v+' € statt '+ITEMS[1].v+' € für ein Holzteil.':'Schau zu: Holz wird zu Teilen und dann zu Rohlingen. Der Versand verkauft sie automatisch. Ein ⏸ zeigt, dass eine Maschine wartet.',hl:()=>[['t',tuG.sx,tuG.sy,5,1]],nx:()=>G.sl[2]>=1?'Weiter':tuA>=20?'Weiter ohne Verkauf':'',sf:'achieve'},
@@ -3577,7 +3613,7 @@ function practiceDone(stage){
  const spot=practicePlace();
  if(!spot)return false;
  const [x,y]=spot,source=cell(x,y),band=cell(x+1,y),ship=cell(x+2,y);
- return source?.t=='src'&&source.r==0&&(stage==0||band?.t=='belt'&&band.r==0&&ship?.t=='shp');
+ return source?.t=='src'&&source.r==0&&(stage==0||buildType(band?.t)==='belt'&&band.r===0&&ship?.t=='shp');
 }
 function practiceText(stage){
  if(!practicePlace())return 'In einer freien Hallenzeile kannst du Holzlager, Band und Versand hintereinander bauen. Das Lager kauft selbstständig Rohholz.';
@@ -3589,14 +3625,14 @@ function practiceHighlight(stage){
  if(!spot)return [['u','pg_h']];
  const [x,y]=spot;
  if(!stage)return pg!='h'?[['u','pg_h']]:tool!='src'?[['u','tl_src']]:rot?[['u','tl_rot']]:[['t',x,y,1,1]];
- if(cell(x+1,y)?.t!='belt')return tool!='belt'?[['u','tl_belt']]:rot?[['u','tl_rot']]:[['t',x+1,y,1,1]];
+ if(buildType(cell(x+1,y)?.t)!=='belt')return tool!='belt'?[['u','tl_belt']]:rot?[['u','tl_rot']]:[['t',x+1,y,1,1]];
  return pg!='l'?[['u','pg_l']]:tool!='shp'?[['u','tl_shp']]:[['t',x+2,y,1,1]];
 }
 const TOUR=[
  {ti:'Karte und Standorte',tx:'Ziehe zum Verschieben. Zoome mit +/−, Mausrad oder zwei Fingern. Das Haussymbol zentriert den Standort. Andere Standorte findest du unter Firma → Werkzeuge.',hl:()=>[['u','camera_home']]},
  {ti:'Bauen und Ausrichten',tx:'Wähle unten eine Gerätegruppe und dann die Maschine. Die Pfeile neben den Reihen zeigen weitere Einträge. „Richtung“ dreht den Ausgang. Tippe zum Bauen auf ein freies Feld.',hl:()=>[['r','dock']]},
- {ti:'Förderbänder',tx:'Wähle „Band“ und ziehe über mehrere Felder, um eine Strecke zu legen. Die Pfeile zeigen die Warenrichtung. Schnell- und Expressbänder tragen mehr Ware.',hl:()=>[['u','tl_belt']]},
- {ti:'Verteilen und Unterführen',tx:'Splitter teilen, Fusionatoren bündeln. Eine Kreuzung hält zwei Ströme getrennt. Sortierbänder lenken gewählte Ware um. Zwei gleich ausgerichtete Tunnelstücke verbinden sich bei 2–6 Feldern Abstand.',hl:()=>[['u','pg_l']]},
+ {ti:'Förderbänder',tx:'Wähle „Band“ und ziehe über mehrere Felder, um eine Strecke zu legen. Die Pfeile zeigen die Warenrichtung. Forschung → Logistiktempo macht alle Bänder schneller.',hl:()=>[['u','tl_belt']]},
+ {ti:'Verteilen und Unterführen',tx:'Splitter teilen, Fusionatoren bündeln. Eine Kreuzung hält zwei Ströme getrennt. Sortierbänder lenken gewählte Ware um. Zwei gleich ausgerichtete Tunnelstücke verbinden sich bei 2–6 Feldern Abstand. Das Logistiktempo gilt auch für Verteiler und Lagerausgänge.',hl:()=>[['u','pg_l']]},
  {ti:'Maschinen und Rezepte',tx:'Mit Hand öffnest du eine Maschine. Das Fenster zeigt Rezept, Puffer, Stückpreis und das nächste Upgrade. Das Info-Symbol erklärt jedes Gerät mit Bildern und Anschlüssen.',hl:()=>[['u','tl_hand']]},
  {ti:'Bewegen und Abbauen',tx:'Tippe mit „Bewegen“ ein Gebäude und dann sein Zielfeld an. Der Inhalt bleibt im Gerät. Prüfe danach die Anschlüsse. Beim Abbauen erhältst du die Hälfte der Baukosten zurück.',hl:()=>[['u','tl_mov']]},
  {ti:'Engpässe und Lager',tx:'„Wartet“ heißt: Material fehlt. „Gestaut“ heißt: Ware kommt am Ausgang nicht weg. Zwischenlager puffern Ware. Prüfe Richtungen und Zutaten, bevor du mehr Tempo kaufst.',hl:()=>[['r','warning']]},
@@ -3627,7 +3663,7 @@ const alteredStart={
 };
 const tuCur=()=>tuTour>0?TOUR[tuTI]:G.tu>=0&&G.tu<guideSteps().length?(G.guide?guideSteps()[G.tu]:tuG?TU[G.tu]:alteredStart):tuHn;
 function tuGeo(){
- const saw=L.find(o=>o.t=='saw'&&o.r==0&&inG(o.x+4,o.y)&&cell(o.x+1,o.y)?.t=='belt');
+ const saw=L.find(o=>o.t=='saw'&&o.r==0&&inG(o.x+4,o.y)&&buildType(cell(o.x+1,o.y)?.t)==='belt');
  if(!saw&&G.tu<11)return null;
  const x=saw?.x??9,y=saw?.y??6;
  if(G.tu<=3&&(!inG(x+4,y)||cell(x+3,y)||cell(x+4,y)))return null;
@@ -3742,7 +3778,7 @@ function demo(){init(null);stQ=[];G.tu=-1;G.th=[];G.hl={gar:1,met:1};L=[];g=[];p
   [12,8,'belt',2],[13,8,'belt',2],[14,8,'belt',2],[15,8,'mil',2,2],[16,8,'sme',2,2],[17,8,'ers',2,2]].forEach(([x,y,t,r,l])=>put(x,y,t,r,l,[1,1]));
  G.m=4820;G.sold=312;G.pk=64;G.ord=2;Object.assign(G.sl,[0,60,40,30,22,64,0,18,30,48]);G.tk=2900;refreshIndustrialArea();recalc();fs=1;for(let i=0;i<640;i++)tick();fs=0;sb.fill(2.3);rw=60;ready=1;cam={x:12*TS,y:6.2*TS,z:1};analyze();lr=Date.now()}
 const {loadParcel,clearBelt,beltDirections,moveBelt,jtick,sortingGroups}=createFactoryTransport({
- TICK,MD,PR,isBelt,beltSize,beltTime,currentTick:()=>G.tk,junctionTime:()=>BTv,neighbor,inputNeighbor,tunnelExit,
+ MD,PR,isBelt,currentCycle:()=>transportCycle,neighbor,inputNeighbor,tunnelExit,
  give,record,prod,uses,prjNeed,isProjectRamp,orderFor
 });
 const audio=createFactoryAudio({
@@ -3922,4 +3958,4 @@ update(dt){
  for(const o of L){if(o.bt<1)o.bt=Math.min(1,o.bt+dt*3);if(o.fl>0)o.fl=Math.max(0,o.fl-dt*1.6);o.dv+=(o.ew-o.dv)*.1}
  for(const k in afl)afl[k]=Math.max(0,afl[k]-dt*1.2);for(const k in rflash)rflash[k]=Math.max(0,rflash[k]-dt*1.5);pfl=Math.max(0,pfl-dt*1.2);PO=PO.filter(p=>(p.t+=dt)<1.2);tl+=dt;if(tl>1){tl=0;analyze();warnChk()}at+=dt;if(at>20){at=0;sv(0)}if(storyOnScreen()&&!ff)updateStory(dt);tuUpd(dt);stShow();if(!storyOnScreen())audMach(dt);audCloudSync();},
 draw:drawFrame,pointerPosition,
-dbg:()=>({AUD:audio.getContext,ASg:()=>AS,audStart:audioStart,audTick:musTick,musFill,audMach,sfxAt:sfx,mshot,SFX,MS,MOODS,audSetK:(k,v)=>{AS[k]=v;audApply();audSave()},aud,audCloudSync,audFlush:audio.clearPending,pcfSet:v=>{pcf=v},fTabSet:v=>{fTab=v},del,xp,setLv,lv:()=>LV,AC,chkAc,acOpen:v=>{acO=v},pnOpen:v=>{pnO=v},RN,rOK,buyR,rfx,RH,rsOpen:v=>{rsO=v},rsel:id=>{rsel=id},fx:()=>({STC,BTv,SPm,RM,PM,OS,WG,OFFE,KOF,RCm,KUC}),MG,hireE,setCrew,hireM,lvlM,specM,recalc,cap,assignTo:(id,x,y)=>assignManager(G.mg.find(q=>q.id===id),areaAt(x,y),cell(x,y)),salePrice,rawCost,mkOpen:v=>{mkO=v},ITEMS,MD,acc2,view:(x,y,z)=>{cam={x:x*TS,y:y*TS,z}},fm,cst,nf,uc,tme,rrLeft,fillOrders,get ff(){return ff},get lr(){return lr},HL,PH,STX,hlv,hReq,hNext,buyHall,bchk,delAt,sellAll,moveObj,prjIn,phaseDone,get stQ(){return stQ},bProg,dLeft,hallOf,hrect,areaAt,inG,jtick,put,setTool:t=>{tool=t},mvSet:o=>{mvO=o},hselGet:()=>hsel,togP,rotObj,storyIntro,beginNextChapter,currentStoryId,finishStory,replayStory,updateStory,feed,itemPos,rate,G,L,g,tick,analyze,place,plan,buy,sb,give,sv,init,inputCap,currentStats,upgradeBelt,lineMetrics,allProductionLines,lostConnections,recipeTree,beltCapacity,cell,footprint,placement,makePlan,previewPlan,commitBuild,planRoute,checkBuild,connectedLine,REGIONS,SITE,FLEET,projectTrucks,get industrial(){return industrial},switchSite,companyValue,cloud,flushCloud,chooseSave,applySave,get msg(){return msg},get bn(){return bn},sel:o=>{sel=o},tuD:()=>({HB,view,panelSurface,panelScroll,dockTracks,dockOffsets,cur:tuCur(),TU,TOUR,HNT,tuHn,tuTour,tuTI,tuG,rot,tool,pg,sel,cam,fTab,acO,hlO,bkO,mkO,mvO,delAsk})})}};
+dbg:()=>({AUD:audio.getContext,ASg:()=>AS,audStart:audioStart,audTick:musTick,musFill,audMach,sfxAt:sfx,mshot,SFX,MS,MOODS,audSetK:(k,v)=>{AS[k]=v;audApply();audSave()},aud,audCloudSync,audFlush:audio.clearPending,pcfSet:v=>{pcf=v},fTabSet:v=>{fTab=v},del,xp,setLv,lv:()=>LV,AC,chkAc,acOpen:v=>{acO=v},pnOpen:v=>{pnO=v},RN,rOK,buyR,rfx,RH,rsOpen:v=>{rsO=v},rsel:id=>{rsel=id},fx:()=>({STC,BTv,SPm,RM,PM,OS,WG,OFFE,KOF,RCm,KUC}),MG,hireE,setCrew,hireM,lvlM,specM,recalc,cap,assignTo:(id,x,y)=>assignManager(G.mg.find(q=>q.id===id),areaAt(x,y),cell(x,y)),salePrice,rawCost,mkOpen:v=>{mkO=v},ITEMS,MD,acc2,view:(x,y,z)=>{cam={x:x*TS,y:y*TS,z}},fm,cst,nf,uc,tme,rrLeft,fillOrders,get ff(){return ff},get lr(){return lr},HL,PH,STX,hlv,hReq,hNext,buyHall,bchk,delAt,sellAll,moveObj,prjIn,phaseDone,get stQ(){return stQ},bProg,dLeft,hallOf,hrect,areaAt,inG,jtick,put,setTool:t=>{tool=t},mvSet:o=>{mvO=o},hselGet:()=>hsel,togP,rotObj,storyIntro,beginNextChapter,currentStoryId,finishStory,replayStory,updateStory,feed,itemPos,rate,G,L,g,tick,analyze,place,plan,buy,sb,give,sv,init,inputCap,currentStats,lineMetrics,allProductionLines,lostConnections,recipeTree,beltCapacity,cell,footprint,placement,makePlan,previewPlan,commitBuild,planRoute,checkBuild,connectedLine,REGIONS,SITE,FLEET,projectTrucks,get industrial(){return industrial},switchSite,companyValue,cloud,flushCloud,chooseSave,applySave,get msg(){return msg},get bn(){return bn},sel:o=>{sel=o},tuD:()=>({HB,view,panelSurface,panelScroll,dockTracks,dockOffsets,cur:tuCur(),TU,TOUR,HNT,tuHn,tuTour,tuTI,tuG,rot,tool,pg,sel,cam,fTab,acO,hlO,bkO,mkO,mvO,delAsk})})}};

@@ -59,7 +59,7 @@ d = load([
  [10, 6, 'saw', 0, 1, -1, [0], -1, 0, 0, { wk: true, p: 3.875, pq: 132 }],
  [11, 6, 'belt', 0, 1], [12, 6, 'sto', 0, 1]
 ]);
-ticks(3);
+ticks(4);
 assert.equal(d.G.pc[1], 1);
 assert.deepEqual(Array.from(d.L[2].q), [1]);
 assert.equal(d.L[2].qq[0], 100);
@@ -196,7 +196,7 @@ d = load([
  [7, 6, 'sort', 0, 1, 1, 0, -1, 0, 0, { sortRule: 1 }],
  [8, 6, 'sto', 0, 1], [7, 7, 'sto', 0, 1]
 ], { rs: ['lag'] });
-ticks(3);
+ticks(4);
 assert.equal(d.cell(8, 6).q.length, 0);
 assert.deepEqual(Array.from(d.cell(7, 7).q), [1]);
 
@@ -209,6 +209,65 @@ assert.equal(belt.queue.length, 3);
 d = load(save().o, { rs: ['bel2'] });
 ticks(8);
 assert.deepEqual(Array.from(d.cell(9, 6).qq), [100, 101, 102, 103, 110, 111, 112, 113]);
+
+const logisticsIds=['bel','bel2','logistics1','logistics2','logistics3'];
+const logisticsRates=[120,240,480,960,1920,3840];
+d=load([], {rp:1000,rs:['lag','spd1','lag2']});
+for(const [i,id] of logisticsIds.entries()){
+ assert.equal(d.beltCapacity(),logisticsRates[i]);
+ const technology=d.RN.find(node=>node.id===id);
+ assert(d.rOK(technology));
+ const previous=d.G.rp;
+ d.buyR(technology);
+ assert(d.G.rp<previous);
+ assert.equal(d.beltCapacity(),logisticsRates[i+1]);
+}
+
+const parcels=Array.from({length:140},(_,i)=>[1,100+i%30]);
+const throughWarehouse=(x,y,r)=>[
+ x,y,'sto',r,1,-1,0,-1,parcels.map(row=>row[0]),0,{qq:parcels.map(row=>row[1])}
+];
+const relayNetwork=[
+ throughWarehouse(7,6,0),[8,6,'express',0,1],[9,6,'spl',0,1],[10,6,'fus',0,1],
+ [11,6,'kre',0,1],[12,6,'sort',0,1],[13,6,'smart',0,1],[14,6,'sorter',0,1],
+ [15,6,'tunnel',0,1],[17,6,'tunnel',0,1],[18,6,'sto',0,1],
+ throughWarehouse(11,4,1),[11,5,'fast',1,1],[11,7,'belt',1,1],[11,8,'sto',1,1]
+];
+const relayResearch=[...logisticsIds,'lag2','depots1','depots2','depots3'];
+for(const objects of [relayNetwork,[...relayNetwork].reverse()]){
+ d=load(objects,{rs:relayResearch});
+ ticks(3);
+ const output=d.cell(18,6),crossOutput=d.cell(11,8);
+ const before=[output.q.length,crossOutput.q.length];
+ ticks(8);
+ assert.equal(output.q.length-before[0],64,'all logistics devices sustain the max research rate');
+ assert.equal(crossOutput.q.length-before[1],64,'crossing routes run in parallel');
+ assert.deepEqual(Array.from(output.qq),parcels.slice(0,output.q.length).map(row=>row[1]));
+ const savedNetwork=save();
+ d=load(savedNetwork.o,savedNetwork);
+ ticks(8);
+ for(const [x,y] of [[18,6],[11,8]]){
+  const delivered=d.cell(x,y).qq;
+  assert.equal(delivered.length,parcels.length);
+  assert.deepEqual(Array.from(delivered),parcels.slice(0,delivered.length).map(row=>row[1]));
+ }
+}
+
+const preTransportSave={v:4,yardRows:[2,2],ts:clock,rev:'old-speed-band',rs:['bel2'],m:1000,
+ o:[[8,6,'express',0,1,1,0,-1,0,0,{iq:121,queue:[[2,132,2,0,false]]}]]};
+core().applySave(preTransportSave);
+d=core();
+assert([...data].some(([key,value])=>key.includes('.before-logistics-research')&&JSON.parse(value).rev===preTransportSave.rev));
+const oldBand=d.cell(8,6);
+assert(d.place(8,6,'belt',0));
+assert.equal(d.cell(8,6),oldBand);
+assert.equal(oldBand.queue[0][1],132);
+const oldPlan=d.previewPlan([[0,0,'express',0,false],[1,0,'fast',0,false]],11,6);
+assert(!oldPlan.error);
+assert(d.commitBuild(oldPlan));
+assert.equal(d.cell(11,6).t,'belt');
+assert.equal(d.cell(12,6).t,'belt');
+assert.equal(save().transportVersion,1);
 console.log('Building footprints, blueprints, route construction, tunnels and transport passed.');
 
 const logisticsTypes=['belt','fast','express','sort','smart','tunnel','sorter','spl','fus','kre','sto','shp','prj'];
@@ -403,7 +462,7 @@ assert.equal(d.G.sl[5],4);
 assert.equal(d.G.saleIncome[1],undefined);
 assert.equal(d.G.od[0].d,2);
 assert.equal(d.salePrice(1),6);
-ticks(1);
+ticks(4);
 assert.equal(d.G.m,saleMigration.m+6+125);
 assert.equal(d.G.te,saleMigration.te+6+125);
 assert.equal(d.G.ord,3);
@@ -643,13 +702,14 @@ d=load([[7,6,'src',0,3],[8,6,'sto',0,2]],researchSave);
 const baseEffects=d.fx();
 assert.equal(d.G.rp,researchSave.rp);
 assert.equal(d.G.m,researchSave.m);
-assert.equal(d.RN.filter(node=>node.advanced).length,12);
+assert.equal(d.RN.filter(node=>node.advanced).length,15);
 assert(!d.rOK(d.RN.find(node=>node.id==='tools2')));
 d.rsOpen(true);
 play.draw();
 d.tuD().HB.find(hit=>hit.id==='research_advanced').fn();
 play.draw();
 assert(d.tuD().HB.some(hit=>hit.id==='research_tools1'));
+assert(d.tuD().HB.some(hit=>hit.id==='research_logistics3'));
 assert(!d.tuD().HB.some(hit=>hit.id==='research_spd3'));
 for(const id of ['tools1','tools2','depots1','sourcing1','service1']){
  const node=d.RN.find(entry=>entry.id===id);
@@ -679,7 +739,7 @@ assert.equal(d.G.rp,101,'sales milestone awards 1 FP and ordinary repeat orders 
 d.G.ord=9;d.G.od=[{s:1,n:1,d:0,r:5}];
 assert(d.give(d.cell(7,6),0,1));
 assert.equal(d.G.rp,102,'every tenth completed order awards 1 FP');
-console.log('Offline limits, saved research and four upgrade tracks passed.');
+console.log('Offline limits, saved research and five upgrade tracks passed.');
 
 const pending = factory();
 pending.dbg().applySave({ ...idle, ts: clock, carry: 10 });
@@ -795,8 +855,9 @@ for(const [width,height,rotated] of viewports){
    tap('shop_next');
   }
   for(const [type,model] of Object.entries(d.MD)){
-   if(model.g===id&&!model.legacyOnly&&!model.chapter)assert(built.has(type),label+' '+type);
+   if(model.g===id&&!model.legacyOnly&&!model.chapter&&!['fast','express'].includes(type))assert(built.has(type),label+' '+type);
   }
+  assert(!built.has('fast')&&!built.has('express'),label+' old speed bands stay out of the shop');
  }
  for(const id of ['tl_hand','tl_belt','tl_rot','tl_mov','tl_del','zoom_in','zoom_out','camera_home']){
   assert(hits().some(hit=>hit.id===id),label+' '+id);
@@ -1039,11 +1100,9 @@ const line = d.allProductionLines()[0];
 const metrics = d.lineMetrics(line);
 assert(metrics.output>0 && metrics.materials>0 && metrics.sold>0);
 const firstBelt=d.cell(8,6), balanceBeforeBelt=d.G.m;
-assert(d.upgradeBelt(firstBelt));
-assert.equal(firstBelt.t,'fast');
-assert(d.upgradeBelt(firstBelt));
-assert.equal(firstBelt.t,'express');
-assert(d.G.m<balanceBeforeBelt);
+assert.equal(firstBelt.t,'belt');
+assert.equal(d.beltCapacity(firstBelt),480);
+assert.equal(d.G.m,balanceBeforeBelt);
 assert(d.connectedLine(d.cell(7,6)).includes(d.cell(11,6)));
 const misplaced=[{o:d.cell(9,6),x:9,y:8,r:0}];
 assert.equal(d.lostConnections(misplaced),2);
