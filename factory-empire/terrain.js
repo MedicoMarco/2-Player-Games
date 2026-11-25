@@ -305,27 +305,29 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
   const phase=time*.52;
   withState(()=>{
    c.translate(x+Math.cos(phase)*1.15,y+Math.sin(phase)*.62);
-   // Turn the tail with the swim direction while keeping the face and label upright.
+   // Head, body and tail share a heading. Only the name tag faces the screen.
    withState(()=>{
     c.rotate(Math.atan2(Math.cos(phase)*.62,-Math.sin(phase)*1.15));
     const wag=Math.sin(time*6)*.055;
-    polygon([[-.18,0],[-.43,-.14+wag],[-.37,.14+wag]],'#bd8759');
-    oval(-.08,0,.25,.14,'#ddb079',0);
+    polygon([[-.24,0],[-.51,-.15+wag],[-.46,.15+wag]],'#bd8759');
+    oval(-.13,0,.26,.14,'#ddb079',0);
+    c.translate(.24,0);
+    c.rotate(Math.PI/2);
+    polygon([[0,-.32],[.23,.18],[-.23,.18]],'#8e5347');
+    polygon([[0,-.30],[.211,.16],[-.211,.16]],'#d49982');
+    polygon([[0,-.27],[.09,.058],[0,.105],[-.05,.045]],'#e6af97');
+    for(const eye of [-.066,.066]){
+     oval(eye,-.035,.044,.017,'#92594e',eye<0?-.24:.24);
+     oval(eye,.005,.028,.039,'#efe0d3',0);
+     oval(eye,.012,.017,.025,'#382824',0);
+    }
+    oval(0,.115,.091,.023,'#864754',0);
+    oval(0,.104,.059,.009,'#efc0ac',0);
    });
-   polygon([[0,-.32],[.29,.22],[-.29,.22]],'#8e5347');
-   polygon([[0,-.30],[.266,.19],[-.265,.19]],'#d49982');
-   polygon([[0,-.27],[.11,.07],[0,.13],[-.06,.05]],'#e6af97');
-   for(const eye of [-.073,.073]){
-    oval(eye,-.028,.049,.017,'#92594e',eye<0?-.24:.24);
-    oval(eye,.018,.033,.041,'#efe0d3',0);
-    oval(eye,.024,.018,.027,'#382824',0);
-   }
-   oval(0,.136,.10,.027,'#864754',0);
-   oval(0,.123,.067,.010,'#efc0ac',0);
-   rr(-.58,-.68,1.16,.26,.025,'#101014bc');
+   rr(-.58,-.84,1.16,.26,.025,'#101014bc');
    c.font='700 .18px monospace';c.textAlign='center';c.textBaseline='middle';
-   c.fillStyle='#131319';c.fillText('Dreimacs',.018,-.532);
-   c.fillStyle='#fff';c.fillText('Dreimacs',0,-.55);
+   c.fillStyle='#131319';c.fillText('Dreimacs',.018,-.692);
+   c.fillStyle='#fff';c.fillText('Dreimacs',0,-.71);
   });
  }
  function paintRoads(drives,visible,detail){
