@@ -15,18 +15,22 @@
   }
 
   function create(count, shuffle) {
-    const seats=Array.from({length:count},(_,seat)=>({name:seat?'Bot '+seat:'You',chips:initialChips,hands:[]}));
+    const names=Array.isArray(count)?count:Array.from({length:count},(_,i)=>i?'Bot '+i:'You');
+    const seats=names.map(name=>({name,chips:initialChips,hands:[]}));
     let deck=[],dealer=[],turn=-1,handIndex=0,round=0,phase='ready',dealerVisible=false;
-    const draw=()=>deck.pop();
+    const draw=()=>{if(!deck.length)deck=shuffle();return deck.pop();};
     const newHand=(cards,stake,split=false)=>({cards,stake,split,done:false,outcome:'',returned:0});
     const natural=h=>!h.split&&h.cards.length===2&&score(h.cards).total===21;
     const current=()=>seats[turn]?.hands[handIndex];
 
     function open(stake) {
-      if(!['ready','result'].includes(phase)||!Number.isSafeInteger(stake)||stake<1||stake>seats[0].chips)return false;
+      if(!['ready','result'].includes(phase))return false;
+      const amounts=Array.isArray(stake)?stake:seats.map((p,i)=>i?stakes.findLast(n=>n<=stake&&n<=p.chips)||0:stake);
+      if(amounts.length!==seats.length||!amounts.some(n=>n>0)||
+        amounts.some((n,i)=>!Number.isSafeInteger(n)||n<0||n>seats[i].chips)||!Array.isArray(stake)&&!amounts[0])return false;
       round++;deck=shuffle();dealer=[];dealerVisible=false;
-      for(const p of seats){
-        const amount=p===seats[0]?stake:stakes.findLast(n=>n<=stake&&n<=p.chips);
+      for(const [i,p] of seats.entries()){
+        const amount=amounts[i];
         p.hands=amount?[newHand([],amount)]:[];
         if(amount)p.chips-=amount;
       }
@@ -118,7 +122,7 @@
     }
 
     function snapshot() {
-      return {seats,round,turn,handIndex,phase,dealer:dealerVisible?dealer:[dealer[0],-1],actions:actions()};
+      return {seats,round,turn,handIndex,phase,dealer:!round?[]:dealerVisible?dealer:[dealer[0],-1],actions:actions()};
     }
     return {open,act,dealerStep,botAction,snapshot};
   }

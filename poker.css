@@ -5,12 +5,30 @@
 .card-table-controls{position:absolute;z-index:2;left:5%;right:5%;bottom:3%;display:flex;align-items:center;justify-content:center;gap:clamp(.24rem,1vw,.8rem);font-size:clamp(.72rem,2vw,1rem)}
 .card-table-controls[hidden],.card-table-controls button[hidden]{display:none}
 .card-table-controls .btn{box-shadow:none;padding:.57em .88em;border:1px solid #ead8ab7a;border-radius:.7em;background:#153f38;color:#fff5dd;font-weight:750;white-space:nowrap}
-.card-table-controls .btn[data-poker=call],.card-table-controls .btn[data-poker=next],.card-table-controls .btn[data-bj=custom],.card-table-controls .btn[data-bj=hit],.card-table-controls .btn[data-bj^="stake:"]{background:#efd099;color:#2e2118}
+.card-table-controls .btn[data-poker=call],.card-table-controls .btn[data-poker=next],.card-table-controls .btn[data-bj=hit]{background:#efd099;color:#2e2118}
 .card-table-controls .btn:disabled{opacity:.44;cursor:default}
 .card-table-announcement{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 @media(max-width:480px){.card-table-controls{bottom:1%}.card-table-controls .btn{padding:.4em .55em}}
 
-.card-table-controls input[type=number]{box-sizing:border-box;width:4.7em;min-width:0;border:1px solid #ead8ab7a;border-radius:.6em;background:#102e29;color:#fff5dd;padding:.46em .4em;font:inherit;text-align:center;font-variant-numeric:tabular-nums}
-.card-table-controls input[hidden]{display:none}
-.card-table-controls .btn[data-poker=all-in],.card-table-controls .btn[data-bj=all-in]{border-color:#edab71;color:#ffd9b5}
 @media(max-width:365px){.card-table-controls{font-size:.69rem;gap:.15rem}.card-table-controls .btn{padding:.4em .39em}}
+
+.card-table-controls{flex-direction:column;gap:.15rem}
+.card-actions:not(:empty),.chip-values,.chip-summary{display:flex;align-items:center;justify-content:center;gap:clamp(.2rem,1vw,.6rem)}
+.chip-picker[hidden]{display:none}
+.chip-picker{display:grid;gap:.19rem;padding:.25rem .45rem;border:1px solid #ead8ab7a;border-radius:.75rem;background:#092721f2;color:#fff5dd;max-width:100%;box-sizing:border-box}
+.chip-summary{flex-wrap:wrap}
+.chip-readout{display:grid;line-height:1.1}
+.chip-minimum{color:#d5e4dc;font-size:.85em}
+.chip-total{font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip-picker .play-chip{--chip:#394561;width:clamp(22px,6.7vw,39px);aspect-ratio:1;padding:0;border:3px dashed #fff2d7;border-radius:50%;background:var(--chip);box-shadow:0 2px 0 #0009,inset 0 0 0 2px #0005;color:#fff;font:800 clamp(.62rem,1.6vw,.85rem) system-ui;cursor:pointer;touch-action:manipulation}
+.chip-picker .chip-5{--chip:#a22839}
+.chip-picker .chip-10{--chip:#165c97}
+.chip-picker .chip-25{--chip:#28734b}
+.chip-picker .chip-50{--chip:#6f3a8d}
+.chip-picker .chip-100{--chip:#22252d}
+.chip-picker .play-chip:disabled{opacity:.45;cursor:default}
+.chip-picker .chip-confirm{background:#efd099;color:#2e2118}
+.chip-picker .btn{padding:.25em .6em}
+@media(max-width:480px){.chip-picker{gap:.14rem;padding:.17rem .3rem}.chip-picker .play-chip{border-width:2px}.chip-picker .btn{padding:.25em .42em}}
+
+.chip-table-note{background:#092721f2;color:#fff5dd;border-radius:.65rem;padding:.38em .7em;font-weight:700}

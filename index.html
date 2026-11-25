@@ -296,7 +296,7 @@ body.onl #rs,body.onl-guest #rs{display:none}
 #legal .lg-body a{color:var(--b)}#legal .lg-body p,#legal .lg-body ul,#legal .lg-body ol{margin:.5em 0}
 </style>
 <link rel="stylesheet" href="./direct-chat.css?v=2">
-<link rel="stylesheet" href="./poker.css">
+<link rel="stylesheet" href="./poker.css?v=2">
 <link rel="stylesheet" href="./game-chat.css">
 <link rel="stylesheet" href="./chat-moderation.css">
 </head><body>
@@ -570,9 +570,11 @@ Deutschland</p>
 <script src="./factory-empire/world.js?v=7"></script>
 <script src="./factory-empire/game.js?v=26"></script>
 <script src="./poker.js"></script>
-<script src="./poker-table.js?v=2"></script>
-<script src="./blackjack.js"></script>
-<script src="./blackjack-table.js"></script>
+<script src="./card-chip-picker.js"></script>
+<script src="./poker-table.js?v=3"></script>
+<script src="./blackjack.js?v=2"></script>
+<script src="./blackjack-online.js"></script>
+<script src="./blackjack-table.js?v=2"></script>
 <script>
 const $=s=>document.querySelector(s),W=800,H=480,cl=(v,a,b)=>Math.max(a,Math.min(b,v)),rnd=(a,b)=>a+Math.random()*(b-a),now=()=>performance.now();
 let S={vm:'auto',cpu:0,d:1,t:5,snd:1,anim:1,theme:'auto',ori:'a',side:0,st:{},fav:[],rec:[],cat:'all',ach:{},pl:0,sk:[0,0]},B='#3b82f6',R='#ef4444';
@@ -4516,8 +4518,8 @@ GAMES.push({id:'poker',n:'Poker',ic:'♠',d:'Texas Hold’em mit Spielchips für
 RULES.poker='No-Limit Texas Hold’em mit Spielchips. Jeder beginnt mit 500 Chips und erhält pro Hand zwei eigene Karten. Die fünf Gemeinschaftskarten kommen als Flop, Turn und River. Die beste Kombination aus fünf Karten gewinnt. Bei Gleichstand wird der Pot geteilt. Blinds: 5 und 10. Check klopft, Call geht mit, Fold steigt aus. Mit Bet oder Raise wählst du deinen Einsatz im angezeigten Bereich, mit All-in setzt du deinen gesamten Stack. Gegen einen kurzen All-in-Einsatz kann ein bereits abgeschlossener Zug unter Umständen nur mitgehen oder folden. Side Pots trennen unterschiedlich hohe Einsätze. Wer als Letzter Chips hat, gewinnt.';
 
 GAMES.push({id:'blackjack',n:'Blackjack',ic:'♣',d:'Play against the dealer with the Mau-Mau deck.',cat:'Karten',
-  h:'Get as close to 21 as you can · Dealer stands on 17 · Play chips',sub:'1–10 seats · Bots · Local',mk:window.createBlackjackGame});
-RULES.blackjack='Enter any whole-chip bet or choose All-in to bet your entire bankroll. Try to get closer to 21 than the dealer. Face cards count as 10 and aces as 1 or 11. Hit draws a card. Stand keeps your total. Double adds a second bet and draws one card. You may split matching values once if you have enough chips. Split aces receive one card each. A natural blackjack pays 3:2, rounded down to a whole chip. A tie returns your bet. The dealer hits through 16 and stands on any 17.';
+  h:'Get as close to 21 as you can · Dealer stands on 17 · Play chips',sub:'1–10 seats · Bots · Online',mk:window.createBlackjackGame});
+RULES.blackjack='Tap one or more play chips, then confirm your bet. All-in selects your entire chip balance. Try to get closer to 21 than the dealer. Face cards count as 10 and aces as 1 or 11. Hit draws a card. Stand keeps your total. Double adds a second bet and draws one card. You may split matching values once if you have enough chips. Split aces receive one card each. A natural blackjack pays 3:2, rounded down to a whole chip. A tie returns your bet. The dealer hits through 16 and stands on any 17.';
 
 GAMES.forEach(g=>{const m=NM[g.id];if(m){g.n=m[0];g.d=m[1]}g.ic=ICON[g.id]||g.ic});
 const revised={
@@ -5341,7 +5343,7 @@ async function olAccept(u){
 
 /* Einladung in einen Online-Raum annehmen */
 async function olJoinRoom(code,gid){
-  if(!['ludo','maumau','poker'].includes(gid))return false;
+  if(!['ludo','maumau','poker','blackjack'].includes(gid))return false;
   if(ON||OL.sess){toast('Beende zuerst dein aktuelles Online-Spiel.');return}
   if(!(cur&&gdef&&gdef.id==gid&&cur.canJoin&&cur.canJoin())){
     if(cur&&gdef&&gdef.id==gid&&cur.canJoin&&!cur.canJoin()){toast('Du bist schon in einem Raum.');return}

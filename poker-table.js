@@ -5,7 +5,7 @@
 
   window.createPokerGame = function () {
     let playerCount=4, mode='setup', mySeat=0, engine=null, snapshot=null, privateHand=null;
-    let controls=null, turnTimer=null, dealingSince=0, busy=false, pending=false, seen=new Map(), snapshotWrites=Promise.resolve();
+    let controls=null, chips=null, turnTimer=null, dealingSince=0, busy=false, pending=false, seen=new Map(), snapshotWrites=Promise.resolve();
     let publishedHand=-1;
     const alive = ()=>cur===api;
 
@@ -13,14 +13,15 @@
       if(controls)return;
       controls=document.createElement('div');
       controls.className='card-table-controls';
-      controls.innerHTML='<span class="card-table-announcement" role="status"></span><button class="btn" data-poker="fold">Fold</button><button class="btn" data-poker="call">Check</button><input class=poker-raise-amount data-poker-amount type=number inputmode=numeric step=1 aria-label="Raise to chips"><button class="btn" data-poker="raise">Raise</button><button class="btn" data-poker="all-in">All-in</button><button class="btn" data-poker="next">Nächste Hand</button>';
+      controls.innerHTML='<span class="card-table-announcement" role="status"></span><div class="card-actions"><button class="btn" data-poker="fold">Fold</button><button class="btn" data-poker="call">Check</button><button class="btn" data-poker="next">Nächste Hand</button></div>';
+      chips=createCardChipPicker({language:'de',confirm:amount=>{
+        const options=snapshot?.options;
+        if(options)act(amount===options.max&&options.allIn?'all-in':'raise',amount);
+      }});
+      controls.append(chips.element);
       controls.addEventListener('click', event=>{
         const action=event.target.closest('[data-poker]')?.dataset.poker;
         if(action==='next')nextHand();
-        else if(action==='raise'){
-          const input=controls.querySelector('[data-poker-amount]');
-          if(input.reportValidity())act(action,input.valueAsNumber);
-        }
         else if(action)act(action);
       });
       $('#game .stage').append(controls);
@@ -35,17 +36,17 @@
       controls.hidden=!localTurn&&!ready;
       next.hidden=!ready;
       next.disabled=pending;
-      for(const name of ['fold','call','raise','all-in']){
+      for(const name of ['fold','call']){
         const button=controls.querySelector('[data-poker='+name+']');
         button.hidden=!localTurn;
-        button.disabled=pending||!localTurn||name==='raise'&&!options?.raise||name==='all-in'&&!options?.allIn;
+        button.disabled=pending||!localTurn;
       }
-      const amount=controls.querySelector('[data-poker-amount]');
-      amount.hidden=!localTurn||!options?.raise;amount.disabled=pending;amount.required=!amount.hidden;
-      const min=String(options?.raise||0),max=String(options?.max||0);
-      if(amount.min!==min||amount.max!==max){amount.min=min;amount.max=max;amount.value=min;}
+      const label=players[mySeat].bet+Number(options?.call||0)?'Raise':'Bet';
+      chips.update(localTurn&&(options?.raise||options?.allIn)?{
+        key:snapshot.seq,min:options.raise||Infinity,max:options.max,allIn:options.allIn,
+        label:'Gewählt',showMinimum:true,confirmLabel:label+' bestätigen',disabled:pending
+      }:null);
       controls.querySelector('[data-poker=call]').textContent=options?.call?'Call '+options.call:'Check';
-      controls.querySelector('[data-poker=raise]').textContent=snapshot.players[mySeat].bet+Number(options?.call||0)?'Raise':'Bet';
       controls.querySelector('[role=status]').textContent=localTurn?'Du bist dran.':result;
     }
 
@@ -349,8 +350,8 @@
     const api={
       draw,update(){},click(){},key(code){
         if(document.activeElement?.matches('input,select,textarea,button')||$('#ov').style.display!=='none')return;
-        const actions={KeyF:'fold',KeyC:'call',KeyR:'raise'};
-        if(actions[code])act(actions[code],snapshot?.options?.raise);
+        const actions={KeyF:'fold',KeyC:'call'};
+        if(actions[code])act(actions[code]);
       },
       showSetup:setup,luClick:setupClick,joinCode:joinRoom,canJoin:()=>!LUN.ref&&(mode==='setup'||mode==='local'),
       chatAnchors:()=>snapshot?positions(snapshot):{},
