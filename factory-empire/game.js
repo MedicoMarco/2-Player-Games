@@ -2,7 +2,7 @@
 const fabrik=()=>{
 const canvasScope=createFactoryCanvasScope(c);
 const {save:saveCanvas,restore:restoreCanvas,withState:withCanvasState}=canvasScope;
-const TS=48,GW=188,GH=62,TICK=.125,DAYSEC=300,DAYS=1500,BELT=.25,OFF=28800,RRC=1920,DX=[1,0,-1,0],DY=[0,1,0,-1],PI=Math.PI;
+const TS=48,GW=188,ORIGINAL_HEIGHT=62,TICK=.125,DAYSEC=300,DAYS=1500,BELT=.25,OFF=28800,RRC=1920,DX=[1,0,-1,0],DY=[0,1,0,-1],PI=Math.PI;
 let view=FactoryLayout.create(800,480),FW=view.width,FH=view.height,CX=view.cx,CY=view.cy;
 let uiTransform={x:0,y:0,scale:1,clip:null},panelSurface=null;
 let panelScroll={id:null,x:0,y:0},layoutRotated=false;
@@ -230,22 +230,29 @@ HL.push(
 );
 const siteAvailable=site=>(site.chapter||1)<=campaignChapter()&&(!site.retired||hlv(site.hall));
 const hallAvailable=hall=>(hall.chapter||1)<=campaignChapter()&&(!hall.retired||hlv(hall.id));
-const regionTiles=new Array(GW*GH);
+const regionTiles=new Array(GW*ORIGINAL_HEIGHT);
 for(const site of REGIONS){
  const [left,top,right,bottom]=site.rect;
  for(let y=top;y<=bottom;y++)for(let x=left;x<=right;x++)regionTiles[y*GW+x]=site;
 }
+// Keep every hall in its original shape. Insert a ten-tile yard between each row.
+const yardCuts=[19,41],yardDepth=10,mainRight=79,bunkerOriginal=[66,42,81,61];
+const yardOffset=(x,y)=>x<=bunkerOriginal[2]&&y>=yardCuts[0]?yardDepth*(y>=yardCuts[1]?2:1):0;
+const yardRect=([x,y,r,b])=>[x,y+yardOffset(x,y),r,b+yardOffset(r,b)];
+let GH=ORIGINAL_HEIGHT,SITE=bunkerOriginal,expandedYard=false;
 const siteAt=(x,y)=>{
- const site=x>=0&&y>=0&&x<GW&&y<GH?regionTiles[y*GW+x]:null;
+ const site=x>=0&&y>=0&&x<GW&&y<GH
+  ?regionTiles[y*GW+x]??(expandedYard&&x<=mainRight&&y>=ORIGINAL_HEIGHT?REGIONS[0]:null)
+  :null;
  return site&&siteAvailable(site)?site:undefined;
 };
 let currentSite='main';
-const hlv=id=>(G&&G.hl&&G.hl[id])|0,hallOf=id=>HL.find(h=>h.id==id),inR=(r,x,y)=>x>=r[0]&&x<=r[2]&&y>=r[1]&&y<=r[3],SITE=[66,42,81,61];
-const originalHallRect=h=>h.rc[Math.max(1,hlv(h.id))-1];
-// Extend the existing floors without reindexing a single tile in saved factories.
+const hlv=id=>(G&&G.hl&&G.hl[id])|0,hallOf=id=>HL.find(h=>h.id==id),inR=(r,x,y)=>x>=r[0]&&x<=r[2]&&y>=r[1]&&y<=r[3];
 const hallExtensions={gar:[2,2],met:[2,1],vrs:[2,2],elk:[2,1],ene:[2,2],fzg:[0,2],hit:[2,2],bnk:[0,2],nor:[2,2],lab:[2,2],prt:[2,2],orb:[0,2]};
 const extendedHallRects=new Map(HL.map(h=>[h.id,h.rc.map(([x,y,r,b])=>[x,y,r+hallExtensions[h.id][0],b+hallExtensions[h.id][1]])]));
-const hrect=h=>hlv(h.id)?extendedHallRects.get(h.id)[hlv(h.id)-1]:originalHallRect(h);
+const layoutRect=rect=>expandedYard?yardRect(rect):rect;
+const originalHallRect=h=>layoutRect(h.rc[Math.max(1,hlv(h.id))-1]);
+const hrect=h=>hlv(h.id)?layoutRect(extendedHallRects.get(h.id)[hlv(h.id)-1]):originalHallRect(h);
 const FLEET=[179,29,186,48];
 const isProjectRamp=t=>t==='prj'||t==='orbitRamp';
 const mapWidth=()=>campaignChapter()>=2?GW:144;
@@ -280,13 +287,20 @@ function mapObject(o,value){
  teamPaths.clear();
  for(const [x,y] of footprint(o))g[y*GW+x]=value;
 }
+function physicalNeighbor(o,d){
+ return o.base[0]===1&&o.base[1]===1?cell(o.x+DX[d],o.y+DY[d]):cell(...port(o,d));
+}
 function neighbor(o,d){
  if(o.needsRelocation)return null;
- const next=o.base[0]===1&&o.base[1]===1?cell(o.x+DX[d],o.y+DY[d]):cell(...port(o,d));
+ const next=o.yardOutputs?.[d]||physicalNeighbor(o,d);
  return next?.needsRelocation?null:next;
 }
-function tunnelExit(o,lookup=cell){
+function inputNeighbor(o,d){
+ return o.yardInputs?.[d]||physicalNeighbor(o,d);
+}
+function tunnelExit(o,lookup=cell,keepLink){
  if(o.t!='tunnel'||o.needsRelocation)return null;
+ if(o.yardTunnel&&(!keepLink||keepLink(o.yardTunnel))&&!o.yardTunnel.needsRelocation)return o.yardTunnel;
  for(let distance=1;distance<=6;distance++){
   const q=lookup(o.x+distance*DX[o.r],o.y+distance*DY[o.r]);
   if(q?.t=='tunnel'&&!q.needsRelocation&&q.r==o.r)return distance>=2?q:null;
@@ -306,7 +320,7 @@ function put(x,y,t,r,lv,base=defaultSize(t)){const m=MD[t],o={t,x,y,r,lv:lv||1,i
  if(m&&m.j){o.j=m.j;o.rr=0;o.pr=0;o.xs=[-1,-1,-1,-1];o.xa=[0,0,0,0];o.jm=m.j==1?jpre(t,r):[0,0,0,0]}
  Object.assign(o,{up:{},spec:'',paused:false,priority:false,control:0,supplyItem:-1,supplyStock:0,credits:o.iv.map(()=>0),ivq:o.iv.map(()=>0),oq:100,pq:100,iq:100,qq:[],xq:[100,100,100,100],threshold:105,base,queue:[],beltCarry:0,carryTick:-2,jumped:false,sortRule:-1,smartMode:0,stats:newStats(),recent:FactoryTelemetry.create(G.tk,TICK)});
  L.push(o);mapObject(o,o);return o}
-function del(o){L=L.filter(q=>q!=o);mapObject(o,null);buildSelection.delete(o);if(routeSource===o){routeSource=null;buildPreview=null}if(sel==o)sel=null}
+function del(o){forgetYardLinks(new Set([o]));L=L.filter(q=>q!=o);mapObject(o,null);buildSelection.delete(o);if(routeSource===o){routeSource=null;buildPreview=null}if(sel==o)sel=null}
 const legacyPlots=[
  {id:'w',name:'Lagerhalle',rect:[1,3,5,10]},
  {id:'o',name:'Produktionshalle',rect:[18,3,22,10]},
@@ -334,7 +348,11 @@ function refreshIndustrialArea(){
   }
  };
  const previous=FactoryGrid.industrialArea(plots(originalHallRect),options).tiles;
- industrial=FactoryGrid.industrialArea(plots(hrect),{...options,apron:6,corridor:2,previous});
+ const yards=[];
+ if(expandedYard&&['met','vrs','elk','ene','fzg'].some(hlv))yards.push([6,18,mainRight,31]);
+ if(expandedYard&&['hit','bnk'].some(hlv))yards.push([6,50,mainRight,63]);
+ industrial=FactoryGrid.industrialArea(plots(hrect),{...options,apron:6,corridor:2,previous,
+  yards:yards.map(rect=>({rect,site:REGIONS[0]}))});
 }
 function compactPortBridges(objects,compacted,canBridge){
  if(!compacted.size)return [];
@@ -384,9 +402,78 @@ function migrateLegacy(save){
  if(plots.includes('e')||research.includes('elk')||types.some(type=>MD[type]?.a==='elk'))hl.elk=1;
  return {...save,v:2,hl,legacyPlots:plots};
 }
-function init(value){
- const legacy=value&&value.v!==2;
+let yardLinks=[];
+function setYardLayout(expanded){
+ expandedYard=expanded;
+ GH=ORIGINAL_HEIGHT+(expanded?yardCuts.length*yardDepth:0);
+ SITE=layoutRect(bunkerOriginal);
+ [worldArt,drawBunker]=yardArt(expanded);
+}
+function attachYardLinks(links){
+ for(const {from,to} of yardLinks){
+  delete from.yardOutputs;delete from.yardTunnel;
+  delete to.yardInputs;delete to.yardFeeders;
+ }
+ yardLinks=links;
+ for(const {from,to,d,tunnel,reverse} of links){
+  if(tunnel)from.yardTunnel=to;
+  else{
+   (from.yardOutputs??=[])[d]=to;
+   if(reverse)(to.yardInputs??=[])[(d+2)%4]=from;
+  }
+  (to.yardFeeders??=new Set()).add(from);
+ }
+}
+function forgetYardLinks(objects){
+ if(yardLinks.some(({from,to})=>objects.has(from)||objects.has(to))){
+  attachYardLinks(yardLinks.filter(({from,to})=>!objects.has(from)&&!objects.has(to)));
+ }
+}
+function readYardLinks(saved){
+ const links=[];
+ for(const row of Object.values(saved||{})){
+  if(!row||![row[0],row[1],row[2],row[3]].every(Number.isInteger)||![0,1,2,3,4].includes(row[4]))continue;
+  const from=cell(row[0],row[1]),to=cell(row[2],row[3]),tunnel=row[4]===4;
+  if(!from||!to||from===to||from.x!==row[0]||from.y!==row[1]||to.x!==row[2]||to.y!==row[3])continue;
+  if(siteAt(from.x,from.y)!==REGIONS[0]||siteAt(to.x,to.y)!==REGIONS[0])continue;
+  if(tunnel&&(from.t!=='tunnel'||to.t!=='tunnel'||from.r!==to.r))continue;
+  links.push({from,to,d:tunnel?from.r:row[4],tunnel,reverse:row[5]===true});
+ }
+ return links;
+}
+function expandSavedYard(){
+ const offset=o=>yardOffset(o.x,o.y);
+ // An older or manually edited save can contain a footprint across a cut.
+ // Keep the entire original layout if that footprint cannot move as a unit.
+ if(L.some(o=>footprint(o).some(([x,y])=>yardOffset(x,y)!==offset(o))))return false;
+
+ const links=[];
+ for(const from of L){
+  for(let d=0;d<4;d++){
+   if(!fdn(from,(d+2)%4))continue;
+   const to=neighbor(from,d);
+   if(!compatiblePort(from,to,d)||offset(from)===offset(to)||siteAt(from.x,from.y)!==siteAt(to.x,to.y))continue;
+   const reverse=inputNeighbor(to,(d+2)%4)===from;
+   if(isBelt(from.t)&&to.j&&!reverse)continue;
+   links.push({from,to,d,reverse});
+  }
+  const to=tunnelExit(from);
+  if(to&&offset(from)!==offset(to))links.push({from,to,d:from.r,tunnel:true});
+ }
+ setYardLayout(true);
+ g=[];
+ for(const o of L){o.y+=offset(o);mapObject(o,o)}
+ for(const manager of G.mg)if(manager.x>=0&&manager.y>=0)manager.y+=offset(manager);
+ attachYardLinks(links);
+ refreshIndustrialArea();
+ refreshLogisticsPlacement();
+ return true;
+}
+function init(value,expand=true){
+ const legacy=value&&(value.v==null||value.v===1);
  const d=legacy?migrateLegacy(value):value;
+ attachYardLinks([]);
+ setYardLayout(!d||d.v===3);
  resetPlanning();
  projectCargo.clear();projectTrucks.length=0;
  rejectedBuild=null;
@@ -498,6 +585,8 @@ function init(value){
  const bridges=compactPortBridges(L,compacted,(x,y,a,b)=>siteAt(a,b)===siteAt(x,y)&&!bchk(x,y,'belt',true,true));
  for(const {x,y,t,r} of bridges)put(x,y,t,r);
  refreshLogisticsPlacement();
+ if(d?.v===3)attachYardLinks(readYardLinks(d.yardLinks));
+ else if(d&&expand)expandSavedYard();
  if(legacy){
   G.sf={...G.sf,mig:1};
   stQ.push(storyCard('Spielstand übernommen','Deine Fabrik ist wieder da',[
@@ -528,6 +617,9 @@ function feeders(o){
  if(o.t=='tunnel')for(let distance=2;distance<=6;distance++){
   const n=cell(o.x-distance*DX[o.r],o.y-distance*DY[o.r]);
   if(n?.t=='tunnel'&&tunnelExit(n)==o)found.add(n);
+ }
+ for(const n of o.yardFeeders||[]){
+  if(tunnelExit(n)===o||[0,1,2,3].some(d=>fdn(n,(d+2)%4)&&neighbor(n,d)===o))found.add(n);
  }
  return [...found];
 }
@@ -769,6 +861,8 @@ function backupOriginal(save,suffix){
  return readLocal(separate)!==null||writeLocal(separate,save);
 }
 function backupBeforeMigration(save){
+ if(save.v===3)return true;
+ if(!backupOriginal(save,'before-logistics-yard'))return false;
  if(save.v!==2)return backupOriginal(save,'before-v2');
  const oversized=Object.values(save.o||{}).some(row=>row?.[10]?.large===true&&MD[row[2]]?.previousSize);
  const oldTeam=save.crewVersion!==1&&(crewRoles.some(role=>save.emp?.[role.id]>0)||Object.values(save.mg||{}).length>0);
@@ -829,7 +923,7 @@ async function loadFactory(){
 function snapshot(){
  const ts=Date.now();
  return {
-  v:2,ts,rev:ts.toString(36)+'-'+Math.random().toString(36).slice(2,12),base:cloud.base,
+  v:expandedYard?3:2,ts,rev:ts.toString(36)+'-'+Math.random().toString(36).slice(2,12),base:cloud.base,
   carry:Math.max(0,acc),m:G.m,te:G.te,sold:G.sold,made:G.made,units:G.units,productTracks:G.productTracks,pk:G.pk,cost:G.cost,
   tk:G.tk,ord:G.ord,history:G.history,rt:Math.round(rate()*10)/10,
   hl:G.hl,legacyPlots:G.legacyPlots,site:currentSite,campaign:G.campaign,story:G.story,legacyIndustry:G.legacyIndustry,sp:G.sp,sq:G.sq.map(v=>v|0),st:G.st,sd:G.sd,sf:G.sf,late:G.late,end:G.end,
@@ -839,6 +933,9 @@ function snapshot(){
   plans:G.plans,epoch:G.epoch,stock:G.stock,activeBoosts:G.activeBoosts,milestones:G.milestones,
   lineCounts:G.lineCounts,recent:G.recent,wins:G.wins,goals:G.goals,contracts:G.contracts,contractWins:G.contractWins,
   supplyOrders:G.supplyOrders,od:G.od.map(q=>[q.s,q.n,q.d,q.r]),rr:G.rr??null,
+  ...(yardLinks.length?{yardLinks:yardLinks.map(({from,to,d,tunnel,reverse})=>[
+   from.x,from.y,to.x,to.y,tunnel?4:d,!!reverse
+  ])}:{}),
   o:L.map(o=>[
    o.x,o.y,o.t,o.r,o.lv,o.it,o.iv.length?o.iv:0,o.out,isStorage(o.t)&&o.q.length?o.q:0,
    o.j?(o.j==1?o.jm.join(''):o.xs.join(',')):0,
@@ -1069,7 +1166,7 @@ function buyHall(h){const l=hlv(h.id);if(l>=h.rc.length){deny('Diese Halle hat i
  if(G.m<h.c[l]){deny('Nicht genug Geld.');return}G.m-=h.c[l];G.hl[h.id]=l+1;afl[h.id]=1;xp(l?40:90);sfx('unlock');
  refreshIndustrialArea();refreshLogisticsPlacement();toast(l?h.n+' erweitert: jetzt '+hSize(h)+' Felder!':h.n+' freigeschaltet!');sv(1);analyze()}
 function delAt(a,b){const o=cell(a,b);if(!o)return false;const v=Math.floor(cst(o.t)/2);G.m+=v;PO.push({x:(a+.5)*TS,y:b*TS,t:0,v:'+'+v});if(mvO==o)mvO=null;for(const m of G.mg)if(m.x==o.x&&m.y==o.y){m.x=-1;m.y=-1}del(o);sfx('remove');return true}
-function sellAll(){let v=0;for(const o of L)v+=Math.floor(cst(o.t)/2);for(const m of G.mg){m.x=-1;m.y=-1}G.m+=v;L=[];g=[];resetPlanning();sel=null;mvO=null;delAsk=0;PO.push({x:cam.x,y:cam.y,t:0,v:'+'+fm(v)});sfx('remove');toast('Alles verkauft: +'+fm(v)+' €');recalc();analyze();sv(1)}
+function sellAll(){let v=0;for(const o of L)v+=Math.floor(cst(o.t)/2);for(const m of G.mg){m.x=-1;m.y=-1}G.m+=v;attachYardLinks([]);L=[];g=[];resetPlanning();sel=null;mvO=null;delAsk=0;PO.push({x:cam.x,y:cam.y,t:0,v:'+'+fm(v)});sfx('remove');toast('Alles verkauft: +'+fm(v)+' €');recalc();analyze();sv(1)}
 function moveObj(o,x,y){
  const error=placement(o,x,y,o.r,new Set([o]));
  if(error){constructionError(error,{x,y,t:o.t,r:o.r,base:o.base});return false}
@@ -1081,6 +1178,7 @@ function relocate(positions){
   const move=positionsByObject.get(cell(manager.x,manager.y));
   if(move){manager.x=move.x;manager.y=move.y}
  }
+ forgetYardLinks(new Set(positions.filter(({o,x,y})=>x!==o.x||y!==o.y).map(({o})=>o)));
  for(const {o} of positions)mapObject(o,null);
  for(const {o,x,y} of positions){o.x=x;o.y=y;o.bt=0;o.needsRelocation=false;mapObject(o,o)}
  sfx('place');analyze();sv(0);
@@ -1211,8 +1309,15 @@ const onHide=()=>{
 /* ---- Zeichnen ---- */
 const {rr,tx,sh,di,dart}=createFactoryDrawing(c,ITEMS,MD,()=>tm,canvasScope);
 const worldPrimitives={rr,tx,withState:withCanvasState};
-const worldArt=createFactoryWorldArt(c,TS,GW,GH,SITE,worldPrimitives);
-const drawBunker=createFactoryBunkerArt(c,TS,worldPrimitives,worldArt);
+const worldArtByLayout=new Map();
+function yardArt(expanded){
+ if(!worldArtByLayout.has(expanded)){
+  const art=createFactoryWorldArt(c,TS,GW,GH,SITE,worldPrimitives,expanded?yardDepth:0);
+  worldArtByLayout.set(expanded,[art,createFactoryBunkerArt(c,TS,worldPrimitives,art)]);
+ }
+ return worldArtByLayout.get(expanded);
+}
+let worldArt,drawBunker;
 const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 const projectCargo=new Map(),projectTrucks=[];
 const truckSpeed=5.35;
@@ -1526,6 +1631,19 @@ function drawFleet(){
   tx(phase?.n||'STARTBEREIT',mid,h-.74,.26,'#e9d8a4','center',700);
  });
 }
+function drawYardLinks(intersects){
+ for(const {from,to,d} of yardLinks){
+  const [ax,ay]=port(from,d),[bx,by]=port(to,(d+2)%4);
+  const x=(ax+.5-DX[d]*.66)*TS,y=(ay+.5-DY[d]*.66)*TS;
+  const u=(bx+.5+DX[d]*.66)*TS,v=(by+.5+DY[d]*.66)*TS;
+  if(!intersects(Math.min(x,u)-8,Math.min(y,v)-8,Math.abs(x-u)+16,Math.abs(y-v)+16))continue;
+  if(sel===from||sel===to){
+   c.beginPath();c.moveTo(x,y);c.lineTo(u,v);
+   c.setLineDash([8,6]);c.lineWidth=3;c.strokeStyle='#9fe9e0';c.stroke();c.setLineDash([]);
+  }
+  rr(x-5,y-5,10,10,3,'#3b847d');rr(u-5,v-5,10,10,3,'#3b847d');
+ }
+}
 function world(){
  const [left,top]=viewToWorld(0,0),[right,bottom]=viewToWorld(FW,FH);
  const intersects=(x,y,w,h,margin=0)=>x+w+margin>left&&x-margin<right&&y+h+margin>top&&y-margin<bottom;
@@ -1542,7 +1660,7 @@ function world(){
   if(!level)continue;
   const rect=hrect(hall);
   plots.push({id:hall.id,name:hall.n,rect,floor:hall.f,drive:worldArt.driveway(hall.id,rect),
-   level,previous:extendedHallRects.get(hall.id)[level-2],flash:afl[hall.id]});
+   level,previous:level>1?layoutRect(extendedHallRects.get(hall.id)[level-2]):undefined,flash:afl[hall.id]});
  }
  const editing=(!!MD[tool]||tool==='belt')&&!G.bt.includes(tool)||tool==='mov'&&!!mvO||['place','move','route'].includes(buildMode);
  const gridIn=rect=>editing&&(hv&&inR(rect,...hv)||buildPreview?.rows.some(row=>inR(rect,row.x,row.y)));
@@ -1589,6 +1707,7 @@ function world(){
    if(MD[o.t].rc==null&&!terminal(o.t)&&o.st==3)tx('⏸',(o.x+.5)*TS,o.y*TS-2,12,'#fff','center');
   });
  }
+ if(yardLinks.length)drawLayer('Unterführungen',()=>drawYardLinks(intersects));
  if(campaignChapter()>=2&&isVisible(FLEET,2*TS))drawLayer('Flottenbau',drawFleet);
  if(bn&&isBelt(bn.t)&&visible.includes(bn)){
   c.strokeStyle='#ef4444';c.lineWidth=3;c.strokeRect(bn.x*TS+1,bn.y*TS+1,TS-2,TS-2);
@@ -2244,6 +2363,7 @@ function rsPanel(){const [X,Y,W,H]=MENUS.rs.box,NW=138,NH=32,pos=n=>[X+104+n.x*1
 function rotObj(o,r=(o.r+1)%4){
  const error=placement(o,o.x,o.y,r,new Set([o]));
  if(error){constructionError(error,{x:o.x,y:o.y,t:o.t,r,base:o.base});return false}
+ if(r!==o.r)forgetYardLinks(new Set([o]));
  mapObject(o,null);
  if(o.j==1)o.jm=[o.jm[3],o.jm[0],o.jm[1],o.jm[2]];
  o.r=r;o.needsRelocation=false;mapObject(o,o);sfx('rotate');analyze();sv(0);return true;
@@ -2590,6 +2710,7 @@ function ui(){
  else panelScroll={id:null,x:0,y:0};
 }
 
+const hasYardLinks=o=>!!(o.yardOutputs||o.yardTunnel||o.yardFeeders);
 function objectPanelBox(o){
  const d=MD[o.t],isB=isBelt(o.t);
  let h=104;
@@ -2601,13 +2722,22 @@ function objectPanelBox(o){
  else if(d.supply||d.distribution)h=116;
  else if(d.j)h=o.j===1?208:150;
  else if(isProjectRamp(o.t))h=112+28*(projectPhase(o.t)?.q.length||0);
- return [548,96,240,h];
+ return [548,96,240,h+(hasYardLinks(o)?33:0)];
 }
 function panel(o){
  const [X,Y,W,H]=objectPanelBox(o),isB=isBelt(o.t),d=isB?null:MD[o.t],prod=!!d&&d.o!=null,jn=!!d?.j;
  btn(X,Y,W,H,()=>{},'#0f141bf0');c.strokeStyle='#ffffff22';c.lineWidth=1;c.beginPath();c.roundRect(X,Y,W,H,12);c.stroke();
  tx(isB?MD[o.t]?.n||'Förderband':d.n,X+14,Y+24,isB&&o.t!='belt'||prod&&d.n.length>17?12:16,'#fff','left',800);if(prod)tx('Level '+o.lv,X+W-14,Y+24,13,'#fde68a','right',700);
- let y=Y+46;const delB=(bx,bw,lab)=>{btn(X+bx,y,bw,28,()=>{delAt(o.x,o.y);sel=null;sv(0);analyze()},'#7f1d1d',0,'del');tx(lab,X+bx+bw/2,y+19,12,'#fff','center',700)};
+ let y=Y+46;
+ if(hasYardLinks(o)){
+  const top=y-9;
+  btn(X+14,top,W-28,26,()=>{
+   forgetYardLinks(new Set([o]));analyze();sv(0);
+  },'#29504f',0,'disconnect_yard');
+  tx('Unterführung trennen',X+W/2,top+17,11,'#c5f4ec','center',700);
+  y+=33;
+ }
+ const delB=(bx,bw,lab)=>{btn(X+bx,y,bw,28,()=>{delAt(o.x,o.y);sel=null;sv(0);analyze()},'#7f1d1d',0,'del');tx(lab,X+bx+bw/2,y+19,12,'#fff','center',700)};
  if(prod){recipePreview(o.t,X+12,y-3,W-22);y+=22;
   const t0=tme(o),p=plan(o),t1=tme(o,o.lv+p.n);
   tx('Zeit pro Stück',X+14,y,12,'#94a3b8');tx(t0.toFixed(1)+' s → '+t1.toFixed(1)+' s',X+W-14,y,12,'#fff','right',700);y+=18;
@@ -2773,12 +2903,13 @@ function commitBuild(preview){
 }
 function planRoute(from,to){
  if(!from||!to||!L.includes(from)||!L.includes(to)||from===to||terminal(from.t))return null;
- if(from.needsRelocation||to.needsRelocation)return null;
+ if(from.needsRelocation||to.needsRelocation||from.yardOutputs?.[from.r]||from.yardTunnel)return null;
  const site=siteAt(from.x,from.y);
  if(site!==siteAt(to.x,to.y))return null;
  return FactoryGrid.planRoute(from,to,{
   width:GW,cell,canUse:(x,y)=>siteAt(x,y)===site&&!bchk(x,y,'belt',false,!!cell(x,y)),
-  canEnter:(target,direction)=>target.j==1?target.jm[direction]==1:!isBelt(target.t)||target.r!=direction,
+  canLeave:(belt,direction)=>!belt.yardOutputs?.[direction],
+  canEnter:(target,direction)=>!target.yardInputs?.[direction]&&(target.j==1?target.jm[direction]==1:!isBelt(target.t)||target.r!=direction),
   validate:checkBuild
  });
 }
@@ -2965,14 +3096,15 @@ function compatiblePort(from,target,direction){
  if(prod(target)&&prod(from))return uses(target,MD[from.t].o);
  return true;
 }
-function outgoing(o,lookup=cell){
+function outgoing(o,lookup=cell,keepLink=()=>true){
  const outputs=[0,1,2,3].filter(d=>fdn(o,(d+2)%4));
  const targets=new Set();
  for(const d of outputs){
-  const q=lookup(...port(o,d));
+  const link=o.yardOutputs?.[d];
+  const q=link&&keepLink(link)?link:lookup(...port(o,d));
   if(compatiblePort(o,q,d))targets.add(q);
  }
- const exit=tunnelExit(o,lookup);
+ const exit=tunnelExit(o,lookup,keepLink);
  if(exit)targets.add(exit);
  return targets;
 }
@@ -3032,7 +3164,7 @@ function lostConnections(positions){
  };
  let count=0;
  for(const o of L){
-  const next=outgoing(replacements.get(o)||o,lookup);
+  const next=outgoing(replacements.get(o)||o,lookup,target=>!moved.has(o)&&!moved.has(target));
   for(const target of outgoing(o)){
    if(!moved.has(o)&&!moved.has(target))continue;
    if(!next.has(replacements.get(target)||target))count++;
@@ -3351,7 +3483,7 @@ function demo(){init(null);stQ=[];G.tu=-1;G.th=[];G.hl={gar:1,met:1};L=[];g=[];p
   [12,8,'belt',2],[13,8,'belt',2],[14,8,'belt',2],[15,8,'mil',2,2],[16,8,'sme',2,2],[17,8,'ers',2,2]].forEach(([x,y,t,r,l])=>put(x,y,t,r,l,[1,1]));
  G.m=4820;G.sold=312;G.pk=64;G.ord=2;Object.assign(G.sl,[0,60,40,30,22,64,0,18,30,48]);G.tk=2900;refreshIndustrialArea();recalc();fs=1;for(let i=0;i<640;i++)tick();fs=0;sb.fill(2.3);rw=60;ready=1;cam={x:12*TS,y:6.2*TS,z:1};analyze();lr=Date.now()}
 const {loadParcel,clearBelt,beltDirections,moveBelt,jtick,sortingGroups}=createFactoryTransport({
- TICK,MD,PR,isBelt,beltSize,beltTime,currentTick:()=>G.tk,junctionTime:()=>BTv,neighbor,tunnelExit,
+ TICK,MD,PR,isBelt,beltSize,beltTime,currentTick:()=>G.tk,junctionTime:()=>BTv,neighbor,inputNeighbor,tunnelExit,
  give,record,prod,uses,prjNeed,isProjectRamp,orderFor
 });
 const audio=createFactoryAudio({

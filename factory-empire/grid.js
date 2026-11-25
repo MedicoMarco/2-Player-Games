@@ -30,7 +30,7 @@ function floorRoute(start,finish,width,walkable){
  }
  return [];
 }
-function industrialArea(plots,{width,height,usable,protectedTile,apron=4,corridor=1,previous}){
+function industrialArea(plots,{width,height,usable,protectedTile,apron=4,corridor=1,previous,yards=[]}){
  const tiles=previous?previous.slice():new Uint8Array(width*height);
  const inside=(x,y)=>x>=0&&y>=0&&x<width&&y<height;
  const get=(x,y)=>inside(x,y)?tiles[y*width+x]:0;
@@ -44,6 +44,9 @@ function industrialArea(plots,{width,height,usable,protectedTile,apron=4,corrido
    if(x>=left&&x<=right&&y>=top&&y<=bottom&&inside(x,y))tiles[y*width+x]=1;
    else stamp(x,y,site);
   }
+ }
+ for(const {rect:[left,top,right,bottom],site} of yards){
+  for(let y=top;y<=bottom;y++)for(let x=left;x<=right;x++)stamp(x,y,site,true);
  }
  // Join plots at their closest sides and pave the surrounding transport lanes.
  function facing(a,b){
@@ -89,7 +92,7 @@ function industrialArea(plots,{width,height,usable,protectedTile,apron=4,corrido
  }
  return {get,slabs,curbs,crossings,tiles};
 }
-function planRoute(from,to,{width,cell,canUse,canEnter,validate}){
+function planRoute(from,to,{width,cell,canUse,canEnter,canLeave,validate}){
  const direction=from.r,[x,y]=port(from,direction);
  const queue=[{x,y,entry:(direction+2)%4,previous:null}],seen=new Set();
  for(let i=0;i<queue.length;i++){
@@ -99,7 +102,7 @@ function planRoute(from,to,{width,cell,canUse,canEnter,validate}){
   const existing=cell(step.x,step.y);
   if(existing&&(!['belt','fast','express'].includes(existing.t)||existing.r==step.entry))continue;
   for(const d of existing?[existing.r]:[0,1,2,3]){
-   if(d==step.entry)continue;
+   if(d==step.entry||existing&&!canLeave(existing,d))continue;
    const nx=step.x+DX[d],ny=step.y+DY[d],next=cell(nx,ny);
    const completed={x:step.x,y:step.y,r:d,t:existing?.t||'belt',base:[1,1],existing,previous:step.previous};
    if(next===to){

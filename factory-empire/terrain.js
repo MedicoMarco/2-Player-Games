@@ -1,26 +1,26 @@
 /* Distances, road lanes and the map use tiles. Canvas scaling happens at the paint boundary. */
-function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,line,oval}){
+function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,line,oval},yardDepth=0){
  const junction={
   motorWest:[-4.1,-2.36],motorEast:[145.8,5.73],westMerge:[1.4,-2.05],eastMerge:[152.3,5.42],
-  westService:[-4.35,7.8],eastService:[146.9,13.3],westSouth:[-4.3,64.7],eastSouth:[146.2,65.1],
-  plantNorth:[80.88,18.16],plantSouth:[80.88,40.5],southGate:[82.05,64.4],labJunction:[108.6,32.2],portJunction:[109.2,43.25],
+  westService:[-4.35,7.8],eastService:[146.9,13.3],westSouth:[-4.3,64.7+2*yardDepth],eastSouth:[146.2,65.1],
+  plantNorth:[80.88,18.16+.5*yardDepth],plantSouth:[80.88,40.5+1.5*yardDepth],southGate:[82.05,64.4+2*yardDepth],labJunction:[108.6,32.2],portJunction:[109.2,43.25],
   portSouth:[110.6,65.1]
  };
  const j=junction,gateX=(bunker[0]+bunker[2]+1)/2+.06,gateY=bunker[1]+(bunker[3]-bunker[1]+1)*.719;
  const roads=[
   {id:'motor',w:2.66,path:[[-40,-5],[-14,-3],j.motorWest,j.westMerge,[14.8,-1.75],[27.5,-2.3],[45.7,-1.85],[58,-1.75],[71.7,-2.25],[80.6,-1.88],[96,.46],[109.9,.25],[125.8,4.35],j.motorEast,j.eastMerge,[159.6,1.4],[175.4,-1.44],[201,-2.5]]},
-  {id:'west',w:1.28,path:[[-9,-21],[-5.7,-11],[-4.8,-5.7],j.motorWest,j.westService,[-3.4,17.2],[-1.63,26],[-1.51,34.2],[-2.21,41.1],[-5.2,48.1],[-3.75,54],j.westSouth,[-6.3,73.4],[-1.2,83.5]]},
+  {id:'west',w:1.28,path:[[-9,-21],[-5.7,-11],[-4.8,-5.7],j.motorWest,j.westService,[-3.4,17.2],[-1.63,26],[-1.51,34.2],[-2.21,41.1],[-5.2,48.1],[-3.75,54+yardDepth],j.westSouth,[-6.3,73.4+2*yardDepth],[-1.2,83.5+2*yardDepth]]},
   {id:'east',w:1.27,path:[j.motorEast,j.eastService,[146.55,23.4],[145.4,32.8],[147.3,40.6],[145.6,53],j.eastSouth,[149.2,76.4]]},
-  {id:'ring',w:1.57,path:[[-28,59.3],[-16,62.1],j.westSouth,[8.6,65.3],[24.6,63.85],[47.2,64.4],[63.2,63.65],j.southGate,[98.2,64.2],j.portSouth,[129.5,66.1],j.eastSouth,[157.9,67.1],[169.2,63.4]]},
+  {id:'ring',w:1.57,path:[[-28,59.3+2*yardDepth],[-16,62.1+2*yardDepth],j.westSouth,[8.6,65.3+2*yardDepth],[24.6,63.85+2*yardDepth],[47.2,64.4+2*yardDepth],[63.2,63.65+2*yardDepth],j.southGate,[98.2,64.2+0.8*yardDepth],j.portSouth,[129.5,66.1],j.eastSouth,[157.9,67.1],[169.2,63.4]]},
   {id:'westRamp',w:.76,path:[j.westService,[-3.15,5.6],[-1.95,2.6],[-.95,-.14],j.westMerge]},
   {id:'eastRamp',w:.76,path:[j.eastService,[148.52,10.9],[150.4,8.1],j.eastMerge]},
-  {id:'north',w:.77,freight:true,path:[[11.7,18.1],[25.3,17.9],[39.6,18.1],[57.5,18.4],[68.3,18.3],j.plantNorth]},
-  {id:'south',w:.81,freight:true,path:[[12.7,40.4],[26,40.2],[42.4,40.6],[56.7,40.4],[70.7,40.35],j.plantSouth]},
-  {id:'trunk',w:1.03,freight:true,path:[j.plantNorth,[80.92,27.7],[80.91,32.45],j.plantSouth,[82.02,42.5],[82.27,48.2],[82.22,55.8],j.southGate]},
+  {id:'north',w:.77,freight:true,path:[[11.7,18.1+.5*yardDepth],[25.3,17.9+.5*yardDepth],[39.6,18.1+.5*yardDepth],[57.5,18.4+.5*yardDepth],[68.3,18.3+.5*yardDepth],j.plantNorth]},
+  {id:'south',w:.81,freight:true,path:[[12.7,40.4+1.5*yardDepth],[26,40.2+1.5*yardDepth],[42.4,40.6+1.5*yardDepth],[56.7,40.4+1.5*yardDepth],[70.7,40.35+1.5*yardDepth],j.plantSouth]},
+  {id:'trunk',w:1.03,freight:true,path:[j.plantNorth,[80.92,27.7+1*yardDepth],[80.91,32.45+1*yardDepth],j.plantSouth,[82.02,42.5+1.6*yardDepth],[82.27,48.2+1.7*yardDepth],[82.22,55.8+1.8*yardDepth],j.southGate]},
   {id:'annex',w:.84,freight:true,path:[j.labJunction,[105.1,32],[99.7,32.3],[92,32.65],[87,34.4],j.plantSouth]},
   {id:'port',w:.85,freight:true,path:[j.labJunction,[109,37.9],j.portJunction,[115.4,43.36],[123.9,44],[132.8,44.18]]},
   {id:'eastLink',w:.85,freight:true,path:[j.portJunction,[109.4,51.2],[109.9,57.7],j.portSouth]},
-  {id:'bunker',w:1.39,freight:true,path:[j.southGate,[79.6,63.4],[76.2,63.15],[gateX,61.25],[gateX,gateY]]}
+  {id:'bunker',w:1.39,freight:true,path:[j.southGate,[79.6,63.4+2*yardDepth],[76.2,63.15+2*yardDepth],[gateX,61.25+2*yardDepth],[gateX,gateY]]}
  ];
  const outlets={
   gar:['north',1],met:['north',1],elk:['north',1],nor:['annex',1],prt:['port',1],

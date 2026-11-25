@@ -38,7 +38,7 @@ function ticks(count) {
  for (let i = 0; i < count; i++) core().tick();
 }
 function load(objects = [], setup = {}) {
- core().init({ v: 2, m: 1e6, o: objects, ...setup });
+ core().init({ v: 2, m: 1e6, o: objects, ...setup }, false);
  core().analyze();
  return core();
 }
@@ -1491,7 +1491,8 @@ for(const zoom of [.22,.30,.41,.42,.8,1.3,2.6,.33,1.8]){
 }
 assert(drawnHallTitles>0,'hall detail must recover on the next frame');
 assert.deepEqual(renderErrors,[]);
-for(const method of ['save','restore','translate','scale','setTransform','fillText','createLinearGradient'])delete nativeTarget[method];
+for(const method of ['save','restore','translate','scale','setTransform','fillText'])delete nativeTarget[method];
+scope.c.createLinearGradient=()=>({addColorStop(){}});
 delete scope.cv.width;delete scope.cv.height;
 
 zoomGame.leave();
@@ -1528,7 +1529,7 @@ assert.equal(oldGame.bchk(4,5,'src'),'');
 assert.deepEqual(JSON.parse(data.get('2pg_fe_guest.before-v2')),oldSave);
 oldGame.sv(false);
 const migratedSave=JSON.parse(data.get('2pg_fe_guest'));
-assert.equal(migratedSave.v,2);
+assert.equal(migratedSave.v,3);
 assert.equal(migratedSave.m,16480);
 assert.deepEqual(migratedSave.legacyPlots,['w','e']);
 const recoveredFactory=factory();
@@ -1542,10 +1543,95 @@ const compatible=factory();
 compatible.update(.6);
 compatible.dbg().sv(false);
 assert.equal(data.get('2pg_fe_guest'),futureSave);
-assert.equal(JSON.parse(data.get('2pg_fe_guest.compatible')).v,2);
+assert.equal(JSON.parse(data.get('2pg_fe_guest.compatible')).v,3);
 data.delete('2pg_fe_guest');
 data.delete('2pg_fe_guest.compatible');
 console.log('Zoom: wheel, camera bounds, two pointer zoom, canceled gestures and editing passed. Saves: original v1 and unsupported snapshots preserved.');
+
+const earlyYard=factory();
+earlyYard.dbg().init({v:3,m:1000,hl:{gar:1,met:1}});
+assert.equal(earlyYard.dbg().bchk(24,25,'belt'),'','the first logistics yard opens with the metal hall');
+
+const oldYardSave={
+ v:2,ts:clock,rev:'yard-original',m:15250,sp:6,hl:{gar:3,met:2,vrs:3,ene:2,hit:1,nor:1},
+ crewVersion:1,mg:[{id:'prod',lv:3,x:20,y:45,hall:'hit'}],
+ o:[
+  [10,17,'src',1,2],
+  [10,18,'express',1,1,1,0,-1,0,0,{iq:122,queue:[[2,131,3,0,false]]}],
+  [10,19,'kre',0,1],[10,20,'sto',1,2,-1,0,-1,[3],0,{qq:[112]}],
+  [15,16,'tunnel',1,1,1,0,-1,0,0,{iq:138}],[15,21,'tunnel',1,1],[15,22,'sto',1,1],
+  [22,42,'belt',3,1,1,0,-1,0,0,{iq:119}],[22,41,'belt',3,1],
+  [22,40,'belt',3,1],[22,39,'sto',0,1],
+  [20,45,'cellFab',0,3,-1,[1,2,1,1],-1,0,0,{large:true}],
+  [90,12,'sto',0,2,-1,0,-1,[2]]
+ ]
+};
+data.set('2pg_fe_guest',JSON.stringify(oldYardSave));
+const expandedFactory=factory();
+expandedFactory.update(.6);
+const expanded=expandedFactory.dbg;
+let yard=expanded();
+assert.deepEqual(JSON.parse(data.get('2pg_fe_guest.before-logistics-yard.yard-original')),oldYardSave);
+assert.equal(yard.G.m,oldYardSave.m);
+assert.equal(yard.L.length,oldYardSave.o.length);
+assert.equal(yard.hrect(yard.hallOf('vrs'))[1],32);
+assert.equal(yard.hrect(yard.hallOf('hit'))[1],64);
+assert.equal(yard.SITE[1],62);
+assert.equal(yard.bchk(35,26,'belt'),'');
+assert.equal(yard.bchk(35,57,'belt'),'');
+assert(yard.bchk(35,26,'src'));
+assert(yard.bchk(74,67,'belt').includes('ARCHE'));
+assert.equal(yard.cell(10,29).t,'kre');
+assert.equal(yard.cell(15,31).t,'tunnel');
+assert.equal(yard.cell(22,61).t,'belt');
+assert.equal(yard.cell(21,66),yard.cell(20,65));
+assert.equal(yard.G.mg[0].y,65);
+assert.equal(yard.cell(20,65).lv,3);
+assert.equal(yard.cell(90,12).q[0],2);
+assert(yard.connectedLine(yard.cell(10,18)).includes(yard.cell(10,30)));
+assert(yard.connectedLine(yard.cell(15,16)).includes(yard.cell(15,32)));
+assert(yard.connectedLine(yard.cell(22,62)).includes(yard.cell(22,49)));
+yard.sv(false);
+const beforeTransport=JSON.parse(data.get('2pg_fe_guest'));
+assert.equal(beforeTransport.v,3);
+assert.equal(beforeTransport.yardLinks.length,3);
+const reloadedFactory=factory();
+reloadedFactory.update(.6);
+yard=reloadedFactory.dbg();
+assert.equal(yard.L.length,oldYardSave.o.length);
+assert.equal(yard.cell(10,18).queue[0][1],131);
+for(let i=0;i<80;i++)yard.tick();
+assert.deepEqual(Array.from(yard.cell(10,30).q.slice(0,3)),[3,1,2]);
+assert.deepEqual(Array.from(yard.cell(10,30).qq.slice(0,3)),[112,122,131]);
+assert.equal(yard.cell(15,32).qq[0],138);
+assert.equal(yard.cell(22,49).qq[0],119);
+yard.view(10.5,22,1);
+yard.sel(yard.cell(10,18));
+reloadedFactory.draw();
+assert.deepEqual(renderErrors,[],'the expanded map and selection render');
+assert(yard.tuD().HB.some(hit=>hit.id==='disconnect_yard'));
+assert.equal(yard.bchk(10,20,'belt'),'');
+yard.delAt(10,29);
+yard.sv(false);
+const afterRemoval=JSON.parse(data.get('2pg_fe_guest'));
+assert.equal(afterRemoval.yardLinks.length,2);
+assert(!yard.connectedLine(yard.cell(10,18)).includes(yard.cell(10,30)));
+
+const legacyFootprint={v:2,ts:clock,m:5600,hl:{gar:3,hit:1},o:[
+ [10,18,'cellFab',0,3,-1,[1,2,1,1],-1,0,0,{large:true}]
+]};
+yard.applySave(legacyFootprint);
+yard=reloadedFactory.dbg();
+assert.equal(yard.hrect(yard.hallOf('hit'))[1],44);
+assert.equal(yard.cell(11,19),yard.cell(10,18),'a footprint across the cut stays completely intact');
+yard.sv(false);
+const retained=JSON.parse(data.get('2pg_fe_guest'));
+assert.equal(retained.v,2);
+assert.deepEqual(retained.o[0].slice(0,5),legacyFootprint.o[0].slice(0,5));
+data.delete('2pg_fe_guest');
+console.log('Expanded yards, migration backups, both conveyor directions, tunnels, managers and saved cargo passed.');
+
+
 
 scope.window.NOFIN = false;
 scope.$=()=>({style:{display:'none'}});

@@ -1,6 +1,6 @@
 /* Parcel queues, splitters, crossings, sorters and tunnel transfers. */
 function createFactoryTransport({
- TICK,MD,PR,isBelt,beltSize,beltTime,currentTick,junctionTime,neighbor,tunnelExit,
+ TICK,MD,PR,isBelt,beltSize,beltTime,currentTick,junctionTime,neighbor,inputNeighbor,tunnelExit,
  give,record,prod,uses,prjNeed,isProjectRamp=t=>t==='prj',orderFor
 }){
 function loadParcel(o,[item,quality,entry,tick,jumped]){
@@ -50,8 +50,10 @@ function moveBelt(o){
 /* Verteiler behalten Produkt und Qualität gemeinsam und ziehen abwechselnd von ihren Eingängen. */
 function jtick(o){
  const pull=d=>{
-  const n=neighbor(o,d);
-  if(!n||!isBelt(n.t)||!beltDirections(n).includes((d+2)%4)||n.it<0||n.ag<beltTime(n.t)||n.t=='tunnel'&&!n.jumped&&tunnelExit(n))return null;
+  const n=inputNeighbor(o,d);
+  const output=(d+2)%4;
+  if(!n||n.needsRelocation||!isBelt(n.t)||!beltDirections(n).includes(output)||n.it<0||n.ag<beltTime(n.t))return null;
+  if(n.yardOutputs?.[output]&&n.yardOutputs[output]!==o||n.t=='tunnel'&&!n.jumped&&tunnelExit(n))return null;
   const parcel=[n.it,n.iq];
   record(n,'moves');n.beltCarry=0;clearBelt(n);
   return parcel;

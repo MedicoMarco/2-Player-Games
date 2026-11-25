@@ -2,7 +2,7 @@
 const FactoryRuntime=(()=>{
 function validSave(value){
  if(!value||typeof value!=='object'||!Number.isFinite(value.ts)||value.ts<=0||!Number.isFinite(value.m))return false;
- return value.v===1||value.v===2||value.v==null&&('ar' in value||'o' in value);
+ return value.v===1||value.v===2||value.v===3||value.v==null&&('ar' in value||'o' in value);
 }
 function revision(value){
  if(value==null)return '';
