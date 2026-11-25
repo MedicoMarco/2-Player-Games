@@ -1262,12 +1262,36 @@ d=load(fleetSave.o,fleetSave);
 assert.equal(d.G.campaign.level,2);
 assert.equal(d.G.campaign.delivery[0],1);
 assert.equal(d.G.m,fleetSave.m);
-for(const phase of [[ [53,39],[54,20],[55,12] ],[ [56,16],[57,16],[58,12] ],[ [59,14],[60,8],[56,8] ]]){
- for(const [item,target] of phase)for(let i=0;i<target;i++)assert(d.prjIn(item,d.cell(156,12)));
+const expandedHorizont=vm.runInContext('FactoryCampaign.chapters[2].phases',context);
+assert.equal(expandedHorizont.length,d.PH.length);
+const work=(id)=>{
+ const model=Object.values(d.MD).find(entry=>entry.o===id);
+ return model.w+(model.r||[]).reduce((sum,[input,count])=>sum+count*work(input),0);
+};
+const totalWork=phases=>phases.reduce((total,phase)=>total+phase.q.reduce((sum,[id,count])=>sum+work(id)*count,0),0);
+assert(Math.abs(totalWork(expandedHorizont)/totalWork(d.PH)-1)<.12,'expanded Horizont has similar total recipe workload');
+const migratedActive=load([], {sp:7,campaign:{level:2,stage:1,delivery:[12,3,1],total:76}});
+assert.equal(migratedActive.G.campaign.stage,1);
+assert.deepEqual(Array.from(migratedActive.G.campaign.delivery),[12,3,1]);
+const migratedComplete=load([], {sp:7,campaign:{level:2,stage:3,total:129}});
+assert.equal(migratedComplete.G.campaign.stage,7);
+assert.equal(migratedComplete.G.campaign.total,129);
+const beforeArche=load([],{sp:6}).fx();
+const afterArche=load([],{sp:7}).fx();
+assert.equal(afterArche.STC,beforeArche.STC+20);
+assert(Math.abs(afterArche.BTv*1.1-beforeArche.BTv)<1e-10);
+assert.equal(load([],{sp:7}).cst('saw'),57);
+d=load(fleetSave.o,fleetSave);
+for(const [i,phase] of expandedHorizont.entries()){
+ for(const [item,count] of phase.q){
+  const target=count-(i===0&&item===53?1:0);
+  for(let n=0;n<target;n++)assert(d.prjIn(item,d.cell(156,12)));
+ }
+ assert.equal(d.G.campaign.stage,i+1);
 }
-assert.equal(d.G.campaign.stage,3);
+assert.equal(d.G.campaign.stage,7);
 assert(!d.prjIn(60,d.cell(156,12)));
-assert.deepEqual(Array.from(d.G.story.queue),['horizont-intro','horizont-1','horizont-2','horizont-3','horizont-finale']);
+assert.deepEqual(Array.from(d.G.story.queue),['horizont-intro',...Array.from({length:7},(_,i)=>'horizont-'+(i+1)),'horizont-finale']);
 for(const id of Array.from(d.G.story.queue)){
  assert.equal(d.currentStoryId(),id);
  d.updateStory(.2);
@@ -1508,7 +1532,7 @@ assert(html.includes('body.fab #ex{display:none}'));
 assert.deepEqual(renderErrors,[],'no render errors during normal navigation');
 
 const canvasState=[];
-let transform={x:0,y:0,sx:2,sy:2},drawnHeader=false,breakWorld=true,drawnHallTitles=0,detailedMachines=0;
+let transform={x:0,y:0,sx:2,sy:2},drawnHeader=false,drawnBeltIcon=false,breakWorld=true,drawnHallTitles=0,detailedMachines=0;
 nativeTarget.save=()=>canvasState.push({...transform});
 nativeTarget.restore=()=>{
  assert(canvasState.length>0,'unbalanced Canvas restore');
@@ -1522,11 +1546,14 @@ nativeTarget.createLinearGradient=(x0,y0,x1,y1)=>{
  return {addColorStop(){}};
 };
 nativeTarget.fillText=(label)=>{
- if(String(label).startsWith('💰 '))drawnHeader=true;
+ if(String(label).endsWith(' €'))drawnHeader=true;
  if(String(label).includes('GARAGE')){
   if(breakWorld){breakWorld=false;throw Error('A world drawing operation failed')}
   drawnHallTitles++;
  }
+};
+nativeTarget.roundRect=(x,y,w,h)=>{
+ if(x===-11&&y===-6&&w===22&&h===12)drawnBeltIcon=true;
 };
 scope.cv.width=800;scope.cv.height=480;
 const contextBefore={...transform};
@@ -1535,6 +1562,7 @@ assert.doesNotThrow(()=>zoomGame.draw(),'a drawing failure must leave the game i
 assert.equal(canvasState.length,0);
 assert.deepEqual(transform,contextBefore);
 assert(drawnHeader,'the Factory Empire controls must remain available');
+assert(drawnBeltIcon,'the belt shortcut must draw its own artwork');
 assert.equal(drawnHallTitles,0);
 assert.equal(renderErrors.length,1);
 assert.match(renderErrors.pop()[0],/Halle gar/);
@@ -1549,7 +1577,7 @@ for(const zoom of [.22,.30,.41,.42,.8,1.3,2.6,.33,1.8]){
 }
 assert(drawnHallTitles>0,'hall detail must recover on the next frame');
 assert.deepEqual(renderErrors,[]);
-for(const method of ['save','restore','translate','scale','setTransform','fillText'])delete nativeTarget[method];
+for(const method of ['save','restore','translate','scale','setTransform','fillText','roundRect'])delete nativeTarget[method];
 scope.c.createLinearGradient=()=>({addColorStop(){}});
 delete scope.cv.width;delete scope.cv.height;
 

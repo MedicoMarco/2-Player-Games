@@ -554,8 +554,8 @@ Deutschland</p>
 <div id="legal" hidden><div class="lg-box" role="dialog" aria-modal="true" aria-labelledby="lg-t"><div class="lg-head"><h2 id="lg-t"></h2><button type="button" id="lg-x" aria-label="Schließen">✕</button></div><div class="lg-body" id="lg-b"></div></div></div>
 <div id="toast"></div><div id="sp" aria-hidden="true"><div class="spc" role="dialog" aria-modal="true" aria-labelledby="spt"><div class="olh"><h2 id="spt">Einstellungen</h2><button id="spx" aria-label="Schließen">✕</button></div><div class="seg" id="spn" role="tablist"></div><div id="spv"></div></div></div><div id="olp"></div><div id="oli"></div><div class="w" id="game"><div class="bar"><button class="btn r" id="back" aria-label="Zurück zum Menü" title="Menü"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h4.5v-6h4v6h4.5V10"/></svg></button><b id="gt"></b><span id="cs"></span><button class="btn" id="rs" aria-label="Neu starten" title="Neu starten">↻</button></div>
 <div class="stage"><button type="button" id="factory-back" aria-label="Zurück zum Menü" title="Menü"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h4.5v-6h4v6h4.5V10"/></svg></button><canvas id="cv" width="800" height="480"></canvas><video id="gv" autoplay muted playsinline></video><canvas id="gc" width="800" height="480"></canvas><div class="ov" id="ov"></div></div><p id="hint" style="text-align:center;color:var(--mu);font-size:14px"></p></div>
-<script src="./factory-empire/campaign.js?v=1"></script>
-<script src="./factory-empire/story.js?v=1"></script>
+<script src="./factory-empire/campaign.js?v=2"></script>
+<script src="./factory-empire/story.js?v=2"></script>
 <script src="./factory-empire/story-art.js?v=1"></script>
 <script src="./factory-empire/catalog.js?v=15"></script>
 <script src="./factory-empire/audio.js"></script>
@@ -564,12 +564,13 @@ Deutschland</p>
 <script src="./factory-empire/runtime.js?v=3"></script>
 <script src="./factory-empire/telemetry.js"></script>
 <script src="./factory-empire/drawing.js?v=8"></script>
+<script src="./factory-empire/icons.js?v=1"></script>
 <script src="./factory-empire/equipment.js?v=1"></script>
 <script src="./factory-empire/transport.js?v=10"></script>
 <script src="./factory-empire/layout.js?v=18"></script>
 <script src="./factory-empire/terrain.js?v=12"></script>
 <script src="./factory-empire/world.js?v=7"></script>
-<script src="./factory-empire/game.js?v=29"></script>
+<script src="./factory-empire/game.js?v=30"></script>
 <script src="./poker.js"></script>
 <script src="./card-chip-picker.js"></script>
 <script src="./poker-table.js?v=3"></script>
@@ -4544,7 +4545,7 @@ const cupAll=()=>GAMES.filter(g=>!ROOMG.includes(g.id)).map(g=>g.id),newCup=(poo
 function cupNext(){const c=cup;if(!c.bag.length){const b=c.pool.slice().sort(()=>Math.random()-.5);if(b.length>1&&b[b.length-1]==c.last){const t=b[0];b[0]=b[b.length-1];b[b.length-1]=t}c.bag=b}c.last=c.bag.pop();return c.last}
 const cupInfo=()=>'Cup: '+S.t+' zufällige Spiele, jederzeit beendbar · Haken wählt die Spiele ('+sel.size+')';
 let factoryPreviewEnabled=false;
-function start(id,sk){gdef=GAMES.find(g=>g.id==id);AD.lo=0;if(S.cpu===2&&(!gdef.solo||cup))S.cpu=1;clearInput();if(!ON)n1=S.cpu===1&&typeof OL!='undefined'&&OL.name?OL.name:'Spieler 1';S.rec=[id,...S.rec.filter(x=>x!=id)].slice(0,4);save();window.RX='';over=0;PA=[];TBw=-1;if(!ON)$('#ov').style.display='none';setView();cur=id==='fabrik'&&factoryPreviewEnabled?gdef.mk({preview:true}):gdef.mk();$('#menu').style.display='none';$('#game').style.display='block';fsOn();setView();$('#gt').textContent=gdef.n;$('#hint').textContent=gdef.h+(isSolo()?' · Solo: spiele auf Highscore':S.cpu?' (gegen Computer: du bist Spieler 1)':'');cs();intro();olUpdateGame();if(sk)go()}
+function start(id,sk,{preview=false}={}){gdef=GAMES.find(g=>g.id==id);AD.lo=0;if(S.cpu===2&&(!gdef.solo||cup))S.cpu=1;clearInput();if(!ON)n1=S.cpu===1&&typeof OL!='undefined'&&OL.name?OL.name:'Spieler 1';S.rec=[id,...S.rec.filter(x=>x!=id)].slice(0,4);save();window.RX='';over=0;PA=[];TBw=-1;if(!ON)$('#ov').style.display='none';setView();cur=id==='fabrik'&&preview&&factoryPreviewEnabled?gdef.mk({preview:true}):gdef.mk();$('#menu').style.display='none';$('#game').style.display='block';fsOn();setView();$('#gt').textContent=gdef.n;$('#hint').textContent=gdef.h+(isSolo()?' · Solo: spiele auf Highscore':S.cpu?' (gegen Computer: du bist Spieler 1)':'');cs();intro();olUpdateGame();if(sk)go()}
 function showOv(h){const o=$('#ov');o.innerHTML=h;o.style.display='flex';ON&&ON.role==0&&ON.send&&ON.send({o:h})}
 const bd=(id,f)=>{const e=$('#'+id);if(e)e.onclick=f};
 $('#ov').addEventListener('click',e=>{const b=e.target.closest('[data-lu]');if(b&&cur&&cur.luClick)cur.luClick(b)});
@@ -5645,17 +5646,31 @@ const fromHash=()=>{const k=location.hash.slice(1);if(T[k])open(k)};addEventList
 <script src="./chat-moderation.js"></script>
 <script src="./notifications.js"></script>
 <script>
-(async()=>{
- const code=/^#factory-test=([A-Za-z0-9_-]{32})$/.exec(location.hash)?.[1];
- if(!code||!globalThis.crypto?.subtle)return;
- const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(code)));
- if(Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('')!=='22e0e68f19242e14e4f9d3e97fca832245612ae212a416ce7ad7f08befd8166f')return;
- factoryPreviewEnabled=true;
+(()=>{
+ const menuElement=document.querySelector('#menu');
  const button=document.createElement('button');
  button.type='button';button.className='btn';
  button.textContent='Factory Empire · Testmodus';
- button.onclick=()=>start('fabrik');
- document.querySelector('#menu').prepend(button);
-})().catch(()=>{});
+ const open=()=>start('fabrik',false,{preview:true});
+ button.onclick=open;
+ const syncPreview=async launch=>{
+  const hash=location.hash;
+  const code=/^#factory-test=([A-Za-z0-9_-]{32})$/.exec(hash)?.[1];
+  let allowed=false;
+  if(code&&globalThis.crypto?.subtle){
+   const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(code)));
+   allowed=Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('')==='22e0e68f19242e14e4f9d3e97fca832245612ae212a416ce7ad7f08befd8166f';
+  }
+  if(location.hash!==hash)return;
+  factoryPreviewEnabled=allowed;
+  if(allowed){
+   if(!button.isConnected)menuElement.prepend(button);
+   if(launch&&menuElement.style.display!=='none')open();
+  }else button.remove();
+ };
+ const refresh=launch=>syncPreview(launch).catch(()=>{});
+ addEventListener('hashchange',()=>refresh(true));
+ refresh(new URLSearchParams(location.search).has('factory-preview'));
+})();
 </script>
 </body></html>

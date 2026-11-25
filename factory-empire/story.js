@@ -42,7 +42,7 @@ const FactoryStory=(()=>{
   shot(8,i===4?'gate':'bunker','Bauleitung',line,detail,'unlock'),
   shot(7,i<2?'bunker':i===4?'gate':i===5?'command':'habitat','Reyes','Bauabschnitt '+(i+1)+' bestätigt. Die Mannschaft übernimmt die nächste Schicht.')
  ]};
- for(const [i,title] of ['Außenhaut geschlossen','Flugbereit','Kolonieausrüstung an Bord'].entries())scenes['horizont-'+(i+1)]={title,stage:i,shots:[
+ for(const [i,title] of ['Außenhaut geschlossen','Antrieb und Versorgung bereit','Erste Kolonieausrüstung an Bord','Montage der Flotte abgeschlossen','Navigation und Energie geprüft','Vorräte verladen','Startbereitschaft bestätigt'].entries())scenes['horizont-'+(i+1)]={title,stage:i,shots:[
   shot(8,'shipyard','Werftleitung',title+'. Der Abschnitt ist abgenommen.','Auf dem Montagefeld sind die zuletzt eingebauten Systeme zu sehen.','unlock'),
   shot(6,'command','Stationsfunk','Werftfortschritt bestätigt. Die nächste Schicht übernimmt.')
  ]};
