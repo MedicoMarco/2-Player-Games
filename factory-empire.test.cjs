@@ -721,6 +721,14 @@ assert.equal(d.industrial.crossings.length,0,'no connectors cross a river in the
 for(const [x,y] of [[4,8],[13,19],[27,29],[15,51],[140,26]]){
  assert.equal(d.industrial.get(x,y),1,'clear industrial ground at '+x+','+y);
 }
+for(const v of [3,4]){
+ d=load([], {v,hl:{hit:3},sp:7});
+ const [left,top,,bottom]=d.hrect(d.hallOf('hit'));
+ for(let y=top;y<=bottom;y++)for(let x=left-6;x<left;x++){
+  assert.equal(d.industrial.get(x,y),1,'continuous west apron at '+x+','+y+' on map '+v);
+  assert.equal(d.bchk(x,y,'belt'),'');
+ }
+}
 console.log('Factory landscape, locked halls, construction grids and seven ARCHE phases passed.');
 
 const idle = { v: 2, m: 120, ts: clock, tk: 0, o: starter, hl: { gar: 1 } };
@@ -1082,6 +1090,16 @@ async function testCloud() {
  assert.equal(server.sl[1],1);
  assert.equal(server.saleIncome[1],6);
  assert.equal(first.dbg().cloud.pending, null);
+ const setItem=scope.localStorage.setItem;
+ try{
+  scope.localStorage.setItem=()=>{throw new Error('Storage blocked')};
+  firstGame.G.m=555;
+  firstGame.sv(true);
+  await settle();
+  assert.equal(firstGame.cloud.localSaved,false);
+  assert.equal(firstGame.cloud.status,'synced');
+  assert.equal(server.m,555,'blocked local storage must not prevent a cloud write');
+ }finally{scope.localStorage.setItem=setItem}
  console.log('Phase 5: exact offline replay, report, saved backlog, viewport controls and concurrent cloud retries passed.');
 }
 
