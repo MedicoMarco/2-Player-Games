@@ -612,7 +612,7 @@ console.log('Factory landscape, locked halls, construction grids and seven ARCHE
 const idle = { v: 2, m: 120, ts: clock, tk: 0, o: starter, hl: { gar: 1 } };
 load(starter, { m: 120 });
 assert.equal(core().G.od.find(order=>order.s===1).r,116);
-ticks(1200);
+ticks(720);
 const online = { m: core().G.m, sold: core().G.sold, units: core().G.units, cost: core().G.cost, saleIncome: {...core().G.saleIncome} };
 const offline = factory();
 offline.dbg().applySave(idle);
@@ -620,8 +620,66 @@ clock += 600000;
 offline.update(.016);
 const offlineResult = offline.dbg().G;
 assert.deepEqual({ m: offlineResult.m, sold: offlineResult.sold, units: offlineResult.units, cost: offlineResult.cost, saleIncome: {...offlineResult.saleIncome} }, online);
-assert(overlay.includes('10 Min.') && overlay.includes('Material und Löhne'));
-assert(offlineResult.history.length >= 2);
+assert(overlay.includes('10 Min.') && overlay.includes('15 %') && overlay.includes('Material und Löhne'));
+for(const [research,seconds,efficiency] of [[[],1200,.15],[['nst'],1800,.20]]){
+ const long=factory();
+ long.dbg().applySave({...idle,ts:clock,rs:research});
+ clock+=24*3600*1000;
+ long.update(.016);
+ assert.equal(long.dbg().G.tk,seconds*efficiency/.125,'overnight credits only the capped fraction');
+ assert.equal(long.dbg().fx().KOF,seconds);
+ assert.equal(long.dbg().fx().OFFE,efficiency);
+}
+assert.equal(offlineResult.history.length,1);
+
+const excessCarry=factory();
+excessCarry.dbg().applySave({...idle,ts:clock,carry:7200});
+excessCarry.update(.016);
+assert.equal(excessCarry.dbg().G.tk,1440,'remaining offline time in older saves uses the new limit');
+
+const unlockedAchievements=Array.from(core().AC,a=>a.id);
+const researchSave={m:170000,rp:4300,rs:['spd3','lag2','wrk','lean'],sold:330,ac:unlockedAchievements};
+d=load([[7,6,'src',0,3],[8,6,'sto',0,2]],researchSave);
+const baseEffects=d.fx();
+assert.equal(d.G.rp,researchSave.rp);
+assert.equal(d.G.m,researchSave.m);
+assert.equal(d.RN.filter(node=>node.advanced).length,12);
+assert(!d.rOK(d.RN.find(node=>node.id==='tools2')));
+d.rsOpen(true);
+play.draw();
+d.tuD().HB.find(hit=>hit.id==='research_advanced').fn();
+play.draw();
+assert(d.tuD().HB.some(hit=>hit.id==='research_tools1'));
+assert(!d.tuD().HB.some(hit=>hit.id==='research_spd3'));
+for(const id of ['tools1','tools2','depots1','sourcing1','service1']){
+ const node=d.RN.find(entry=>entry.id===id);
+ assert(d.rOK(node));
+ assert(d.G.rp>=node.c);
+ d.buyR(node);
+}
+d.rsOpen(false);
+const enhanced=d.fx();
+assert.equal(enhanced.STC,baseEffects.STC+20);
+assert(Math.abs(enhanced.SPm/baseEffects.SPm/(1+.01*(d.lv()-1))-1.08)<1e-10);
+assert.equal(enhanced.RCm,baseEffects.RCm*.96);
+assert.equal(enhanced.KUC,baseEffects.KUC*.96);
+const savedResearch=save();
+d=load(savedResearch.o,savedResearch);
+assert(d.RH('tools2')&&d.RH('spd3'));
+assert.equal(d.G.rp,savedResearch.rp);
+assert.equal(d.G.m,researchSave.m);
+assert.deepEqual(d.fx(),enhanced);
+
+d=load([[7,6,'belt',0,1],[8,6,'shp',0,1]],{sold:1999,ord:2,rp:100,
+ ac:unlockedAchievements,xp:0,ds:[0,1]});
+d.G.od=[{s:1,n:1,d:0,r:5}];
+assert(d.give(d.cell(7,6),0,1));
+assert.equal(d.G.ord,3);
+assert.equal(d.G.rp,101,'sales milestone awards 1 FP and ordinary repeat orders award none');
+d.G.ord=9;d.G.od=[{s:1,n:1,d:0,r:5}];
+assert(d.give(d.cell(7,6),0,1));
+assert.equal(d.G.rp,102,'every tenth completed order awards 1 FP');
+console.log('Offline limits, saved research and four upgrade tracks passed.');
 
 const pending = factory();
 pending.dbg().applySave({ ...idle, ts: clock, carry: 10 });
