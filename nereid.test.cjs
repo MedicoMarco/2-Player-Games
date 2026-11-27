@@ -35,3 +35,5 @@ for(let id=0;id<E.stations.length;id++){const pattern=E.challenge(s,tech,id);ass
 assert.equal(E.vision(E.meeting,320).length,112);
 const witnessGame=E.newRound(seats,{},()=>.4);const g1=witnessGame.players.find(p=>p.role==='glitch'),crew=witnessGame.players.filter(p=>p.role==='tech');for(const p of [g1,...crew])Object.assign(p,{x:E.meeting.x,y:E.meeting.y});witnessGame.t=30;assert(E.apply(witnessGame,g1.id,{k:'disable',v:crew[0].id}));assert.equal(crew[1].evidence.id,g1.id);assert(E.publicState(witnessGame).players.every(p=>!Object.hasOwn(p,'evidence')));
 console.log('Nereid v2 task variants, visibility and private witness evidence passed.');
+
+assert(E.publicState(bot).done>0,'Bots must complete at least one assignment in a simulated minute');

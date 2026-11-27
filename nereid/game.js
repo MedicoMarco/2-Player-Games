@@ -31,7 +31,7 @@ const Nereid=(()=>{
  function sight(a,b,range=Infinity){const d=distance(a,b);if(d>range)return false;for(let i=0;i<=Math.ceil(d/14);i++){const f=i/Math.max(1,Math.ceil(d/14));if(!walk(a.x+(b.x-a.x)*f,a.y+(b.y-a.y)*f))return false}return true}
  const near=(a,b,r=65)=>distance(a,b)<=r&&sight(a,b);
  function shuffle(a,rand=Math.random){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
- function spawn(p){const a=p.id*2.399; p.x=meeting.x+Math.cos(a)*82;p.y=meeting.y+Math.sin(a)*82;p.dx=p.dy=0;p.inputUntil=0}
+ function spawn(p){const a=p.id*2.399; p.x=meeting.x+Math.cos(a)*82;p.y=meeting.y+Math.sin(a)*82;p.dx=p.dy=0;p.inputUntil=0;p.waypoint=null;p.workUntil=0}
  function newRound(seats,opts={},rand=Math.random){
   const players=seats.map((q,i)=>q&&['p','cpu'].includes(q.k)?{id:i,name:q.name||'Drohne '+(i+1),bot:q.k==='cpu',alive:true,role:'tech',tasks:shuffle(stations.map((_,j)=>j),rand).slice(0,opts.tasks===4?4:3),done:[],cool:18,meeting:1,dx:0,dy:0,inputUntil:0,botWait:0}:null).filter(Boolean);
   if(players.length<4||players.length>10)throw Error('4–10 Teilnehmer erforderlich');
@@ -113,7 +113,7 @@ const Nereid=(()=>{
  function route(a,b){
   const sx=Math.floor(a.x/T),sy=Math.floor(a.y/T),tx=Math.floor(b.x/T),ty=Math.floor(b.y/T);
   const start=sy*C+sx,goal=ty*C+tx;if(start===goal)return b;
-  const center=at(sx,sy);if(distance(a,center)>5)return center;
+  
   const queue=[start],prev=new Map([[start,-1]]);
   for(let i=0;i<queue.length;i++){const k=queue[i];if(k===goal)break;const x=k%C,y=Math.floor(k/C);
    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,n=ny*C+nx;if(floor[ny]?.[nx]&&!prev.has(n)){prev.set(n,k);queue.push(n)}}
@@ -147,12 +147,16 @@ const Nereid=(()=>{
    if(!s.alert&&s.t>=s.sabCool&&s.rand()<dt*.1)apply(s,p.id,{k:'alert',v:'signal'})
   }
   if(!target){const i=p.tasks.find(j=>!p.done.includes(j));target=stations[i];
-   if(target&&near(p,target,42)){if(!p.workUntil)p.workUntil=s.t+3+s.rand()*4;if(s.t>=p.workUntil){apply(s,p.id,{k:'task',v:i,answer:challenge(s,p,i)});p.workUntil=0;p.botWait=s.t+1}p.dx=p.dy=0;return}
+   if(target&&near(p,target,42)){if(!p.workUntil)p.workUntil=s.t+3+s.rand()*4;if(s.t>=p.workUntil){apply(s,p.id,{k:'task',v:i,answer:challenge(s,p,i)});p.workUntil=0;p.botWait=s.t+1}p.dx=p.dy=0;p.waypoint=null;return}
    if(!target){if(!p.wander||near(p,p.wander,28))p.wander=stations[Math.floor(s.rand()*stations.length)];target=p.wander}
   }
-  const step=route(p,target),dx=step.x-p.x,dy=step.y-p.y,n=Math.hypot(dx,dy)||1;
-  // Center on the next tile before turning at a bulkhead.
-  p.dx=dx/n;p.dy=dy/n;p.inputUntil=s.t+.5;
+  // Keep the waypoint until its center is reached, rather than reversing mid-tile.
+  if(!p.waypoint||distance(p,p.waypoint)<7)p.waypoint=route(p,target);
+  const step=p.waypoint,dx=step.x-p.x,dy=step.y-p.y,n=Math.hypot(dx,dy)||1;
+  const speed=Math.min(1,n/Math.max(1,102*dt));p.dx=dx/n*speed;p.dy=dy/n*speed;p.inputUntil=s.t+.5;
+  if(!fits(p.x+p.dx*102*dt,p.y)&&!fits(p.x,p.y+p.dy*102*dt)){
+   const center=at(Math.floor(p.x/T),Math.floor(p.y/T));p.waypoint=center;
+  }
  }
  function step(s,dt){
   dt=Math.max(0,Math.min(.1,dt));if(!dt||s.ph==='end')return;s.t+=dt;
