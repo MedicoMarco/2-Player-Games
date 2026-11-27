@@ -1032,6 +1032,27 @@
           ".validate": false
         }
       }
+    },
+    "sector09Invites": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        "$from": {
+          ".write": "auth != null && $from !== $to && ((!newData.exists() && (auth.uid === $from || auth.uid === $to)) || (newData.exists() && auth.uid === $from && root.child('users').child($from).exists() && !root.child('deletionLocks').child($from).exists() && root.child('users').child($to).exists() && !root.child('deletionLocks').child($to).exists() && root.child('friends').child($from).child($to).val() === true && root.child('friends').child($to).child($from).val() === true && !root.child('blocked').child($from).child($to).exists() && !root.child('blocked').child($to).child($from).exists() && (!data.exists() || data.child('ts').val() < now - 30000)))",
+          ".validate": "newData.hasChildren(['code','name','ts']) && root.child('sector09Lobbies').child(newData.child('code').val()).child('host').val() === $from && !root.child('sector09Lobbies').child(newData.child('code').val()).child('roundActive').exists()",
+          "code": {
+            ".validate": "newData.isString() && newData.val().matches(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{20}$/)"
+          },
+          "name": {
+            ".validate": "newData.val() === root.child('users').child($from).child('name').val()"
+          },
+          "ts": {
+            ".validate": "newData.isNumber() && newData.val() === now"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
     }
   }
 }
