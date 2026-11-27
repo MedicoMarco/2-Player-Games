@@ -40,7 +40,8 @@ jobs:
       - run: node save-progress.test.cjs
       - run: node --test pulse-arena.test.cjs
   browser-regression:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 supports Ubuntu 24.04, not the newer ubuntu-latest image.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
