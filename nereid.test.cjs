@@ -53,3 +53,10 @@ const plain=E.newRound(seats,{special:false},()=>.4);assert(plain.players.every(
 assert.equal(new Set(E.stations.map(p=>p.kind)).size,8);assert.equal(s.verdict.out,bad.id);assert.equal(s.verdict.cast,s.verdict.eligible);assert(!Object.hasOwn(publicSnap,'verdict'));
 for(const id of [9,10]){const r=E.newRound(seats,{tasks:3},()=>.4),p=r.players.find(q=>q.role==='tech');p.tasks=[id];Object.assign(p,E.stations[id]);const pattern=E.challenge(r,p,id);assert(!E.apply(r,p.id,{k:'task',v:id,answer:[9,9,9,9]}));assert(E.apply(r,p.id,{k:'task',v:id,answer:pattern}));assert.equal(p.done[0],id)}
 console.log('Nereid v5 archive and cargo tasks, private voting, result tally passed.');
+
+assert(E.stations.every(p=>reachable.has(Math.floor(p.x/E.T)+','+Math.floor(p.y/E.T))));
+const source=fs.readFileSync(__dirname+'/nereid/game.js','utf8');
+assert(source.includes("const stableKey='meeting:'+s.rn+':'+s.meetingStarted"));
+assert(source.includes("const key='hangar:'+code+':'+my"));
+assert(!source.includes("s.notes,Math.ceil(s.meetingEnd-s.t)"));
+console.log('Abyss v6 stable meeting/hangar keys and expanded connection graph passed.');

@@ -1,4 +1,4 @@
-# Nereidenprotokoll
+# Abyss Protocol (working title)
 Original 2D social-deduction game for Play2Gether. Underwater station N-17, autonomous maintenance units, original procedural vector artwork, no copied assets, characters, audio, names or map from existing games. Title is a working title; no trademark clearance has been performed.
 
 ## Play
@@ -25,3 +25,7 @@ Walkable synchronized online preparation deck, four shell styles, optional readi
 
 ## Version 5
 Eight minigames at eleven stations, anonymous vote totals after voting ends, animated results, directional robot details, host-confirmed task feedback, support bot alert response and stopped snapshot traffic after final upload. Hangar pointer mapping handles letterboxing. Existing v4 Firebase rules required. Visual and live online testing remain outstanding.
+
+
+## Version 6 — Abyss Protocol
+Display title changed; internal ID nereid is unchanged for room compatibility. No trademark clearance. Meeting overlay mounts once per meeting; countdown, vote status and notes update without replacing its buttons or focus. Result screens use stable keys. Lobby preserves the live canvas and uses crew/settings/friends tabs, with controls and room code visible separately. New layered station hull, cross-connections, deck lighting, room details and a redesigned animated preparation deck. Existing Firebase rules unchanged. Browser and real multiplayer verification remain required.
