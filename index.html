@@ -77,6 +77,9 @@ body.playing:not(.fab) #game{--world-gutters:clamp(20px,10vmin,112px)}
 body.playing:not(.fab):not(.rotg) .stage{width:min(calc(100cqw - var(--world-gutters)),calc((100cqh - var(--world-gutters))*var(--ar)))}
 body.playing.rotg:not(.fab) .stage{width:min(calc(100cqh - var(--world-gutters)),calc((100cqw - var(--world-gutters))*var(--ar)))}
 body.playing canvas,body.playing #gv{border:0;border-radius:0;box-shadow:none}
+/* Umgebung und Stage bleiben auch nach Wegfall der Rotation getrennte Ebenen. */
+body.playing #game>.stage{z-index:1}
+body.playing #game>#ex{position:absolute;inset:0;width:100%;height:100%;max-width:none;max-height:none;aspect-ratio:auto;z-index:0;pointer-events:none}
 body.playing .ov{border-radius:0;box-shadow:0 0 0 150vmax #14130fd9}
 body.playing #game>.bar{position:absolute;inset:0;margin:0;padding:0;z-index:6;pointer-events:none;display:block}
 body.playing #game>.bar>*{pointer-events:auto}
@@ -605,6 +608,7 @@ function setView(off){
   }
   const por=(g||tn||gx||rc)&&wantPor(),fl=g&&S.cpu===1&&S.side==1;
   V.por=!!por;V.td=!!(tn&&!S.cpu);V.sw=V.td&&!por;V.fl=!!fl;V.on=(g&&por)||fl||(gx&&por)?1:0;
+  document.body.classList.toggle('por',!!por);rotChk();
   let lw=por?480:800,lh=por?800:480;
   /* Racing: Spielfeld passt sich dem Seitenverhaeltnis des Bildschirms an, damit es ihn ganz fuellt */
   {const st=document.querySelector('#game .stage');if(rc&&gdef.id=='racing'){const g=$('#game'),cs=getComputedStyle(g),aw=g.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight),ah=g.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom),r=aw>0&&ah>0?aw/ah:lw/lh;if(por)lh=Math.max(640,Math.min(1100,Math.round(480/r)));else lw=Math.max(640,Math.min(1100,Math.round(480*r)));st.style.setProperty('--ar',(lw/lh).toFixed(4));cv.style.aspectRatio=lw+'/'+lh}else{st.style.removeProperty('--ar');cv.style.aspectRatio=''}V.pw=lw;V.ph=lh}
@@ -1353,13 +1357,14 @@ let worldLayout='';
 function paintGameWorld(id,surface,variant){
   const art=id==='racing'?RACING_ART[variant]||WORLD_ART.racing:WORLD_ART[id];
   const game=document.getElementById('game'),w=game.clientWidth,h=game.clientHeight;
-  if(!art||!w||!h||!document.body.classList.contains('playing'))return;
+  if(!w||!h||!document.body.classList.contains('playing'))return;
+  if(!art){if(worldLayout){EXX.setTransform(1,0,0,1,0,0);EXX.clearRect(0,0,EXC.width,EXC.height);worldLayout=''}return}
   const r=surface.getBoundingClientRect(),g=game.getBoundingClientRect();
   const x0=Math.max(0,r.left-g.left),x1=Math.min(w,r.right-g.left);
   const y0=Math.max(0,r.top-g.top),y1=Math.min(h,r.bottom-g.top);
   if(x1<=x0||y1<=y0)return;
   const scale=Math.min(2,devicePixelRatio||1),layout=[id,variant,w,h,x0,x1,y0,y1,scale].join('|');
-  if(layout===worldLayout)return;
+  if(layout===worldLayout&&EXC.width===Math.round(w*scale)&&EXC.height===Math.round(h*scale))return;
   const pw=Math.round(w*scale),ph=Math.round(h*scale);
   if(EXC.width!==pw||EXC.height!==ph){EXC.width=pw;EXC.height=ph}
   EXX.setTransform(pw/w,0,0,ph/h,0,0);
@@ -1369,7 +1374,7 @@ function paintGameWorld(id,surface,variant){
   worldStrip(EXX,[x1,y0,w-x1,y1-y0],features[1],objects,brush,true);
   worldStrip(EXX,[0,y1,w,h-y1],features[2],objects,brush,false);
   worldStrip(EXX,[0,y0,x0,y1-y0],features[3],objects,brush,true);
-  EXX.clearRect(x0,y0,x1-x0,y1-y0);
+  // Die Stage verdeckt die Umgebung. Kein transparentes Loch, das beim Drehen veralten kann.
   worldLayout=layout;
 }
 
@@ -1422,7 +1427,26 @@ function rotChk(){
  b.classList.toggle('rotg',on);
  V.factoryRotated=V.factory&&on;
 }
-addEventListener('resize',rotChk);addEventListener('orientationchange',rotChk);
+// Mobile Browser melden den Orientierungswechsel teils vor der endgültigen Viewport-Größe.
+let viewFrame=0,viewSettle=0;
+function refreshGameView(){
+ if(!document.body.classList.contains('playing'))return;
+ worldLayout='';
+ const guest=ON&&ON.role===1;
+ if(cur&&gdef&&!guest)setView();else rotChk();
+ if(guest){const ss=typeof OL!=='undefined'&&OL.sess;if(ss?.live)paintGameWorld(ss.cur||ss.gid,$('#gv'),ss.worldVariant)}
+ else if(gdef&&!V.factory)paintGameWorld(gdef.id,cv,cur?.worldVariant);
+}
+function scheduleGameView(){
+ if(!document.body.classList.contains('playing'))return;
+ rotChk();worldLayout='';
+ cancelAnimationFrame(viewFrame);viewFrame=requestAnimationFrame(refreshGameView);
+ clearTimeout(viewSettle);viewSettle=setTimeout(refreshGameView,250);
+}
+addEventListener('resize',scheduleGameView);addEventListener('orientationchange',scheduleGameView);
+addEventListener('fullscreenchange',scheduleGameView);
+window.visualViewport?.addEventListener('resize',scheduleGameView);
+window.screen.orientation?.addEventListener('change',scheduleGameView);
 const fsOn=()=>{document.body.classList.add('playing');rotChk();if(vmFit()){lockOn();return}const e=document.documentElement;try{if(!document.fullscreenElement&&e.requestFullscreen)e.requestFullscreen({navigationUI:'hide'}).catch(()=>{});else if(e.webkitRequestFullscreen&&!document.webkitFullscreenElement)e.webkitRequestFullscreen()}catch(x){}};
 const fsOff=()=>{worldLayout='';$('#game').style.removeProperty('background');document.body.classList.remove('playing');rotChk();lockOff();try{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});else if(document.webkitFullscreenElement)document.webkitExitFullscreen()}catch(x){}};
 function thumbs(){window.NOFIN=1;const sv=[S.snd,S.cpu,S.t],oc=cur,og=gdef,oo=over,oi=idle,op=PA;S.snd=0;S.cpu=0;S.t=5;
