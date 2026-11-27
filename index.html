@@ -573,6 +573,8 @@ Deutschland</p>
 <script src="./factory-empire/terrain.js?v=13"></script>
 <script src="./factory-empire/world.js?v=7"></script>
 <script src="./factory-empire/game.js?v=35"></script>
+<link rel="stylesheet" href="./nereid/game.css?v=1">
+<script src="./nereid/game.js?v=1"></script>
 <script src="./poker.js?v=2"></script>
 <script src="./card-chip-picker.js"></script>
 <script src="./poker-table.js?v=4"></script>
@@ -595,7 +597,7 @@ const wantPor=()=>S.ori=='p'||(S.ori=='a'&&innerHeight>innerWidth*1.05);
 /* Spiele mit echter Hochkant-Ansicht (Spielfeld wird gedreht, Texte bleiben aufrecht) */
 const PORX=['curling','ice'];
 function setView(off){
-  const g=!off&&gdef&&(gdef.id=='pong'||gdef.id=='hockey')&&!ON&&!(S.cpu===2),tn=!off&&gdef&&gdef.id=='tennis'&&!ON&&S.cpu!==2,gx=!off&&gdef&&PORX.includes(gdef.id)&&!ON&&S.cpu!==2,rc=!off&&gdef&&!ON&&((gdef.id=='racing'||gdef.id=='chess')&&S.cpu!==2||gdef.id=='sudoku'||gdef.id=='kristall'||gdef.id=='solitaire'||gdef.id=='tdefense');
+  const g=!off&&gdef&&(gdef.id=='pong'||gdef.id=='hockey')&&!ON&&!(S.cpu===2),tn=!off&&gdef&&gdef.id=='tennis'&&!ON&&S.cpu!==2,gx=!off&&gdef&&PORX.includes(gdef.id)&&!ON&&S.cpu!==2,rc=!off&&gdef&&!ON&&((gdef.id=='racing'||gdef.id=='chess')&&S.cpu!==2||gdef.id=='sudoku'||gdef.id=='kristall'||gdef.id=='solitaire'||gdef.id=='tdefense'||gdef.id=='nereid');
   V.factory=!!(!off&&gdef?.id==='fabrik');
   document.body.classList.toggle('fab',V.factory);
   if(V.factory){
@@ -3803,7 +3805,8 @@ ICON.maumau=GI(`<rect x="6" y="9" width="21" height="29" rx="4" fill="${Wh}" tra
 NM.maumau=['Mau-Mau','Das Kartenspiel für 2–10 Spieler, auch online.'];
 ICON.sudoku=GI(`<rect x="5" y="5" width="38" height="38" rx="5" fill="${Wh}"/><path d="M17.7 5v38M30.3 5v38M5 17.7h38M5 30.3h38" stroke-width="1.6"/><text x="11.3" y="15.3" text-anchor="middle" font-size="11" font-weight="800" fill="${Bl}" stroke="none" style="font-family:system-ui">5</text><text x="24" y="27.9" text-anchor="middle" font-size="11" font-weight="800" fill="${Ik}" stroke="none" style="font-family:system-ui">3</text><text x="36.7" y="40.5" text-anchor="middle" font-size="11" font-weight="800" fill="${Rd}" stroke="none" style="font-family:system-ui">9</text>`);
 NM.sudoku=['Sudoku','Allein auf Bestzeit oder abwechselnd im Duell – knifflige Felder bringen mehr Punkte.'];
-const ROOMG=['ludo','maumau','poker','blackjack','fabrik'];
+const ROOMG=['ludo','maumau','poker','blackjack','fabrik','nereid'];
+GAMES.push({id:'nereid',n:'Nereidenprotokoll',ic:'◈',d:'Social Deduction auf einer versunkenen Forschungsstation: Aufgaben, geheime Rollen, Systemalarme und Abstimmungen.',cat:'Strategie',sub:'4–10 Teilnehmer · Online · Bot-Training',solo:true,mk:nereidGame,h:'WASD / Pfeile oder Touch-Joystick · E Aufgabe · R Melden · M Karte · F Sonderaktion'});
 /* ===== Karten-Bibliothek (für alle Kartenspiele) =====
    Karte = Zahl 0..51: Farbe = id/13 (0 Pik, 1 Herz, 2 Karo, 3 Kreuz), Rang = id%13 (0 = 2 ... 8 = 10, 9 = Bube, 10 = Dame, 11 = König, 12 = Ass).
    cdSprite() zeichnet jede Karte einmal vektorscharf in ein Bild, drawCard() stempelt sie in beliebiger Größe (Rückseite: id -1). */
@@ -6514,7 +6517,7 @@ async function olAccept(u){
 
 /* Einladung in einen Online-Raum annehmen */
 async function olJoinRoom(code,gid){
-  if(!['ludo','maumau','poker','blackjack'].includes(gid))return false;
+  if(!['ludo','maumau','poker','blackjack','nereid'].includes(gid))return false;
   if(ON||OL.sess){toast('Beende zuerst dein aktuelles Online-Spiel.');return}
   if(!(cur&&gdef&&gdef.id==gid&&cur.canJoin&&cur.canJoin())){
     if(cur&&gdef&&gdef.id==gid&&cur.canJoin&&!cur.canJoin()){toast('Du bist schon in einem Raum.');return}
