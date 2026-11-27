@@ -15,6 +15,7 @@ const scope = {
  window: { NOFIN: true },
  console: { error: (...args) => renderErrors.push(args) },
  setTimeout, clearTimeout,
+ Blob, Response, CompressionStream, DecompressionStream, btoa, atob,
  Date: class extends Date { static now() { return clock; } },
  OL: {},
  localStorage: { getItem: key => data.get(key) || null, setItem: (key, value) => data.set(key, value) },
@@ -1027,7 +1028,16 @@ assert(accountRules['.write'].includes('auth.uid === $uid'));
 assert(accountRules.factory['.validate'].includes('newData.hasChildren()'));
 
 async function testCloud() {
- const settle = () => new Promise(resolve => setImmediate(resolve));
+ const codec=vm.runInContext('FactoryRuntime',context);
+ const fixture={...idle,ts:clock,rev:'codec-test',m:123,unicode:'Fabrik 🏭'.repeat(20000)};
+ const packed=await codec.packCloudSave(fixture);
+ assert.equal(packed.codec,'gzip-base64');
+ assert(JSON.stringify(packed).length<JSON.stringify(fixture).length/2);
+ assert.deepEqual(JSON.parse(JSON.stringify(await codec.unpackCloudSave(packed))),fixture);
+ assert.equal(await codec.unpackCloudSave(fixture),fixture);
+ await assert.rejects(codec.unpackCloudSave({...packed,rev:'broken'}));
+ const settle = async () => {for(let i=0;i<100;i++){await new Promise(resolve=>setTimeout(resolve,10));if(!firstRef?.dbg().cloud.busy&&!secondRef?.dbg().cloud.busy)break;}};
+ let firstRef,secondRef;
  const snap = value => ({ val: () => value });
  let server = { ...idle, ts: clock, rev: 'initial', m: 200 };
  let fail = false;
@@ -1046,7 +1056,7 @@ async function testCloud() {
  };
  scope.window.NOFIN = false;
  scope.OL = { me: 'simulation-account', db: { ref: path => path.endsWith('/factoryAudio') ? { async get() { return snap(null); } } : mock } };
- const first = factory(), second = factory();
+ const first = firstRef=factory(), second = secondRef=factory();
  first.update(1);
  second.update(1);
  await settle();
@@ -1057,13 +1067,13 @@ async function testCloud() {
  first.dbg().sv(true);
  await settle();
  assert.equal(first.dbg().cloud.status, 'synced');
- assert.equal(server.m, 350);
+ assert.equal((await codec.unpackCloudSave(server)).m, 350);
 
  second.dbg().G.m = 400;
  second.dbg().sv(true);
  await settle();
  assert.equal(second.dbg().cloud.status, 'conflict');
- assert.equal(server.m, 350);
+ assert.equal((await codec.unpackCloudSave(server)).m, 350);
  assert.equal(second.dbg().cloud.remote.m, 350);
 
  fail = true;
@@ -1086,9 +1096,9 @@ async function testCloud() {
  fail = false;
  await first.dbg().flushCloud(true);
  assert.equal(first.dbg().cloud.status, 'synced');
- assert.equal(server.m, 410);
- assert.equal(server.sl[1],1);
- assert.equal(server.saleIncome[1],6);
+ assert.equal((await codec.unpackCloudSave(server)).m, 410);
+ assert.equal((await codec.unpackCloudSave(server)).sl[1],1);
+ assert.equal((await codec.unpackCloudSave(server)).saleIncome[1],6);
  assert.equal(first.dbg().cloud.pending, null);
  const setItem=scope.localStorage.setItem;
  try{
@@ -1098,7 +1108,7 @@ async function testCloud() {
   await settle();
   assert.equal(firstGame.cloud.localSaved,false);
   assert.equal(firstGame.cloud.status,'synced');
-  assert.equal(server.m,555,'blocked local storage must not prevent a cloud write');
+  assert.equal((await codec.unpackCloudSave(server)).m,555,'blocked local storage must not prevent a cloud write');
  }finally{scope.localStorage.setItem=setItem}
  console.log('Phase 5: exact offline replay, report, saved backlog, viewport controls and concurrent cloud retries passed.');
 }
