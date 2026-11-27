@@ -1069,14 +1069,14 @@ function itemPos(o){const b=(o.r+2)%4,e=o.ein==null||o.ein==o.r?b:o.ein,R=TS/2,c
 /* ---- Speichern ---- */
 const cloud={ref:null,uid:null,base:null,status:'guest',pending:null,busy:false,localSaved:true,localKey:null,migrationBlocked:false,localMigrationBlocked:false,last:0,backoff:0,remote:null};
 let saveOpen=false, saveAfterTick=false;
-const {validSave,revision,openSaveStorage}=FactoryRuntime;
+const {validSave,revision,cloudRevision,packCloudSave,unpackCloudSave,byteSize,openSaveStorage}=FactoryRuntime;
 let saveStorage=null,latestLocalAttempt=0;
 const diskSaves=new Map(),diskWrites=new Map();
 function readLocal(key){
  let browserSave=null;
  try{browserSave=JSON.parse(localStorage.getItem(key))}catch{}
  const disk=diskSaves.get(key);
- if(disk&&(!browserSave||validSave(browserSave)&&disk.ts>=browserSave.ts))return disk;
+ if(disk&&(!browserSave||validSave(browserSave)&&(disk.ts>browserSave.ts||disk.ts===browserSave.ts&&disk.rev===browserSave.rev)))return disk;
  return browserSave;
 }
 function writeLocal(key,value){
@@ -1110,6 +1110,13 @@ function storeSnapshot(key,value){
 const storeBackup=async(key,value)=>writeLocal(key,value)||await writeDisk(key,value);
 function stillSignedIn(){
  return cloud.ref&&typeof OL!='undefined'&&OL.me===cloud.uid;
+}
+function cloudFailure(error){
+ const code=String(error?.code||'')+' '+String(error?.message||error||'');
+ if(/permission|denied|unauthor/i.test(code))return 'Firebase: Zugriff verweigert – Datenbank-Regeln prüfen.';
+ if(/quota|limit|too.large|size|exceed/i.test(code))return 'Firebase: Speicher-, Transfer- oder Größenlimit erreicht.';
+ if(/encoding|identity|save parts|newer browser|JSON/i.test(code))return 'Cloud-Daten nicht lesbar – Original bleibt unverändert.';
+ return 'Cloud-Verbindung fehlgeschlagen; lokaler Stand bleibt erhalten.';
 }
 function readCloud(){
  const request=typeof cloud.ref.get=='function'?cloud.ref.get():cloud.ref.once('value');
@@ -1210,7 +1217,7 @@ async function loadFactory(){
  if(!stillSignedIn()){applySave(local);return}
  cloud.status='loading';
  try{
-  const remote=await readCloud();
+  const remote=await unpackCloudSave(await readCloud());
   if(!stillSignedIn())return;
   const chosen=chooseSave(remote,local,readLocal('2pg_fe_guest'));
   if(saveStorage){
@@ -1218,9 +1225,10 @@ async function loadFactory(){
    await finishMigrationBackup(chosen);
   }
   if(stillSignedIn())applySave(chosen);
- }catch{
+ }catch(error){
+  cloud.error=cloudFailure(error);
   cloud.base=validSave(local)?local.base??(local.rev?revision(local):null):null;
-  cloud.status='offline';applySave(local);
+  cloud.status='offline';applySave(validSave(local)?local:readLocal('2pg_fe_guest'));
  }
 }
 function snapshot(){
@@ -1266,7 +1274,7 @@ function sv(force){
  cloud.pending=data;
  if(cloud.status!='conflict'&&cloud.status!='invalid'){
   if(cloud.status!='offline'&&cloud.status!='recovered')cloud.status='pending';
-  if(force||Date.now()-cloud.last>=20000)flushCloud(force);
+  if(force||Date.now()-cloud.last>=60000)flushCloud(force);
  }
 }
 async function flushCloud(force=false){
@@ -1275,7 +1283,7 @@ async function flushCloud(force=false){
  cloud.last=Date.now();cloud.busy=true;
  try{
   if(cloud.base==null){
-   const remote=await readCloud();
+   const remote=await unpackCloudSave(await readCloud());
    if(revision(remote)!==''){
     cloud.remote=remote;cloud.status=validSave(remote)?'conflict':'invalid';return;
    }
@@ -1283,21 +1291,31 @@ async function flushCloud(force=false){
   }
   if(!stillSignedIn())return;
   const expected=cloud.base;
+  const wire=await packCloudSave({...data,base:expected});
+  if(!stillSignedIn())return;
   const saved=await cloud.ref.transaction(current=>{
-   if(revision(current)===expected||revision(current)===data.rev)return {...data,base:expected};
+   if(cloudRevision(current)===expected||cloudRevision(current)===data.rev)return wire;
+   // The SDK may invoke the callback with an empty cache before checking the server.
+   // A null proposal on an empty cache can only commit against an already empty node.
    if(current==null&&expected!=='')return null;
    return undefined;
   },undefined,false);
-  const remote=saved.snapshot.val();
+  if(!stillSignedIn())return;
+  const remote=await unpackCloudSave(saved.snapshot.val());
   if(!saved.committed||revision(remote)!==data.rev){
-   cloud.remote=remote;cloud.status='conflict';return;
+   cloud.remote=remote;cloud.status=validSave(remote)?'conflict':'invalid';return;
   }
-  cloud.base=data.rev;cloud.backoff=0;
+  cloud.base=data.rev;cloud.backoff=0;cloud.error=null;
+  cloud.rawBytes=byteSize(JSON.stringify(data));cloud.cloudBytes=byteSize(JSON.stringify(wire));
   if(cloud.pending===data){
    cloud.pending=null;cloud.status='synced';storeSnapshot(cloud.localKey||KEY,{...data,base:data.rev});
-  }else cloud.status='pending';
- }catch{
-  cloud.status='offline';cloud.backoff=Date.now()+15000;
+  }else{
+   cloud.status='pending';
+   cloud.pending={...cloud.pending,base:data.rev};
+   storeSnapshot(cloud.localKey||KEY,cloud.pending);
+  }
+ }catch(error){
+  cloud.error=cloudFailure(error);cloud.status='offline';cloud.backoff=Date.now()+15000;
  }finally{cloud.busy=false}
 }
 async function takeCloudSave(){
@@ -1330,7 +1348,7 @@ async function restoreLocalBackup(){
  }
  cloud.busy=true;
  try{
-  const remote=await readCloud();
+  const remote=await unpackCloudSave(await readCloud());
   if(!stillSignedIn())return;
   if(!validSave(remote)){toast('Kein gültiger Cloud-Stand zum Vergleich verfügbar.');return}
   cloud.remote=remote;cloud.status='conflict';cloud.pending=local;confirmLocal=false;
@@ -1386,6 +1404,8 @@ function savePanel(){
  }else if(stillSignedIn()&&!['loading','invalid'].includes(cloud.status)&&!cloud.migrationBlocked){
   btn(X+20,Y+86,178,34,()=>sv(true),'#334155');tx('Jetzt synchronisieren',X+109,Y+108,11,'#fff','center',700);
  }
+ if(cloud.error&&cloud.status==='offline')tx(cloud.error,X+20,Y+139,11,'#fca5a5');
+ if(cloud.cloudBytes&&cloud.status==='synced')tx('Cloud: '+Math.ceil(cloud.cloudBytes/1024)+' KiB · vorher unkomprimiert: '+Math.ceil(cloud.rawBytes/1024)+' KiB',X+20,Y+139,11,'#86efac');
  const backup=readLocal(KEY+'.recovery');
  if(validSave(backup)){
   tx('Wiederherstellungspunkt · '+fmtSaveDate(backup.ts)+' · '+fm(backup.m)+' €',X+20,Y+211,11,'#cbd5e1');
