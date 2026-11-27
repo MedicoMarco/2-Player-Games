@@ -24,7 +24,9 @@ const Nereid=(()=>{
   {name:'Tauchdock',...at(15,18),kind:'route'},
   {name:'Energiekern',...at(25,17),kind:'pulse'},
   {name:'Observatorium',...at(34,3),kind:'spectral'},
-  {name:'Algenzucht',...at(34,11),kind:'balance'}
+  {name:'Algenzucht',...at(34,11),kind:'balance'},
+  {name:'Atrium · Archiv',...at(11,7),kind:'matrix'},
+  {name:'Tauchdock · Fracht',...at(11,18),kind:'cargo'}
  ];
  const diagnostic=at(16,11);
  const meeting=at(14,9),ports=[at(6,2),at(26,11),at(6,18),at(26,18)];
@@ -48,7 +50,7 @@ const Nereid=(()=>{
   glitches.forEach(p=>p.role='glitch');
   if(opts.special!==false&&players.length>=5){const crew=shuffle(players.filter(p=>p.role==='tech'),rand);crew[0].special='analyst';if(players.length>=7&&crew[1])crew[1].special='support'}
   players.forEach(spawn);
-  return {ph:'run',rn:Date.now(),players,t:0,seq:0,markers:[],alert:null,sabCool:25,meetingCool:12,meetingEnd:0,votes:{},notes:[],cause:'',result:'',total:players.filter(p=>p.role==='tech').reduce((n,p)=>n+p.tasks.length,0),opts:{discussion:opts.discussion===45?45:30},rand};
+  return {ph:'run',rn:Date.now(),players,t:0,seq:0,markers:[],alert:null,sabCool:25,meetingCool:12,meetingEnd:0,meetingStarted:0,votes:{},notes:[],cause:'',result:'',verdict:null,total:players.filter(p=>p.role==='tech').reduce((n,p)=>n+p.tasks.length,0),opts:{discussion:opts.discussion===45?45:30},rand};
  }
  const player=(s,id)=>s.players.find(p=>p.id===id);
  function progress(s){return s.players.filter(p=>p.role==='tech').reduce((n,p)=>n+p.done.length,0)}
@@ -59,7 +61,7 @@ const Nereid=(()=>{
   else if(glitch>=tech||s.alert?.kind==='pressure'&&s.alert.until<=s.t){s.ph='end';s.result='glitch'}
  }
  function beginMeeting(s,by,cause){
-  s.ph='meeting';s.meetingEnd=s.t+s.opts.discussion;s.votes={};s.notes=[];s.cause=by.name+' · '+cause;
+  s.ph='meeting';s.meetingStarted=s.t;s.meetingEnd=s.t+s.opts.discussion;s.votes={};s.notes=[];s.verdict=null;s.cause=by.name+' · '+cause;
   s.players.forEach(p=>{p.dx=p.dy=0;p.inputUntil=0});
   // Interrupt the fictional alert during a meeting so the timer stays fair.
   s.alert=null;s.markers=[];
@@ -68,6 +70,7 @@ const Nereid=(()=>{
   const tally={};for(const v of Object.values(s.votes))tally[v]=(tally[v]||0)+1;
   const ranked=Object.entries(tally).sort((a,b)=>b[1]-a[1]);let out=null;
   if(ranked.length&&ranked[0][0]!=='-1'&&(!ranked[1]||ranked[0][1]>ranked[1][1]))out=player(s,+ranked[0][0]);
+  s.verdict={out:out?.id??-1,tally:Object.entries(tally).map(([id,n])=>[Number(id),n]),eligible:s.players.filter(p=>p.alive).length,cast:Object.keys(s.votes).length};
   if(out)out.alive=false;
   s.players.forEach(p=>{p.evidence=null;p.lastSeen=null;p.workUntil=0;p.scan=null});
   s.cause=out?out.name+' wurde isoliert.':'Keine eindeutige Mehrheit.';
@@ -76,7 +79,7 @@ const Nereid=(()=>{
  function challenge(s,p,id){
   const seed=(s.rn%997)+(p.id+3)*37+(id+11)*71;
   const values=Array.from({length:4},(_,i)=>(Math.imul(seed+i*97,2654435761)>>>((i+1)*3))%4);
-  if(['sort','spectral'].includes(stations[id]?.kind))return [0,1,2,3].sort((a,b)=>(Math.imul(seed+a*13,1597334677)>>>0)-(Math.imul(seed+b*13,1597334677)>>>0));
+  if(['sort','spectral','cargo'].includes(stations[id]?.kind))return [0,1,2,3].sort((a,b)=>(Math.imul(seed+a*13,1597334677)>>>0)-(Math.imul(seed+b*13,1597334677)>>>0));
   return values;
  }
  function sortValues(pattern){const values=[];pattern.forEach((slot,i)=>values[slot]=[12,29,47,81][i]);return values}
@@ -149,7 +152,8 @@ const Nereid=(()=>{
   let target;
   const marker=s.markers.find(m=>near(p,m,76));
   if(marker&&p.alive&&p.role==='tech'&&s.rand()<.12){apply(s,p.id,{k:'report'});return}
-  if(s.alert&&p.alive&&p.role==='tech'&&p.id%2===0){
+  if(s.alert?.kind==='pressure'&&p.alive&&p.special==='support'&&!p.specialUsed&&s.alert.until-s.t<12)apply(s,p.id,{k:'stabilize'});
+  if(s.alert&&p.alive&&p.role==='tech'&&(s.alert.kind==='pressure'||p.id%2===0)){
    target=stations[s.alert.station];if(near(p,target,65)){apply(s,p.id,{k:'repair'});p.botWait=s.t+1;return}
   }else if(p.role==='glitch'&&p.alive&&s.t>=p.cool){
    const candidates=s.players.filter(q=>q.alive&&q.role==='tech'&&sight(p,q,s.alert?.kind==='signal'?125:280)).sort((a,b)=>distance(p,a)-distance(p,b));
@@ -194,14 +198,14 @@ const Nereid=(()=>{
  }
  function gone(s,id){const p=player(s,id);if(p){p.bot=true;p.dx=p.dy=0}}
  function publicState(s){
-  return {ph:s.ph,rn:s.rn,seq:++s.seq,t:Math.round(s.t*10)/10,players:s.players.map(p=>({id:p.id,name:p.name,bot:p.bot,style:p.style,alive:p.alive,x:Math.round(p.x),y:Math.round(p.y),dx:Math.round(p.dx*10)/10,dy:Math.round(p.dy*10)/10,...(s.ph==='end'?{role:p.role,special:p.special}:{})})),markers:s.markers,alert:s.alert,meetingEnd:s.meetingEnd,meetingCool:s.meetingCool,meetingVotes:Object.keys(s.votes).map(Number),notes:s.notes,cause:s.cause,result:s.result,done:progress(s),total:s.total};
+  return {ph:s.ph,rn:s.rn,seq:++s.seq,t:Math.round(s.t*10)/10,players:s.players.map(p=>({id:p.id,name:p.name,bot:p.bot,style:p.style,alive:p.alive,x:Math.round(p.x),y:Math.round(p.y),dx:Math.round(p.dx*10)/10,dy:Math.round(p.dy*10)/10,...(s.ph==='end'?{role:p.role,special:p.special}:{})})),markers:s.markers,alert:s.alert,meetingEnd:s.meetingEnd,meetingStarted:s.meetingStarted,meetingCool:s.meetingCool,...(s.ph==='result'||s.ph==='end'?{verdict:s.verdict}:{}),meetingVotes:Object.keys(s.votes).map(Number),notes:s.notes,cause:s.cause,result:s.result,done:progress(s),total:s.total};
  }
  function privateState(s,id){const p=player(s,id);return p?{rn:s.rn,role:p.role,tasks:p.tasks,done:p.done,cool:p.cool,meeting:p.meeting,sabCool:s.sabCool,portCool:p.portCool||0,special:p.special,specialUsed:p.specialUsed,scanCool:p.scanCool,...(p.scan&&p.scan.until>s.t?{scan:p.scan}:{}),...(p.role==='glitch'?{allies:s.players.filter(q=>q.role==='glitch').map(q=>q.id)}:{})}:null}
  return {T,C,R,MW,MH,rooms,halls,floor,stations,meeting,ports,colors,phrases,at,near,sight,fits,newRound,apply,step,gone,publicState,privateState,challenge,sortValues,routePath,vision,route,player,location,guidance,sectors,diagnostic,normalizeLobby,specialName};
 })();
 function nereidGame(){
  const E=Nereid,esc=s=>String(s??'').replace(/[&<>"']/g,a=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[a]));
- let mode='setup',state=null,snap=null,secret=null,room=null,ref=null,roleRef=null,code='',my=0,host=false,alive=true,busy=false,opts={bots:6,two:true,tasks:3,discussion:30,special:true},clock=0,publishAt=0,sendAt=0,seq=0,seen={},privateCache={},panel='',task=null,touch=null,buttons=[],smooth={},camera={x:0,y:0},camReady=false,phase='',overlayKey='',lastText='',lobbyStamp='',lastMotion=-10,pending=0,moveKey='',roleUntil=0,visionCache=null,fx=[],seenMarkers=new Set(),taskFlash=0,guideCache=null,guideOn=true,lastStepSound=-10,lastAlertSound=-10,lastAmbience=-10,previousAlert='',audio=null,lobbyUnit=null,lobbyGoal=null,lobbySmooth={},lobbyLast='',lobbySendAt=0,lobbyWriting=false,lobbyWarning=false,localStyle=0;
+ let mode='setup',state=null,snap=null,secret=null,room=null,ref=null,roleRef=null,code='',my=0,host=false,alive=true,busy=false,opts={bots:6,two:true,tasks:3,discussion:30,special:true},clock=0,publishAt=0,sendAt=0,seq=0,seen={},privateCache={},panel='',task=null,touch=null,buttons=[],smooth={},camera={x:0,y:0},camReady=false,phase='',overlayKey='',lastText='',lobbyStamp='',lastMotion=-10,pending=0,moveKey='',roleUntil=0,visionCache=null,fx=[],seenMarkers=new Set(),taskFlash=0,guideCache=null,guideOn=true,lastStepSound=-10,lastAlertSound=-10,lastAmbience=-10,previousAlert='',audio=null,lobbyUnit=null,lobbyGoal=null,lobbySmooth={},lobbyLast='',lobbySendAt=0,lobbyWriting=false,lobbyWarning=false,localStyle=0,finalPublished=false,taskPending=null;
  const C=E.colors,cl=(n,a,b)=>Math.max(a,Math.min(b,n)), me=()=>snap?.players?.find(p=>p.id===my), width=()=>V.pw||800,height=()=>V.ph||480;
  const box=(x,y,w,h,r,col)=>{c.fillStyle=col;c.beginPath();c.roundRect(x,y,w,h,r);c.fill()};
  const line=(x,y,a,b,col,w=1)=>{c.strokeStyle=col;c.lineWidth=w;c.beginPath();c.moveTo(x,y);c.lineTo(a,b);c.stroke()};
@@ -237,7 +241,7 @@ function nereidGame(){
  }
  const button=(action,label,disabled=false)=>'<button class="nr-btn" data-nr="'+action+'" '+(disabled?'disabled':'')+'>'+esc(label)+'</button>';
  const header=(eyebrow,title,copy)=>'<div class="nr-eyebrow">'+esc(eyebrow)+'</div><h2>'+esc(title)+'</h2><p>'+esc(copy)+'</p>';
- function bind(root){root.querySelectorAll('[data-nr]').forEach(el=>el.onclick=()=>action(el.dataset.nr));const canvas=root.querySelector('#nr-hangar');if(canvas){canvas.onpointerdown=e=>{const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;lobbyGoal=E.normalizeLobby({x:(e.clientX-r.left)*1000/r.width,y:(e.clientY-r.top)*600/r.height},my);canvas.focus();e.preventDefault()};canvas.onkeydown=e=>{const dirs={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],KeyW:[0,-1],KeyS:[0,1],KeyA:[-1,0],KeyD:[1,0]};const d=dirs[e.code];if(d&&lobbyUnit){e.preventDefault();e.stopPropagation();const p=lobbyGoal||lobbyUnit;lobbyGoal=E.normalizeLobby({x:p.x+d[0]*90,y:p.y+d[1]*90},my)}};drawHangar()}}
+ function bind(root){root.querySelectorAll('[data-nr]').forEach(el=>el.onclick=()=>action(el.dataset.nr));const canvas=root.querySelector('#nr-hangar');if(canvas){canvas.onpointerdown=e=>{const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;const scale=Math.min(r.width/1000,r.height/600);lobbyGoal=E.normalizeLobby({x:(e.clientX-r.left-(r.width-1000*scale)/2)/scale,y:(e.clientY-r.top-(r.height-600*scale)/2)/scale},my);canvas.focus();e.preventDefault()};canvas.onkeydown=e=>{const dirs={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],KeyW:[0,-1],KeyS:[0,1],KeyA:[-1,0],KeyD:[1,0]};const d=dirs[e.code];if(d&&lobbyUnit){e.preventDefault();e.stopPropagation();const p=lobbyGoal||lobbyUnit;lobbyGoal=E.normalizeLobby({x:p.x+d[0]*90,y:p.y+d[1]*90},my)}};drawHangar()}}
  function setup(){
   stopAmbience();host=false;mode='setup';lobbyUnit=null;lobbyGoal=null;lobbySmooth={};state=snap=secret=null;camReady=false;phase='';overlayKey='';
   overlay('setup'+opts.bots+':'+localStyle+':'+opts.special,header('NEREIDENPROTOKOLL / 2049','Stille unter der Oberfläche','Eine Forschungsstation. Autonome Wartungseinheiten. Ein verborgenes Störsignal.')+
@@ -258,7 +262,7 @@ function nereidGame(){
 
  }
  function local(){startAmbience();host=true;mode='local';my=0;state=E.newRound(Array.from({length:opts.bots},(_,i)=>i===0?{k:'p',name:'Du',style:localStyle}:{k:'cpu',name:['','Mira','Kelp','Orion','Lumen','Vela','Nix','Echo','Delta','Nova'][i]}),opts);beginRound()}
- function beginRound(){snap=E.publicState(state);secret=E.privateState(state,my);camReady=false;smooth={};phase='';task=null;touch=null;moveKey='';seenMarkers.clear();fx=[];roleUntil=clock+4;guideCache=null;previousAlert='';hide();startAmbience();sound(660)}
+ function beginRound(){finalPublished=false;taskPending=null;snap=E.publicState(state);secret=E.privateState(state,my);camReady=false;smooth={};phase='';task=null;touch=null;moveKey='';seenMarkers.clear();fx=[];roleUntil=clock+4;guideCache=null;previousAlert='';hide();startAmbience();sound(660)}
  async function openOnline(joinCode){
   if(busy||mode!=='setup')return false;busy=true;
   try{
@@ -302,7 +306,7 @@ function nereidGame(){
    }
   }else if(!host&&v.snap){try{
    const q=JSON.parse(v.snap).snap;if(!q||!Array.isArray(q.players))return;
-   if(!snap||q.rn!==snap.rn){seq=0;camReady=false;smooth={};phase='';task=null;moveKey='';seenMarkers.clear();fx=[];roleUntil=clock+4;hide()}
+   if(!snap||q.rn!==snap.rn){taskPending=null;seq=0;camReady=false;smooth={};phase='';task=null;moveKey='';seenMarkers.clear();fx=[];roleUntil=clock+4;hide()}
    if(!snap||q.rn!==snap.rn||q.seq>snap.seq)snap=q;
    mode='guest';
   }catch(_){}}
@@ -329,10 +333,10 @@ function nereidGame(){
   finally{busy=false;if(mode==='lobby')lobby()}
  }
  function publish(){
-  if(!state||mode!=='host'||!ref||pending)return;
+  if(!state||mode!=='host'||!ref||pending||busy||finalPublished)return;
   const changes={['rooms/'+code+'/snap']:JSON.stringify({snap})};
   for(const p of state.players){const q=room?.seats?.[p.id];if(q?.k==='p'&&p.id!==my){const raw=JSON.stringify(E.privateState(state,p.id));if(privateCache[q.uid]!==raw){changes['hands/'+code+'/'+q.uid]=raw;privateCache[q.uid]=raw}}}
-  pending=1;OL.db.ref().update(changes).catch(e=>{privateCache={};if(alive&&clock-lastMotion>3){lastMotion=clock;toast(luErr(e))}}).finally(()=>pending=0)
+  const round=state,ended=snap.ph==='end';pending=1;OL.db.ref().update(changes).then(()=>{if(state===round&&ended)finalPublished=true}).catch(e=>{privateCache={};if(alive&&clock-lastMotion>3){lastMotion=clock;toast(luErr(e))}}).finally(()=>pending=0)
  }
  function send(a){
   if(!snap||!secret||secret.rn!==snap.rn)return;
@@ -341,10 +345,10 @@ function nereidGame(){
    return ref.child('act/'+OL.me).set(JSON.stringify({...a,n:++seq,rn:snap.rn})).catch(e=>toast(luErr(e)))}
  }
  function taskOpen(id){
-  if(task||panel||!secret||!E.stations[id]||!secret.tasks.includes(id)||secret.done.includes(id)||!E.near(me(),E.stations[id]))return;
+  if(task||taskPending||panel||!secret||!E.stations[id]||!secret.tasks.includes(id)||secret.done.includes(id)||!E.near(me(),E.stations[id]))return;
   send({k:'move',x:0,y:0});task={id,answer:[],pattern:E.challenge(snap,{id:my},id),start:clock,dials:[0,0,0,0],err:false};overlayKey='';renderTask();
  }
- function finishTask(answer){const id=task.id;send({k:'task',v:id,answer:answer.slice()});task=null;taskFlash=clock+1.8;hide();sound(820)}
+ function finishTask(answer){const id=task.id;taskPending={id,until:clock+4};send({k:'task',v:id,answer:answer.slice()});task=null;hide()}
  function renderTask(){
   if(!task)return;
   const st=E.stations[task.id],kind=st.kind,symbols=['◆','●','▲','■'],arrows=['↑','→','↓','←'],preview=clock-task.start<2.6;
@@ -362,6 +366,12 @@ function nereidGame(){
    title='Spektralanalyse';copy='Ordne die vier Signale nach Wellenlänge: kurz bis lang. Vergleiche die sichtbaren Wellen.';
    const vals=E.sortValues(task.pattern);
    body='<div class="nr-taskgrid nr-samples">'+vals.map((n,i)=>'<button class="nr-wave" data-nr="answer:'+i+'" '+(task.answer.includes(i)?'disabled':'')+'><svg viewBox="0 0 100 28" aria-hidden="true"><polyline points="'+Array.from({length:91},(_,j)=>(j+4)+','+(14+Math.sin(j/(n/7))*9).toFixed(1)).join(' ')+'" fill="none" stroke="currentColor" stroke-width="2"/></svg>Signal '+String.fromCharCode(65+i)+'</button>').join('')+'</div><p>'+task.answer.length+' / 4 Signale</p>';
+  }else if(kind==='matrix'){
+   title='Datenarchiv';copy='Wähle pro Zeile das Feld mit dem passenden Symbol. Beginne oben.';
+   body='<div class="nr-matrix">'+task.pattern.map((n,i)=>'<div><b>'+symbols[n]+'</b>'+symbols.map((s,j)=>button('answer:'+j,s,i!==task.answer.length)).join('')+'</div>').join('')+'</div><p>'+task.answer.length+' / 4 Datensätze</p>';
+  }else if(kind==='cargo'){
+   title='Frachtprüfung';copy='Prüfe die vier Frachtbehälter vom leichtesten zum schwersten. Die Balken zeigen das relative Gewicht.';
+   body='<div class="nr-taskgrid nr-samples">'+E.sortValues(task.pattern).map((n,i)=>'<button class="nr-cargo" data-nr="answer:'+i+'" '+(task.answer.includes(i)?'disabled':'')+'><span>FRACHT '+(i+1)+'</span><i><em style="width:'+n+'%"></em></i></button>').join('')+'</div><p>'+task.answer.length+' / 4 Behälter</p>';
   }else if(kind==='balance'){
    title='Nährstoff-Regelung';copy='Verteile die vier Dosierwerte entsprechend der Messanzeige. Jeder Kanal besitzt vier Stufen.';
    body='<div class="nr-balance">'+task.dials.map((n,i)=>'<div><small>KANAL '+(i+1)+' · Ziel '+(task.pattern[i]+1)+'</small><div class="nr-gauge"><i style="height:'+((n+1)*25)+'%"></i><b>'+(n+1)+'</b></div><div class="nr-row">'+button('minus:'+i,'−')+button('dial:'+i,'+')+'</div></div>').join('')+'</div>'+button('calibrate','Dosierung bestätigen');
@@ -411,7 +421,7 @@ function nereidGame(){
   if(a==='rematch'&&host&&mode==='host'&&snap?.ph==='end')return rematch();
  }
  async function rematch(){
-  if(busy||!ref||!room)return;busy=true;
+  if(busy||!ref||!room||pending)return;busy=true;
   try{
    const changes={['rooms/'+code+'/status']:'lobby',['rooms/'+code+'/snap']:null,['rooms/'+code+'/act']:null,['rooms/'+code+'/chat']:null,['rooms/'+code+'/lobbyUnits']:null,['hands/'+code]:null};
    Object.entries(room.seats||{}).forEach(([i,q])=>{if(i!=='0'&&q.k!=='p')changes['rooms/'+code+'/seats/'+i]={k:'open'}});
@@ -420,13 +430,14 @@ function nereidGame(){
  }
  function meetingUI(){
   const s=snap,p=me(),voted=s.meetingVotes.includes(my);
-  const sig=JSON.stringify([s.ph,s.cause,s.meetingVotes,s.notes,Math.ceil(s.meetingEnd-s.t),s.players.map(p=>[p.id,p.alive]),s.result,secret?.role]);
+  const sig=JSON.stringify([s.ph,s.cause,s.meetingVotes,s.notes,Math.ceil(s.meetingEnd-s.t),s.players.map(p=>[p.id,p.alive]),s.result,s.verdict,secret?.role]);
+  const results=s.verdict?'<div class="nr-verdict"><b>ABSTIMMUNGSERGEBNIS</b>'+s.verdict.tally.slice().sort((a,b)=>b[1]-a[1]).map(([id,n])=>'<div><span>'+esc(id===-1?'Überspringen':s.players.find(p=>p.id===id)?.name||'Einheit')+'</span><i><em style="width:'+Math.round(n/Math.max(1,s.verdict.eligible)*100)+'%"></em></i><strong>'+n+'</strong></div>').join('')+'<small>'+s.verdict.cast+' von '+s.verdict.eligible+' Stimmen abgegeben</small></div>':'';
   if(s.ph==='meeting'){
    const list=s.players.map(q=>'<div class="nr-vote"><i style="background:'+C[q.id]+'"></i><span>'+esc(q.name)+(q.alive?'':' · offline')+'</span>'+(s.meetingVotes.includes(q.id)?'<small>ABGESTIMMT</small>':'')+button('vote:'+q.id,'Wählen',!p?.alive||voted||!q.alive)+'</div>').join('');
-   overlay(sig,header('BESPRECHUNG / '+Math.max(0,Math.ceil(s.meetingEnd-s.t))+' s','Wer sendet das Störsignal?',s.cause)+'<div class="nr-votes">'+list+'</div><div class="nr-row">'+button('vote:-1','Überspringen',voted||!p?.alive)+'</div><div class="nr-notes">'+s.notes.map(([i,j])=>'<div><b style="color:'+C[i]+'">'+esc(s.players.find(q=>q.id===i)?.name)+':</b> '+esc(E.phrases[j])+'</div>').join('')+'</div>'+(p?.alive?'<div class="nr-row">'+E.phrases.map((x,i)=>button('say:'+i,x)).join('')+'</div>':'<p>Du beobachtest die Abstimmung.</p>'),bind)
-  }else if(s.ph==='result')overlay(sig,header('ABSTIMMUNG / AUSWERTUNG',s.cause,'Der Einsatz wird in wenigen Sekunden fortgesetzt.'),bind)
+   overlay(sig,header('BESPRECHUNG / '+Math.max(0,Math.ceil(s.meetingEnd-s.t))+' s','Wer sendet das Störsignal?',s.cause)+'<div class="nr-meetbar"><i style="width:'+Math.round(cl((s.meetingEnd-s.t)/Math.max(1,s.meetingEnd-s.meetingStarted),0,1)*100)+'%"></i></div><p class="nr-small">'+s.meetingVotes.length+' / '+s.players.filter(q=>q.alive).length+' haben abgestimmt · Stimmen bleiben bis zur Auswertung geheim.</p><div class="nr-votes">'+list+'</div><div class="nr-row">'+button('vote:-1','Überspringen',voted||!p?.alive)+'</div><div class="nr-notes">'+s.notes.map(([i,j])=>'<div><b style="color:'+C[i]+'">'+esc(s.players.find(q=>q.id===i)?.name)+':</b> '+esc(E.phrases[j])+'</div>').join('')+'</div>'+(p?.alive?'<div class="nr-row">'+E.phrases.map((x,i)=>button('say:'+i,x)).join('')+'</div>':'<p>Du beobachtest die Abstimmung.</p>'),bind)
+  }else if(s.ph==='result')overlay(sig,header('ABSTIMMUNG / AUSWERTUNG',s.cause,'Der Einsatz wird in wenigen Sekunden fortgesetzt.')+results,bind)
   else if(s.ph==='end')overlay(sig,header('EINSATZ BEENDET',s.result==='tech'?'Station stabilisiert':'Störsignal erfolgreich',s.result===secret?.role?'Dein Team gewinnt.':'Die Rollen werden aufgedeckt.')+
-   '<div class="nr-roster">'+s.players.map(q=>'<div><i style="background:'+C[q.id]+'"></i>'+esc(q.name)+' · '+E.specialName(q)+'</div>').join('')+'</div><div class="nr-row">'+(mode==='local'?button('retry','Neuer Einsatz'):host?button('rematch','Neue Runde in der Lobby'):'')+button('leave','Zurück zum Menü')+'</div>',bind)
+   results+'<div class="nr-roster">'+s.players.map(q=>'<div><i style="background:'+C[q.id]+'"></i>'+esc(q.name)+' · '+E.specialName(q)+'</div>').join('')+'</div><div class="nr-row">'+(mode==='local'?button('retry','Neuer Einsatz'):host?button('rematch','Neue Runde in der Lobby'):'')+button('leave','Zurück zum Menü')+'</div>',bind)
  }
  function drawHangar(){
   const canvas=$('#nr-hangar');if(!canvas||!room)return;const d=canvas.getContext('2d');if(!d)return;
@@ -474,6 +485,7 @@ function nereidGame(){
    }else if(host&&state)E.apply(state,my,{k:'move',x:0,y:0});
   }else if(phase!==snap.ph){phase=snap.ph;task=null;panel='';touch=null;overlayKey='';sound(260)}
   if(host&&state){E.step(state,dt);snap=E.publicState(state);secret=E.privateState(state,my);if(mode==='host'&&clock>=publishAt){publishAt=clock+.20;publish()}}
+  if(taskPending&&secret?.rn===snap.rn){if(secret.done.includes(taskPending.id)){taskPending=null;taskFlash=clock+1.8;sound(820)}else if(clock>=taskPending.until||snap.ph!=='run'){taskPending=null;if(snap.ph==='run')toast('Auftrag nicht bestätigt. Bitte erneut versuchen.')}}
   if(snap.ph!=='run')meetingUI();
   if(panel==='scan'&&(!secret?.scan||secret.scan.until<=snap.t))panel='';
   if(snap.ph==='end')stopAmbience();
@@ -531,15 +543,15 @@ function nereidGame(){
   return art;
  }
  function robot(p,x,y,time,ghost=false){
-  const col=C[p.id],moving=Math.abs(p.dx)+Math.abs(p.dy)>.1,bob=moving?Math.sin(time*13+p.id)*2:Math.sin(time*3+p.id)*1.3,side=p.dx<-.1?-1:1;
-  c.save();c.translate(x,y+bob);c.globalAlpha=ghost?.38:1;
+  const col=C[p.id],moving=Math.abs(p.dx)+Math.abs(p.dy)>.1,bob=moving?Math.sin(time*13+p.id)*2:Math.sin(time*3+p.id)*1.3,side=p.dx<-.1?-1:1,back=p.dy<-.15&&Math.abs(p.dy)>Math.abs(p.dx);
+  c.save();c.translate(x,y+bob);c.globalAlpha=ghost?.38:1;c.rotate(moving?Math.sin(time*13+p.id)*.035:0);
   c.fillStyle='#04131eaa';c.beginPath();c.ellipse(0,13,17,7,0,0,Math.PI*2);c.fill();
   c.strokeStyle='#8eb0be';c.lineWidth=2;
   for(const s of [-1,1]){const f=moving?Math.sin(time*13+s*Math.PI/2)*5:0;box(s*8-4,7+f,8,12,3,'#243b48');box(s*8-5,13+f,10,5,2,col)}
-  box(-20,-7,8,20,4,'#162b39');box(12,-7,8,20,4,'#162b39');
+  for(const s of [-1,1]){const swing=moving?Math.sin(time*13+p.id+s*Math.PI/2)*4:0;box(s*17-4,-7+swing,8,20,4,'#162b39');box(s*17-3,-5+swing,6,8,3,col);circle(s*17,9+swing,3,'#678b9a')}
   box(-14,-18,28,30,8,'#132c3c');const shell=c.createLinearGradient(-12,-16,12,8);shell.addColorStop(0,'#f2ffff');shell.addColorStop(.26,col);shell.addColorStop(1,'#294858');box(-12,-16,24,23,7,shell);box(-9,-13,18,14,5,'#102d3e');line(-7,-11,7,-11,'#80c1c9',1);
   if(p.style===1){box(-5,-27,10,11,3,'#d2e8ef');circle(0,-28,2.5,col)}else if(p.style===2){box(-22,-8,6,19,3,'#d2e1e3');box(16,-8,6,19,3,'#d2e1e3')}else if(p.style===3){box(-15,6,30,6,2,'#d9c08b')}
-  box(-6+side*2,-10,10,4,2,'#d7ffff');box(-7,5,14,4,2,'#122e3e');circle(0,7,1.8,'#c8fffa');
+  if(back){box(-9,-13,18,14,5,'#294653');for(let i=0;i<3;i++)line(-6,-10+i*4,6,-10+i*4,'#8bb3bd',1.5)}else{box(-6+side*2,-10,10,4,2,'#d7ffff');if(Math.floor(time*2+p.id)%13===0)box(-6+side*2,-10,10,3,1,'#173e50')}box(-7,5,14,4,2,'#122e3e');circle(0,7,1.8,'#c8fffa');
   line(-4,-18,-9,-25,'#879fa9',2);circle(-9,-25,2.4,col);
   if(p.id===my){c.strokeStyle='#e5ffff';c.lineWidth=1.7;c.beginPath();c.ellipse(0,16,21,9,0,0,Math.PI*2);c.stroke()}
   c.globalAlpha=1;text(p.name.slice(0,18),0,-32,11,'#edfaff','center',750);c.restore()
@@ -590,10 +602,10 @@ function nereidGame(){
    const guide=guideCache.data;if(guide){const angle=Math.atan2(guide.point.y-p.y,guide.point.x-p.x),gx=w/2,gy=h-29;box(gx-79,gy-17,158,34,9,'#0d2b37ed');c.save();c.translate(gx-61,gy);c.rotate(angle);c.beginPath();c.moveTo(10,0);c.lineTo(-5,-6);c.lineTo(-2,0);c.lineTo(-5,6);c.closePath();c.fillStyle='#d0f9a1';c.fill();c.restore();text(E.stations[guide.id].name,gx-44,gy-4,10,'#d9f6ef','left',750);text('Nächster Auftrag',gx-44,gy+8,8,'#9cb6bf')}
   }
   if(roleUntil>clock&&secret?.rn===snap.rn){box(w*.20,h*.39,w*.60,65,13,'#102a38f5');text(E.specialName(secret).toUpperCase(),w/2,h*.39+20,20,secret.role==='glitch'?'#ffc69b':'#a3f1de','center',900);text(secret.role==='glitch'?'Täusche die anderen Einheiten.':secret.special==='analyst'?'Diagnose auch außerhalb der Konsole.':secret.special==='support'?'Einmal einen Druckalarm verlängern.':'Erfülle Aufträge und beobachte die Station.',w/2,h*.39+45,12,'#e3f5f4','center',600)}
-  if(taskFlash>clock){box(w*.33,h*.26,w*.34,31,9,'#205347ed');text('Auftrag übermittelt',w/2,h*.26+15,12,'#d4ffec','center',800)}
+  if(taskFlash>clock){box(w*.33,h*.26,w*.34,31,9,'#205347ed');text('Auftrag abgeschlossen',w/2,h*.26+15,12,'#d4ffec','center',800)}
   const bw=Math.min(112,w*.22),y=h-47;
   const available=secret?.tasks?.find(i=>!secret.done.includes(i)&&E.near(p,E.stations[i]));
-  b('Aufgabe',w-bw-10,y,bw,37,()=>taskOpen(available),available!==undefined);
+  b('Aufgabe',w-bw-10,y,bw,37,()=>taskOpen(available),available!==undefined&&!taskPending);
   const report=p.alive&&snap.markers.some(q=>E.near(p,q,76));
   b('Melden',w-bw*2-17,y,bw,37,()=>send({k:'report'}),report);
   b('Karte',w-bw-10,65,bw,31,()=>{panel=panel==='map'?'':'map';send({k:'move',x:0,y:0})});
@@ -611,7 +623,7 @@ function nereidGame(){
    b('Systemalarm',w-bw*2-17,y-88,bw,37,()=>{panel=panel==='alarm'?'':'alarm';send({k:'move',x:0,y:0})},!snap.alert&&snap.t>=secret.sabCool,'#744551');
    if(E.ports.some(q=>E.near(p,q,55))&&snap.t>=secret.portCool)b('Wartungstunnel',w-bw*2-17,y-132,bw,36,()=>{panel='port';send({k:'move',x:0,y:0})},true);
   }
-  const jx=touch?.sx||62,jy=touch?.sy||h-64;circle(jx,jy,37,'#193c4d90');circle(jx+(touch?cl(touch.x-jx,-29,29):0),jy+(touch?cl(touch.y-jy,-29,29):0),14,'#7ac7cf86');
+  const jx=touch?.sx??62,jy=touch?.sy??(h-64);circle(jx,jy,37,'#193c4d90');circle(jx+(touch?cl(touch.x-jx,-29,29):0),jy+(touch?cl(touch.y-jy,-29,29):0),14,'#7ac7cf86');
   if(panel){
    buttons=[];box(w*.1,h*.13,w*.8,h*.72,16,'#0a1e2af7');
    if(panel==='map'){
