@@ -20,7 +20,7 @@ function check(g){if(g.phase==='end')return;const a=g.units.filter(u=>u.active&&
 function meet(g,p,reason){if(g.phase!=='play'||!p.active)return;g.phase='vote';g.meetingId++;g.meetingLeft=25;g.meetingReason=reason;g.votes={};}
 function voteEnd(g){const active=g.units.filter(u=>u.active),counts=new Map();for(const p of active){const v=g.votes[p.id]??-1;counts.set(v,(counts.get(v)||0)+1);}const rank=[...counts].sort((a,b)=>b[1]-a[1]);const out=rank[0]?.[0]>=0&&(!rank[1]||rank[0][1]>rank[1][1])?g.units.find(u=>u.id===rank[0][0]):null;if(out)out.active=false;g.lastVote={id:g.meetingId,text:out?out.name+' scheidet aus. Rolle: '+(out.agent?'Störsignal':'Technik'):'Keine eindeutige Mehrheit.'};g.disabled.forEach(d=>d.reported=true);g.phase='play';g.votes={};check(g);}
 function action(g,p,a){
- if(!p.active||!a||!Number.isInteger(a.n)||a.n<=p.lastAction)return;
+ if(!p.active||!a||!Number.isSafeInteger(a.n)||a.n<=p.lastAction)return;
  p.lastAction=a.n;
  if(g.phase==='vote'){if(a.kind==='vote'&&a.meeting===g.meetingId&&!(p.id in g.votes)&&(a.target===-1||g.units.some(u=>u.id===a.target&&u.active&&u.id!==p.id)))g.votes[p.id]=a.target;return;}
  if(g.phase!=='play')return;
@@ -28,11 +28,11 @@ function action(g,p,a){
  else if(a.kind==='repair'&&!p.agent&&g.alarmIndex>=0&&near(g.map,p,g.tasks[effects[g.alarmIndex].station],75)){g.alarm=0;g.alarmIndex=-1;}
  else if(a.kind==='report'){const d=g.disabled.find(d=>!d.reported&&near(g.map,p,d,75));if(d){d.reported=true;meet(g,p,p.name+' meldet einen Stationsvorfall.');}}
  else if(a.kind==='meeting'&&p.meeting>0){p.meeting--;meet(g,p,p.name+' ruft den Stationsrat ein.');}
- else if(a.kind==='signal'&&p.agent&&g.alarmIndex<0&&g.signalCool<=0&&effects[a.target]){g.alarmIndex=a.target;g.alarm=effects[a.target].duration;g.signalCool=45;}
+ else if(a.kind==='signal'&&p.agent&&g.alarmIndex<0&&g.signalCool<=0&&Number.isInteger(a.target)&&a.target>=0&&a.target<effects.length){g.alarmIndex=a.target;g.alarm=effects[a.target].duration;g.signalCool=45;}
  else if(a.kind==='tag'&&p.agent&&p.cool<=0){const t=g.units.filter(u=>u.active&&!u.agent&&near(g.map,p,u,58)).sort((a,b)=>distance(p,a)-distance(p,b))[0];if(t){t.active=false;p.cool=17;g.disabled.push({id:t.id,x:t.x,y:t.y,reported:false});}}
  check(g);
 }
-function step(g,dt,inputs){if(g.phase==='end')return;dt=clamp(dt,0,.1);g.time+=dt;for(const p of g.units){p.cool=Math.max(0,p.cool-dt);const i=inputs[p.uid]||{};if(i.action)action(g,p,i.action);if(g.phase==='end')return;if(g.phase==='play'){const dx=clamp(Number(i.dx)||0,-1,1),dy=clamp(Number(i.dy)||0,-1,1),n=Math.max(1,Math.hypot(dx,dy));move(g.map,p,dx/n*165*dt,dy/n*165*dt);}}
+function step(g,dt,inputs){if(g.phase==='end')return;dt=clamp(dt,0,.1);g.time+=dt;for(const p of g.units){p.cool=Math.max(0,p.cool-dt);const i=inputs[p.uid]||{};if(i.action)action(g,p,i.action);if(g.phase==='end')return;if(g.phase==='play'){const dx=clamp(Number.isFinite(i.dx)?i.dx:0,-1,1),dy=clamp(Number.isFinite(i.dy)?i.dy:0,-1,1),n=Math.max(1,Math.hypot(dx,dy));move(g.map,p,dx/n*165*dt,dy/n*165*dt);}}
  if(g.phase==='vote'){g.meetingLeft-=dt;if(g.meetingLeft<=0||g.units.filter(u=>u.active).every(u=>u.id in g.votes))voteEnd(g);return;}
  g.signalCool=Math.max(0,g.signalCool-dt);if(g.alarmIndex>=0){g.alarm-=dt;if(g.alarm<=0){const effect=effects[g.alarmIndex];g.alarm=0;g.alarmIndex=-1;if(effect.critical)end(g,'agent','Der fiktive Stationsfehler blieb ungelöst.');}}check(g);
 }
