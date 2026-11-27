@@ -5,9 +5,6 @@ on:
       - 'factory-empire/**'
       - 'factory-empire.test.cjs'
       - 'save-progress.test.cjs'
-      - 'pulse-arena.js'
-      - 'pulse-arena.test.cjs'
-      - 'pulse-arena.browser.cjs'
       - 'firebase/database.rules.json'
       - 'index.html'
       - 'service-worker.js'
@@ -18,9 +15,6 @@ on:
       - 'factory-empire/**'
       - 'factory-empire.test.cjs'
       - 'save-progress.test.cjs'
-      - 'pulse-arena.js'
-      - 'pulse-arena.test.cjs'
-      - 'pulse-arena.browser.cjs'
       - 'firebase/database.rules.json'
       - 'index.html'
       - 'service-worker.js'
@@ -38,19 +32,3 @@ jobs:
           node-version: '22'
       - run: node factory-empire.test.cjs
       - run: node save-progress.test.cjs
-      - run: node --test pulse-arena.test.cjs
-  browser-regression:
-    # Playwright 1.56.1 supports Ubuntu 24.04, not the newer ubuntu-latest image.
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Install isolated browser test dependency
-        run: npm install --prefix "$RUNNER_TEMP/pulse-browser" --no-save --no-package-lock playwright@1.56.1
-      - name: Install Chromium
-        run: '"$RUNNER_TEMP/pulse-browser/node_modules/.bin/playwright" install --with-deps chromium'
-      - name: Run actual browser regression
-        run: NODE_PATH="$RUNNER_TEMP/pulse-browser/node_modules" node pulse-arena.browser.cjs
