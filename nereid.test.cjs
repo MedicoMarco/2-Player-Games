@@ -10,7 +10,7 @@ assert(publicSnap.players.every(p=>!Object.hasOwn(p,'role')&&!Object.hasOwn(p,'t
 assert.equal(E.privateState(s,bad.id).role,'glitch');
 assert.equal(E.apply(s,tech.id,{k:'disable',v:bad.id}),false);
 assert.equal(E.apply(s,tech.id,{k:'move',x:Infinity,y:0}),false);
-assert.equal(E.apply(s,tech.id,{k:'task',v:tech.tasks[0],answer:[0,0,0,0]}),false);
+assert.equal(E.apply(s,tech.id,{k:'task',v:tech.tasks[0],answer:[0,0,0,9]}),false);
 Object.assign(tech,E.stations[tech.tasks[0]]);
 assert(E.apply(s,tech.id,{k:'task',v:tech.tasks[0],answer:E.challenge(s,tech,tech.tasks[0])}));
 assert.equal(E.publicState(s).done,1);
@@ -30,3 +30,8 @@ const bot=E.newRound(Array.from({length:6},(_,i)=>({k:i?'cpu':'p'})),{},()=>.41)
 for(let i=0;i<1200;i++)E.step(bot,.05);
 assert(bot.players.every(p=>E.fits(p.x,p.y)));
 console.log('Nereid: roles, privacy, validated actions, tasks, report, vote, map connectivity and bot movement passed.');
+
+for(let id=0;id<E.stations.length;id++){const pattern=E.challenge(s,tech,id);assert.equal(pattern.length,4);assert(pattern.every(v=>Number.isInteger(v)&&v>=0&&v<4));if(E.stations[id].kind==='sort'){assert.equal(new Set(pattern).size,4);const vals=E.sortValues(pattern);assert.deepEqual(Array.from(pattern.map(i=>vals[i])),[12,29,47,81]);}if(E.stations[id].kind==='route'){assert.equal(E.routePath(pattern).length,5);assert(E.routePath(pattern).every(([x,y])=>x>=0&&x<=8&&y>=0&&y<=8));}}
+assert.equal(E.vision(E.meeting,320).length,112);
+const witnessGame=E.newRound(seats,{},()=>.4);const g1=witnessGame.players.find(p=>p.role==='glitch'),crew=witnessGame.players.filter(p=>p.role==='tech');for(const p of [g1,...crew])Object.assign(p,{x:E.meeting.x,y:E.meeting.y});witnessGame.t=30;assert(E.apply(witnessGame,g1.id,{k:'disable',v:crew[0].id}));assert.equal(crew[1].evidence.id,g1.id);assert(E.publicState(witnessGame).players.every(p=>!Object.hasOwn(p,'evidence')));
+console.log('Nereid v2 task variants, visibility and private witness evidence passed.');

@@ -10,3 +10,6 @@ Uses existing Firebase room, private hands, invite, expiry, block and moderated 
 ## Verification
 node nereid.test.cjs
 Run the full existing Factory Empire/save checks too. Test a real two-browser login, room join, invitations, roles, meeting, disconnect, cache and touch controls after deploying Firebase rules.
+
+## Version 2
+Four distinct assignment interfaces, animated room equipment, wall-limited vision, private bot witness evidence, fewer guest movement writes and host rematches. No new Firebase paths. Real multiplayer and browser visual checks are still required.
