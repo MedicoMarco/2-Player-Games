@@ -5967,6 +5967,7 @@ async function olIn(u){
   olUpdateGame();olPresence();olListen();olRender();olBadge();window.chatModeration?.sync();window.gameNotifications?.signedIn();
 }
 function olGone(){
+  stopOutgoingRequests();
   window.gameNotifications?.signedOut();
   window.chatModeration?.logout();
   window.gameChat?.stop();
@@ -6312,7 +6313,7 @@ function olUpd(syncChat=true){
   let h='';
   if(OL.tab=='on'){
     const l=online.sort((a,b)=>(!!OL.F[b]-!!OL.F[a])||olNameOf(a).localeCompare(olNameOf(b)));
-    h=l.map(u=>row(u,OL.F[u]?ch(u)+'<span title="Freund" style="font-size:18px">★</span>':OL.sent[u]?'<button class="btn g" disabled>Angefragt</button>':`<button class="btn g" data-o=req data-u="${olEsc(u)}">＋ Freund</button>`,olEsc(olStat(u)))).join('')
+    h=l.map(u=>row(u,OL.F[u]?ch(u)+'<span title="Freund" style="font-size:18px">★</span>':OL.sent[u]?'<button class="btn g" data-o=req data-u="'+olEsc(u)+'">Angefragt</button>':`<button class="btn g" data-o=req data-u="${olEsc(u)}">＋ Freund</button>`,olEsc(olStat(u)))).join('')
       ||'<div class=olempty>Gerade ist niemand sonst online.</div>';
     if(!OL.directoryReady)h+='<div class=olempty>Die vollständige Online-Liste ist momentan nicht verfügbar.</div>';
   }else if(OL.tab=='fr'){
@@ -6331,6 +6332,20 @@ const olNote=m=>{const e=$('#olm');if(e)e.textContent=m};
 
 /* ---- Blockieren und Kontolöschung ---- */
 const olAllowed=u=>OL.blocksReady&&!OL.deleting&&!OL.BL[u];
+// Track only our own outgoing request entries, never another account's inbox.
+const outgoingRequestWatches=new Map(),requestInFlight=new Set();
+function stopOutgoingRequests(){
+  for(const stop of outgoingRequestWatches.values())stop();
+  outgoingRequestWatches.clear();requestInFlight.clear();
+}
+function watchOutgoingRequest(u,me,ref){
+  if(outgoingRequestWatches.has(u))return;
+  const stop=()=>ref.off('value',changed);
+  const clear=()=>{stop();if(outgoingRequestWatches.get(u)===stop)outgoingRequestWatches.delete(u);if(OL.me===me){delete OL.sent[u];olUpd()}};
+  const changed=s=>{if(OL.me!==me||!s.exists()||OL.F[u]||!olAllowed(u)){clear();return}OL.sent[u]=1;olUpd()};
+  outgoingRequestWatches.set(u,stop);
+  ref.on('value',changed,clear);
+}
 function olCanContact(u){
   if(!OL.me||!u||u===OL.me||!olAllowed(u)){toast('Kontakt ist nicht möglich. Prüfe deine Blockierliste.');return false}
   return true
@@ -6403,17 +6418,33 @@ async function olAccFr(u){
   const me=OL.me;
   const name=OL.RQ[u]?.name||olNameOf(u);
   try{
-    await OL.db.ref().update({['friends/'+u+'/'+me]:true,['friends/'+me+'/'+u]:true,['requests/'+me+'/'+u]:null});
+    await OL.db.ref().update({['friends/'+u+'/'+me]:true,['friends/'+me+'/'+u]:true,['requests/'+me+'/'+u]:null,['requests/'+u+'/'+me]:null});
+    delete OL.sent[u];
     toast('Jetzt befreundet mit '+name);return true
   }
   catch(e){toast(olMsg(e));return false}
 }
 async function olReq(u){
-  if(!olCanContact(u))return;
-  if(OL.RQ[u])return olAccFr(u)
-  OL.sent[u]=1;olUpd();
-  try{await OL.db.ref('requests/'+u+'/'+OL.me).set({name:OL.name,ts:olTS()});toast('Anfrage gesendet');return true}
-  catch(e){delete OL.sent[u];olUpd();toast(olMsg(e));return false}
+  if(!olCanContact(u)||requestInFlight.has(u))return false;
+  if(OL.F[u]){toast('Ihr seid bereits befreundet.');return true}
+  if(OL.RQ[u])return olAccFr(u);
+  const me=OL.me,ref=OL.db.ref('requests/'+u+'/'+me);
+  requestInFlight.add(u);OL.sent[u]=1;olUpd();
+  try{
+    // Existing requests are immutable: treat them as pending, not a failed resend.
+    let existing=null;
+    try{existing=await ref.once('value')}catch(e){if(e.code!=='PERMISSION_DENIED')throw e}
+    if(OL.me!==me)return false;
+    if(OL.RQ[u])return await olAccFr(u);
+    if(!existing?.exists()){
+      try{await ref.set({name:OL.name,ts:olTS()})}
+      catch(e){const current=await ref.once('value').catch(()=>null);if(!current?.exists())throw e;existing=current}
+    }
+    if(OL.me!==me)return false;
+    watchOutgoingRequest(u,me,ref);
+    toast(existing?.exists()?'Anfrage ist bereits offen.':'Anfrage gesendet');return true
+  }catch(e){if(OL.me===me){delete OL.sent[u];olUpd();toast(olMsg(e))}return false}
+  finally{requestInFlight.delete(u)}
 }
 async function olRm(u){
   const me=OL.me;

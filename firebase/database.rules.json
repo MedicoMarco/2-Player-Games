@@ -183,7 +183,7 @@
               ".validate": "newData.isNumber() && newData.val() === now"
             },
             "g": {
-              ".validate": "newData.isString() && newData.val().matches(/^(tennis|pong|hockey|snakes|sumo|ttt|react|tug|curling|blocks|target|spot|spinner|clash|memory|chess|pool|mini|micro|ice|racing|bball|elf|volley|cup|ludo|maumau|poker|blackjack|fabrik)$/)"
+              ".validate": "newData.isString() && newData.val().matches(/^(tennis|pong|hockey|snakes|sumo|ttt|react|tug|curling|blocks|target|spot|spinner|clash|memory|chess|pool|mini|micro|ice|racing|bball|elf|volley|cup|ludo|maumau|poker|blackjack|fabrik|kristall|tdefense|solitaire|nereid)$/)"
             },
             "$other": {
               ".validate": false
@@ -234,7 +234,8 @@
           },
           "$other": {
             ".validate": false
-          }
+          },
+          ".read": "auth != null && auth.uid === $from && !root.child('deletionLocks').child(auth.uid).exists()"
         }
       }
     },
