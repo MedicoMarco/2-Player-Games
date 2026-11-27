@@ -564,18 +564,18 @@ Deutschland</p>
 <script src="./factory-empire/audio.js"></script>
 <script src="./factory-empire/grid.js?v=4"></script>
 <script src="./factory-empire/yard.js?v=1"></script>
-<script src="./factory-empire/runtime.js?v=4"></script>
+<script src="./factory-empire/runtime.js?v=6"></script>
 <script src="./factory-empire/telemetry.js"></script>
 <script src="./factory-empire/drawing.js?v=9"></script>
 <script src="./factory-empire/equipment.js?v=2"></script>
 <script src="./factory-empire/transport.js?v=12"></script>
 <script src="./factory-empire/layout.js?v=18"></script>
-<script src="./factory-empire/terrain.js?v=12"></script>
+<script src="./factory-empire/terrain.js?v=13"></script>
 <script src="./factory-empire/world.js?v=7"></script>
-<script src="./factory-empire/game.js?v=33"></script>
-<script src="./poker.js"></script>
+<script src="./factory-empire/game.js?v=35"></script>
+<script src="./poker.js?v=2"></script>
 <script src="./card-chip-picker.js"></script>
-<script src="./poker-table.js?v=3"></script>
+<script src="./poker-table.js?v=4"></script>
 <script src="./blackjack.js?v=2"></script>
 <script src="./blackjack-online.js"></script>
 <script src="./blackjack-table.js?v=2"></script>
@@ -5848,13 +5848,53 @@ const olGameName=id=>{if(id=='cup')return'Cup (zufällige Spiele)';const g=GAMES
    Erfolge, Siege/Niederlagen, Highscores, Zähler, Favoriten, Farben und einige Einstellungen liegen im Konto.
    Beim Anmelden wird mit dem Gerät zusammengeführt (nichts geht verloren), danach wird bei jedem save() hochgeladen. */
 const PROG_KEYS=['st','pl','ach','rc','high','stk','gw','hw','sp','ucol','sk','oc','fav','rec'],PREF_KEYS=['snd','anim','theme','d','t'];
-var progT=0,progW=0;
+var progT=0,progW=0,progState=null;
 const progOut=()=>{const o={ts:Date.now(),rs:S.prs||0};for(const k of PROG_KEYS.concat(PREF_KEYS))if(S[k]!==undefined&&S[k]!==null)o[k]=S[k];return JSON.parse(JSON.stringify(o))};
+/* Compare canonical RTDB values, ignoring timestamps and absent empty nodes. */
+function progValue(v){
+ if(v==null)return null;
+ if(typeof v!=='object')return v;
+ const entries=Object.keys(v).sort().map(k=>[k,progValue(v[k])]).filter(([,x])=>x!==null);
+ return entries.length?Object.fromEntries(entries):null;
+}
+const progSame=(a,b)=>JSON.stringify(progValue(a))===JSON.stringify(progValue(b));
+function progDelta(previous,next){
+ const out={};
+ for(const k of ['rs',...PROG_KEYS,...PREF_KEYS]){
+  const a=previous?.[k],b=next[k];
+  if(progSame(a,b))continue;
+  if(['st','ach','high','gw'].includes(k)){
+   for(const id of Object.keys(b||{}))if(!progSame(a?.[id],b[id]))out[k+'/'+id]=b[id];
+  }else out[k]=b??null;
+ }
+ if(Object.keys(out).length)out.ts=next.ts;
+ return out;
+}
 function progPush(now){
-  if(typeof OL=='undefined'||!OL.me||!OL.db||!OL.pready||OL.deleting)return;
-  clearTimeout(progT);
-  const me=OL.me,go=()=>{progT=0;if(OL.me!==me)return;try{OL.db.ref('users/'+me+'/progress').set(progOut()).catch(e=>{if(!progW){progW=1;toast(/PERMISSION/i.test(String(e&&(e.code||e.message)))?'Konto-Speicherung: Zugriff verweigert – bitte die Datenbank-Regeln prüfen.':'Konto-Speicherung fehlgeschlagen – lokal gesichert.')}})}catch(e){}};
-  if(now)go();else progT=setTimeout(go,1500)
+ if(typeof OL==='undefined'||!OL.me||!OL.db||!OL.pready||OL.deleting)return;
+ clearTimeout(progT);
+ const state=progState,me=OL.me;
+ if(!state||state.uid!==me)return;
+ const go=()=>{
+  progT=0;
+  if(progState!==state||OL.me!==me||!OL.pready||OL.deleting)return;
+  if(state.busy){state.again=true;return}
+  const data=progOut();
+  const full=!state.ack||(state.ack.rs||0)!==data.rs||!state.ack.ts;
+  const delta=full?null:progDelta(state.ack,data);
+  if(!full&&!Object.keys(delta).length)return;
+  state.busy=true;state.again=false;
+  const ref=OL.db.ref('users/'+me+'/progress');
+  Promise.resolve().then(()=>full?ref.set(data):ref.update(delta)).then(()=>{
+   state.ack=data;progW=0;
+  },e=>{
+   if(progState===state&&!progW){progW=1;toast(/PERMISSION/i.test(String(e&&(e.code||e.message)))?'Konto-Speicherung: Zugriff verweigert – bitte die Datenbank-Regeln prüfen.':'Konto-Speicherung fehlgeschlagen – lokaler Stand bleibt erhalten.')}
+  }).finally(()=>{
+   state.busy=false;
+   if(progState===state&&state.again)progPush(1);
+  });
+ };
+ if(now)go();else progT=setTimeout(go,1500);
 }
 addEventListener('visibilitychange',()=>{if(document.hidden&&progT)progPush(1)});
 addEventListener('pagehide',()=>{if(progT)progPush(1)});
@@ -5906,14 +5946,18 @@ async function olInit(){
 async function olIn(u){
   if(OL.me===u.uid&&OL.unl)return;
   OL.me=u.uid;
-  let p=(await OL.db.ref('users/'+u.uid).once('value')).val();
-  if(!p){await new Promise(r=>setTimeout(r,900));p=(await OL.db.ref('users/'+u.uid).once('value')).val()}
+  OL.pready=0;progState=null;clearTimeout(progT);progT=0;
+  // Do not download the Factory Empire save until the game needs it.
+  const readProfile=async()=>Object.fromEntries(await Promise.all(['name','stats','ad','progress'].map(async key=>[key,(await OL.db.ref('users/'+u.uid+'/'+key).once('value')).val()])));
+  let p=await readProfile();
+  if(!p.name){await new Promise(r=>setTimeout(r,900));p=await readProfile()}
+  if(OL.me!==u.uid)return;
   OL.name=p?p.name:String(u.email||'?').split('@')[0];OL.stats=(p&&p.stats)||{};
   /* Adaptive Bot-Stärke pro Spiel: Wert aus dem Account hat Vorrang, lokale Werte ohne Gegenstück werden hochgeladen */
   try{const ad=(p&&p.ad)||{};S.ar=S.ar||{};S.am=S.am||{};for(const g in ad){const q=ad[g];if(q&&Number.isFinite(q.r)){S.ar[g]=Math.max(0,Math.min(2,q.r));S.am[g]={s:adNum(q.s,.45),d:adNum(q.d,0),n:adNum(q.n,0),k:adNum(q.k,0),v:adNum(q.v,0)}}}
     const up={};for(const g in S.ar){if(ad[g]||!Number.isFinite(S.ar[g]))continue;const m=S.am[g]||(S.am[g]={s:.3,d:0,n:0,k:0,v:0});up[g]={r:Math.round(S.ar[g]*1000)/1000,s:m.s,d:m.d,n:m.n,k:m.k,v:m.v}}
     if(Object.keys(up).length)OL.db.ref('users/'+u.uid+'/ad').update(up).catch(()=>{});save()}catch(e){}
-  try{progMerge(p&&p.progress);OL.pready=1;progPush(1)}catch(e){OL.pready=0}
+  try{progMerge(p&&p.progress);progState={uid:u.uid,ack:p?.progress||null,busy:false,again:false};OL.pready=1;progPush(1)}catch(e){OL.pready=0}
   try{localStorage.setItem('2pg_ol','1')}catch(e){}
   try{OL.BL=(await OL.db.ref('blocked/'+u.uid).once('value')).val()||{};OL.blocksReady=true}catch(e){OL.blocksReady=false;toast('Blockierliste konnte nicht geladen werden. Online-Kontakte sind vorübergehend gesperrt.')}
   olUpdateGame();olPresence();olListen();olRender();olBadge();window.chatModeration?.sync();window.gameNotifications?.signedIn();
@@ -5924,7 +5968,7 @@ function olGone(){
   window.gameChat?.stop();
   window.directChat?.logout();
   if(progT)progPush(1);
-  if(OL.unl)OL.unl();OL.unl=null;OL.presence?.stop(false);OL.game=null;OL.pready=0;OL.me=null;OL.name='';OL.P={};OL.directory={};OL.directoryReady=false;OL.F={};OL.BL={};OL.blocksReady=false;OL.U={};OL.stats={};OL.seen={};OL.view='main';OL.RQ={};OL.INV={};OL.sent={};
+  if(OL.unl)OL.unl();OL.unl=null;OL.presence?.stop(false);OL.game=null;OL.pready=0;progState=null;clearTimeout(progT);progT=0;OL.me=null;OL.name='';OL.P={};OL.directory={};OL.directoryReady=false;OL.F={};OL.BL={};OL.blocksReady=false;OL.U={};OL.stats={};OL.seen={};OL.view='main';OL.RQ={};OL.INV={};OL.sent={};
   olBadge();olRender();$('#oli').innerHTML='';
 }
 
