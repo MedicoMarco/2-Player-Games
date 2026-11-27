@@ -13,3 +13,7 @@ Run the full existing Factory Empire/save checks too. Test a real two-browser lo
 
 ## Version 2
 Four distinct assignment interfaces, animated room equipment, wall-limited vision, private bot witness evidence, fewer guest movement writes and host rematches. No new Firebase paths. Real multiplayer and browser visual checks are still required.
+
+
+## Version 3
+Two connected eastern station rooms, 10 rooms total and 9 assignment consoles. Six task types including spectral analysis and nutrient dosing. Redesigned lobby with ten slots, host settings and friend status. Optional next-task navigation, area label, repair markers on map, original synthesized ambient sound and alerts. Host task count supports 2–5. No new Firebase paths or rules required; all participants should reload to the current version before joining.

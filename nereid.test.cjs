@@ -37,3 +37,9 @@ const witnessGame=E.newRound(seats,{},()=>.4);const g1=witnessGame.players.find(
 console.log('Nereid v2 task variants, visibility and private witness evidence passed.');
 
 assert(E.publicState(bot).done>0,'Bots must complete at least one assignment in a simulated minute');
+
+assert.equal(E.rooms.length,10);assert.equal(E.stations.length,9);assert(E.stations.every(p=>reachable.has(Math.floor(p.x/E.T)+','+Math.floor(p.y/E.T))));
+assert.equal(E.location(E.stations[7]),'OBSERVATORIUM');assert.equal(E.location(E.stations[8]),'ALGENZUCHT');
+assert.equal(E.guidance(E.meeting,[0,1],[0]).id,1);assert.equal(E.guidance(E.meeting,[0],[0]),null);
+for(const id of [7,8]){const s=E.newRound(seats,{tasks:5},()=>.4),p=s.players.find(q=>q.role==='tech');p.tasks=[id];Object.assign(p,E.stations[id]);assert(E.apply(s,p.id,{k:'task',v:id,answer:E.challenge(s,p,id)}));assert.equal(p.done[0],id);}
+console.log('Nereid v3 expanded map, guidance and new task types passed.');

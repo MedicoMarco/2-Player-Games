@@ -1,15 +1,16 @@
 /* Nereidenprotokoll — original 2D social deduction, host-authoritative game rules. */
 const Nereid=(()=>{
  'use strict';
- const T=40,C=29,R=21,MW=C*T,MH=R*T;
+ const T=40,C=38,R=21,MW=C*T,MH=R*T;
  const colors=['#68e4db','#ffac73','#aeb5ff','#e6df83','#ec8eb7','#79c4ff','#9fe393','#f08379','#d6b4ff','#d2dce5'];
  const rooms=[
   ['PUMPWERK',1,1,7,5,'#244b58'],['BIO-LABOR',21,1,7,5,'#325650'],
   ['LAGER',1,8,7,5,'#4d4754'],['ATRIUM',10,6,9,8,'#304c60'],
   ['FUNKZENTRALE',21,8,7,5,'#41465e'],['WERKSTATT',1,15,7,5,'#514b42'],
-  ['TAUCHDOCK',10,16,9,4,'#34545a'],['ENERGIEKERN',21,15,7,5,'#4c485f']
+  ['TAUCHDOCK',10,16,9,4,'#34545a'],['ENERGIEKERN',21,15,7,5,'#4c485f'],
+  ['OBSERVATORIUM',30,1,7,6,'#264d65'],['ALGENZUCHT',30,9,7,6,'#3a6258']
  ];
- const halls=[[5,5,2,4],[7,3,15,2],[7,9,4,3],[18,9,4,3],[23,5,2,4],[5,12,2,4],[23,12,2,4],[7,17,4,2],[18,17,4,2],[13,13,3,4],[13,4,3,3]];
+ const halls=[[5,5,2,4],[7,3,15,2],[7,9,4,3],[18,9,4,3],[23,5,2,4],[5,12,2,4],[23,12,2,4],[7,17,4,2],[18,17,4,2],[13,13,3,4],[13,4,3,3],[27,3,4,2],[27,10,4,2],[32,6,3,4],[26,13,3,3],[28,14,5,2]];
  const floor=Array.from({length:R},()=>Array(C).fill(false));
  for(const [,x,y,w,h] of rooms)for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)floor[j][i]=true;
  for(const [x,y,w,h] of halls)for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)floor[j][i]=true;
@@ -21,9 +22,14 @@ const Nereid=(()=>{
   {name:'Funkzentrale',...at(25,10),kind:'route'},
   {name:'Werkstatt',...at(3,17),kind:'sort'},
   {name:'Tauchdock',...at(15,18),kind:'route'},
-  {name:'Energiekern',...at(25,17),kind:'pulse'}
+  {name:'Energiekern',...at(25,17),kind:'pulse'},
+  {name:'Observatorium',...at(34,3),kind:'spectral'},
+  {name:'Algenzucht',...at(34,11),kind:'balance'}
  ];
  const meeting=at(14,9),ports=[at(6,2),at(26,11),at(6,18),at(26,18)];
+ const sectors=['West / Nord','Ost / Nord','West / Mitte','Zentrale','Ost / Mitte','West / Süd','Zentrale / Süd','Ost / Süd','Außenring / Nord','Außenring / Süd'];
+ function location(p){const i=rooms.findIndex(([,x,y,w,h])=>p.x>=x*T&&p.y>=y*T&&p.x<(x+w)*T&&p.y<(y+h)*T);return i<0?'Verbindungsgang':rooms[i][0]}
+ function guidance(p,ids,done){const choices=ids.filter(i=>stations[i]&&!done.includes(i));if(!choices.length)return null;const next=choices.sort((a,b)=>distance(p,stations[a])-distance(p,stations[b]))[0];return {id:next,point:route(p,stations[next]),distance:Math.round(distance(p,stations[next])/T)}}
  const phrases=['Ich war bei einer Aufgabe.','Ich habe eine Störung entdeckt.','Ich war im Atrium.','Ich war im Westen.','Ich war im Osten.','Hat jemand etwas gesehen?','Ich bin mir nicht sicher.','Lasst uns die Runde überspringen.'];
  const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
  const walk=(x,y)=>!!floor[Math.floor(y/T)]?.[Math.floor(x/T)];
@@ -33,7 +39,7 @@ const Nereid=(()=>{
  function shuffle(a,rand=Math.random){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
  function spawn(p){const a=p.id*2.399; p.x=meeting.x+Math.cos(a)*82;p.y=meeting.y+Math.sin(a)*82;p.dx=p.dy=0;p.inputUntil=0;p.waypoint=null;p.workUntil=0}
  function newRound(seats,opts={},rand=Math.random){
-  const players=seats.map((q,i)=>q&&['p','cpu'].includes(q.k)?{id:i,name:q.name||'Drohne '+(i+1),bot:q.k==='cpu',alive:true,role:'tech',tasks:shuffle(stations.map((_,j)=>j),rand).slice(0,opts.tasks===4?4:3),done:[],cool:18,meeting:1,dx:0,dy:0,inputUntil:0,botWait:0}:null).filter(Boolean);
+  const players=seats.map((q,i)=>q&&['p','cpu'].includes(q.k)?{id:i,name:q.name||'Drohne '+(i+1),bot:q.k==='cpu',alive:true,role:'tech',tasks:shuffle(stations.map((_,j)=>j),rand).slice(0,[2,3,4,5].includes(opts.tasks)?opts.tasks:3),done:[],cool:18,meeting:1,dx:0,dy:0,inputUntil:0,botWait:0}:null).filter(Boolean);
   if(players.length<4||players.length>10)throw Error('4–10 Teilnehmer erforderlich');
   const glitches=shuffle(players,rand).slice(0,players.length>=7&&opts.two?2:1);
   glitches.forEach(p=>p.role='glitch');players.forEach(spawn);
@@ -65,7 +71,7 @@ const Nereid=(()=>{
  function challenge(s,p,id){
   const seed=(s.rn%997)+(p.id+3)*37+(id+11)*71;
   const values=Array.from({length:4},(_,i)=>(Math.imul(seed+i*97,2654435761)>>>((i+1)*3))%4);
-  if(stations[id]?.kind==='sort')return [0,1,2,3].sort((a,b)=>(Math.imul(seed+a*13,1597334677)>>>0)-(Math.imul(seed+b*13,1597334677)>>>0));
+  if(['sort','spectral'].includes(stations[id]?.kind))return [0,1,2,3].sort((a,b)=>(Math.imul(seed+a*13,1597334677)>>>0)-(Math.imul(seed+b*13,1597334677)>>>0));
   return values;
  }
  function sortValues(pattern){const values=[];pattern.forEach((slot,i)=>values[slot]=[12,29,47,81][i]);return values}
@@ -159,6 +165,7 @@ const Nereid=(()=>{
   }
  }
  function step(s,dt){
+  if(!Number.isFinite(dt))return;
   dt=Math.max(0,Math.min(.1,dt));if(!dt||s.ph==='end')return;s.t+=dt;
   if(s.ph==='result'){if(s.t>=s.meetingEnd){s.ph='run';s.players.forEach(spawn)}return}
   for(const p of s.players)if(p.bot)bot(s,p,dt);
@@ -179,11 +186,11 @@ const Nereid=(()=>{
   return {ph:s.ph,rn:s.rn,seq:++s.seq,t:Math.round(s.t*10)/10,players:s.players.map(p=>({id:p.id,name:p.name,bot:p.bot,alive:p.alive,x:Math.round(p.x),y:Math.round(p.y),dx:Math.round(p.dx*10)/10,dy:Math.round(p.dy*10)/10,...(s.ph==='end'?{role:p.role}:{})})),markers:s.markers,alert:s.alert,meetingEnd:s.meetingEnd,meetingCool:s.meetingCool,meetingVotes:Object.keys(s.votes).map(Number),notes:s.notes,cause:s.cause,result:s.result,done:progress(s),total:s.total};
  }
  function privateState(s,id){const p=player(s,id);return p?{rn:s.rn,role:p.role,tasks:p.tasks,done:p.done,cool:p.cool,meeting:p.meeting,sabCool:s.sabCool,portCool:p.portCool||0,...(p.role==='glitch'?{allies:s.players.filter(q=>q.role==='glitch').map(q=>q.id)}:{})}:null}
- return {T,C,R,MW,MH,rooms,halls,floor,stations,meeting,ports,colors,phrases,at,near,sight,fits,newRound,apply,step,gone,publicState,privateState,challenge,sortValues,routePath,vision,route,player};
+ return {T,C,R,MW,MH,rooms,halls,floor,stations,meeting,ports,colors,phrases,at,near,sight,fits,newRound,apply,step,gone,publicState,privateState,challenge,sortValues,routePath,vision,route,player,location,guidance,sectors};
 })();
 function nereidGame(){
  const E=Nereid,esc=s=>String(s??'').replace(/[&<>"']/g,a=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[a]));
- let mode='setup',state=null,snap=null,secret=null,room=null,ref=null,roleRef=null,code='',my=0,host=false,alive=true,busy=false,opts={bots:6,two:true,tasks:3,discussion:30},clock=0,publishAt=0,sendAt=0,seq=0,seen={},privateCache={},panel='',task=null,touch=null,buttons=[],smooth={},camera={x:0,y:0},camReady=false,phase='',overlayKey='',lastText='',lobbyStamp='',lastMotion=-10,pending=0,moveKey='',roleUntil=0,visionCache=null,fx=[],seenMarkers=new Set(),taskFlash=0;
+ let mode='setup',state=null,snap=null,secret=null,room=null,ref=null,roleRef=null,code='',my=0,host=false,alive=true,busy=false,opts={bots:6,two:true,tasks:3,discussion:30},clock=0,publishAt=0,sendAt=0,seq=0,seen={},privateCache={},panel='',task=null,touch=null,buttons=[],smooth={},camera={x:0,y:0},camReady=false,phase='',overlayKey='',lastText='',lobbyStamp='',lastMotion=-10,pending=0,moveKey='',roleUntil=0,visionCache=null,fx=[],seenMarkers=new Set(),taskFlash=0,guideCache=null,guideOn=true,lastStepSound=-10,lastAlertSound=-10,lastAmbience=-10,previousAlert='',audio=null;
  const C=E.colors,cl=(n,a,b)=>Math.max(a,Math.min(b,n)), me=()=>snap?.players?.find(p=>p.id===my), width=()=>V.pw||800,height=()=>V.ph||480;
  const box=(x,y,w,h,r,col)=>{c.fillStyle=col;c.beginPath();c.roundRect(x,y,w,h,r);c.fill()};
  const line=(x,y,a,b,col,w=1)=>{c.strokeStyle=col;c.lineWidth=w;c.beginPath();c.moveTo(x,y);c.lineTo(a,b);c.stroke()};
@@ -191,6 +198,28 @@ function nereidGame(){
  const text=(s,x,y,sz=12,col='#d6e9f0',align='left',weight=600)=>{c.font=weight+' '+sz+'px system-ui';c.fillStyle=col;c.textAlign=align;c.textBaseline='middle';c.fillText(s,x,y)};
  const b=(label,x,y,w,h,fn,active=true,col='#173546')=>{box(x,y,w,h,9,active?col:'#14232c');text(label,x+w/2,y+h/2,Math.min(13,w/7),active?'#f0fcff':'#70828c','center',750);if(active)buttons.push({x,y,w,h,fn})};
  const sound=(f=440)=>{try{snd(f,.07,'sine')}catch(_){}};
+ // Original synthesized ambience. No downloaded or copied audio assets.
+ function startAmbience(){
+  if(audio||!S.snd)return;
+  try{
+   ac=ac||new AudioContext();ac.resume?.().catch(()=>{});
+   const gain=ac.createGain(),low=ac.createOscillator(),high=ac.createOscillator(),lfo=ac.createOscillator(),mod=ac.createGain();
+   gain.gain.value=.0001;low.type='sine';low.frequency.value=52;high.type='sine';high.frequency.value=78;lfo.frequency.value=.16;mod.gain.value=.008;
+   low.connect(gain);high.connect(gain);lfo.connect(mod);mod.connect(gain.gain);gain.connect(ac.destination);low.start();high.start();lfo.start();
+   gain.gain.setTargetAtTime(.016,ac.currentTime,.4);audio={gain,low,high,lfo,mod};
+  }catch(_){}
+ }
+ function stopAmbience(){if(!audio)return;const a=audio;audio=null;try{a.gain.disconnect();a.low.stop();a.high.stop();a.lfo.stop();a.mod.disconnect()}catch(_){}}
+ function soundscape(){
+  if(!S.snd||snap?.ph==='end'){stopAmbience();return}
+  if(!audio)startAmbience();
+  const p=me();if(!p||!snap)return;
+  if(snap.ph==='run'&&p.alive&&Math.abs(p.dx)+Math.abs(p.dy)>.15&&clock-lastStepSound>.32){lastStepSound=clock;try{snd(112+Math.sin(clock*13)*12,.045,'sine')}catch(_){}}
+  const alert=snap.alert?.kind||'';
+  if(alert!==previousAlert){previousAlert=alert;if(alert){sound(370);lastAlertSound=clock}else sound(650)}
+  if(alert&&snap.ph==='run'&&clock-lastAlertSound>2.4){lastAlertSound=clock;try{snd(alert==='pressure'?245:385,.12,'triangle')}catch(_){}}
+  if(clock-lastAmbience>9&&snap.ph==='run'&&!alert){lastAmbience=clock;try{snd(174,.16,'sine')}catch(_){}}
+ }
  const hide=()=>{$('#ov').style.display='none';overlayKey=''};
  function overlay(key,html,bind){
   if(overlayKey===key)return;const prior=$('#ov')?.querySelector('.nr-panel'),scroll=prior?.scrollTop||0;overlayKey=key;showOv('<div class="nr-panel">'+html+'</div>');const root=$('#ov');bind?.(root);const next=root.querySelector('.nr-panel');if(next&&scroll)next.scrollTop=scroll;
@@ -199,7 +228,7 @@ function nereidGame(){
  const header=(eyebrow,title,copy)=>'<div class="nr-eyebrow">'+esc(eyebrow)+'</div><h2>'+esc(title)+'</h2><p>'+esc(copy)+'</p>';
  function bind(root){root.querySelectorAll('[data-nr]').forEach(el=>el.onclick=()=>action(el.dataset.nr));}
  function setup(){
-  host=false;mode='setup';state=snap=secret=null;camReady=false;phase='';overlayKey='';
+  stopAmbience();host=false;mode='setup';state=snap=secret=null;camReady=false;phase='';overlayKey='';
   overlay('setup'+opts.bots,header('NEREIDENPROTOKOLL / 2049','Stille unter der Oberfläche','Eine Forschungsstation. Autonome Wartungseinheiten. Ein verborgenes Störsignal.')+
    '<div class="nr-feature"><span>01 / AUFTRÄGE</span><span>02 / VERDACHT</span><span>03 / ABSTIMMUNG</span></div><p>Techniker stabilisieren die Station. Störeinheiten täuschen, lösen Systemalarme aus und setzen andere Roboter außer Betrieb. Keine Seite kennt alle Rollen.</p>'+
    '<div class="nr-row">'+button('local','Training mit Bots')+button('create','Online-Raum erstellen')+button('localopts','Training: '+opts.bots+' Einheiten')+'</div><div class="nr-row"><input id="nr-code" maxlength="20" placeholder="20-stelliger Raumcode" autocomplete="off" autocapitalize="characters">'+button('join','Beitreten')+'</div><p class="nr-small">4–10 Teilnehmer · WASD / Pfeile · Touch-Joystick · E: Aufgabe · R: Meldung · M: Karte</p>',bind);
@@ -207,18 +236,23 @@ function nereidGame(){
  function lobby(){
   if(!room)return;
   const seats=Object.entries(room.seats||{}), humans=seats.filter(([,q])=>q.k==='p'),isHost=host;
-  const sig=JSON.stringify([humans,opts,host,code,busy,Object.keys(OL.F||{}),Object.keys(OL.P||{}),LUN.inv]);
+  const target=Math.max(humans.length,opts.bots),friends=Object.keys(OL.F||{}).filter(u=>!humans.some(([,q])=>q.uid===u)&&olAllowed(u));
+  const sig=JSON.stringify([humans,opts,host,code,busy,friends.map(u=>[u,olNameOf(u),!!OL.P[u],!!OL.P[u]?.g,LUN.inv[u]]),guideOn]);
+  const slots=Array.from({length:10},(_,i)=>{const q=room.seats?.[i],person=q?.k==='p',planned=isHost&&!person&&i<target,tag=person?(i===0?'HOST':i===my?'DU':'VERBUNDEN'):planned?'BOT GEPLANT':'OFFEN';return '<div class="nr-slot '+(person?'nr-occupied':'')+'" style="--unit:'+C[i]+'"><div class="nr-unit"><i></i><em></em></div><span><b>'+esc(person?q.name:planned?'Drohne '+(i+1):'Freier Platz')+'</b><small>'+tag+'</small></span></div>'}).join('');
+  const options=isHost?'<div class="nr-settings">'+[['bots','Teilnehmer',target+' / 10'],['tasks','Aufträge pro Einheit',opts.tasks],['two','Störeinheiten ab 7',opts.two?'2':'1'],['discussion','Besprechung',opts.discussion+' s']].map(([a,n,v])=>'<button class="nr-setting" data-nr="'+a+'"><small>'+n+'</small><b>'+v+'</b></button>').join('')+'</div>':'';
   overlay('lobby'+sig,header('BASIS N-17 / VERBINDUNG','Einsatzlobby','Teile den Raumcode oder lade bestätigte Freunde ein.')+
-   '<div class="nr-code"><code>'+esc(code)+'</code>'+button('copy','Kopieren')+'</div><div class="nr-roster">'+humans.map(([i,p])=>'<div><i style="background:'+C[i]+'"></i>'+esc(p.name)+(i==='0'?' <small>HOST</small>':'')+'</div>').join('')+'</div><p>'+humans.length+' / 10 verbunden</p>'+
-   (isHost?'<div class="nr-row">'+button('bots','Zielgröße: '+opts.bots)+button('tasks','Aufgaben: '+opts.tasks)+button('two','2 Störer ab 7: '+(opts.two?'An':'Aus'))+button('discussion','Besprechung: '+opts.discussion+' s')+'</div><p class="nr-small">Freie Plätze bis zur Zielgröße werden beim Start mit Bots besetzt.</p><div class="nr-roster">'+Object.keys(OL.F||{}).filter(u=>!humans.some(([,q])=>q.uid===u)&&olAllowed(u)).slice(0,18).map(u=>'<div>'+esc(olNameOf(u))+' '+button('invite:'+u,LUN.inv[u]?'Gesendet':'Einladen',!!LUN.inv[u])+'</div>').join('')+'</div>'+button('start','Einsatz starten',busy):'<p>Warte auf den Host …</p>')+
-   '<div class="nr-row">'+button('leave','Lobby verlassen')+'</div>',bind);
+   '<div class="nr-code"><code>'+esc(code)+'</code>'+button('copy','Kopieren')+'</div><div class="nr-lobbystatus"><span><i></i> '+humans.length+' / 10 verbunden</span><small>'+(!isHost?'Warte auf den Host':busy?'Einsatz wird vorbereitet':'Bereit für den Einsatz')+'</small></div><div class="nr-slotgrid">'+slots+'</div>'+options+
+   (isHost?'<p class="nr-small">Freie Plätze bis zur Zielgröße werden beim Start mit Bots besetzt.</p><div class="nr-friends"><b>Freunde einladen</b>'+ (friends.length?friends.slice(0,18).map(u=>'<div><i class="'+(OL.P[u]?'nr-online':'')+'"></i><span>'+esc(olNameOf(u))+'<small>'+(OL.P[u]?.g?'Im Spiel':OL.P[u]?'Online':'Offline')+'</small></span>'+button('invite:'+u,LUN.inv[u]?'Gesendet':'Einladen',!!LUN.inv[u])+'</div>').join(''):'<p>Keine weiteren bestätigten Freunde.</p>')+'</div>':'')+
+   '<div class="nr-row">'+(isHost?button('start','Einsatz starten',busy):'')+button('leave','Lobby verlassen')+'</div>',bind);
+
  }
- function local(){host=true;mode='local';my=0;state=E.newRound(Array.from({length:opts.bots},(_,i)=>i===0?{k:'p',name:'Du'}:{k:'cpu',name:['','Mira','Kelp','Orion','Lumen','Vela','Nix','Echo','Delta','Nova'][i]}),opts);beginRound()}
- function beginRound(){snap=E.publicState(state);secret=E.privateState(state,my);camReady=false;smooth={};phase='';task=null;touch=null;moveKey='';seenMarkers.clear();fx=[];roleUntil=clock+4;hide();sound(660)}
+ function local(){startAmbience();host=true;mode='local';my=0;state=E.newRound(Array.from({length:opts.bots},(_,i)=>i===0?{k:'p',name:'Du'}:{k:'cpu',name:['','Mira','Kelp','Orion','Lumen','Vela','Nix','Echo','Delta','Nova'][i]}),opts);beginRound()}
+ function beginRound(){snap=E.publicState(state);secret=E.privateState(state,my);camReady=false;smooth={};phase='';task=null;touch=null;moveKey='';seenMarkers.clear();fx=[];roleUntil=clock+4;guideCache=null;previousAlert='';hide();startAmbience();sound(660)}
  async function openOnline(joinCode){
   if(busy||mode!=='setup')return false;busy=true;
   try{
    if(!await luLogin()||!alive)return false;
+   startAmbience();
    if(joinCode){
     code=String(joinCode).trim().toUpperCase();
     if(!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{20}$/.test(code)){toast('Bitte den vollständigen 20-stelligen Raumcode eingeben.');return false}
@@ -313,6 +347,13 @@ function nereidGame(){
   }else if(kind==='align'){
    title='Sensor-Kalibrierung';copy='Drehe jeden Regler, bis er mit der Zielrichtung übereinstimmt.';
    body='<div class="nr-dials">'+task.dials.map((n,i)=>'<div><small>ZIEL '+arrows[task.pattern[i]]+'</small><button class="nr-dial '+(n===task.pattern[i]?'nr-match':'')+'" data-nr="dial:'+i+'">'+arrows[n]+'</button><small>KANAL '+(i+1)+'</small></div>').join('')+'</div>'+button('calibrate','Kalibrierung bestätigen');
+  }else if(kind==='spectral'){
+   title='Spektralanalyse';copy='Ordne die vier Signale nach Wellenlänge: kurz bis lang. Vergleiche die sichtbaren Wellen.';
+   const vals=E.sortValues(task.pattern);
+   body='<div class="nr-taskgrid nr-samples">'+vals.map((n,i)=>'<button class="nr-wave" data-nr="answer:'+i+'" '+(task.answer.includes(i)?'disabled':'')+'><svg viewBox="0 0 100 28" aria-hidden="true"><polyline points="'+Array.from({length:91},(_,j)=>(j+4)+','+(14+Math.sin(j/(n/7))*9).toFixed(1)).join(' ')+'" fill="none" stroke="currentColor" stroke-width="2"/></svg>Signal '+String.fromCharCode(65+i)+'</button>').join('')+'</div><p>'+task.answer.length+' / 4 Signale</p>';
+  }else if(kind==='balance'){
+   title='Nährstoff-Regelung';copy='Verteile die vier Dosierwerte entsprechend der Messanzeige. Jeder Kanal besitzt vier Stufen.';
+   body='<div class="nr-balance">'+task.dials.map((n,i)=>'<div><small>KANAL '+(i+1)+' · Ziel '+(task.pattern[i]+1)+'</small><div class="nr-gauge"><i style="height:'+((n+1)*25)+'%"></i><b>'+(n+1)+'</b></div><div class="nr-row">'+button('minus:'+i,'−')+button('dial:'+i,'+')+'</div></div>').join('')+'</div>'+button('calibrate','Dosierung bestätigen');
   }else{
    title='Signalroute';copy='Folge dem nummerierten Pfad von START bis zum vierten Signal. Wähle die Richtung jedes Schritts.';
    const points=E.routePath(task.pattern);
@@ -328,7 +369,7 @@ function nereidGame(){
   if(a==='leave')return toMenu();
   if(a==='copy'){navigator.clipboard?.writeText(code).then(()=>toast('Raumcode kopiert.')).catch(()=>toast(code));return}
   if(a==='bots'){opts.bots=opts.bots>=10?4:opts.bots+1;lobby();return}
-  if(a==='tasks'){opts.tasks=opts.tasks===3?4:3;lobby();return}
+  if(a==='tasks'){opts.tasks=opts.tasks>=5?2:opts.tasks+1;lobby();return}
   if(a==='two'){opts.two=!opts.two;lobby();return}
   if(a==='discussion'){opts.discussion=opts.discussion===30?45:30;lobby();return}
   if(a==='start')return startOnline();
@@ -338,6 +379,7 @@ function nereidGame(){
   }
   if(a==='cancel'){task=null;panel='';hide();return}
   if(task&&a==='replay'){task.start=clock;task.answer=[];task.err=false;overlayKey='';renderTask();return}
+  if(task&&a.startsWith('minus:')){const i=+a.slice(6);if(i>=0&&i<4){task.dials[i]=(task.dials[i]+3)%4;task.err=false;renderTask();sound(360)}return}
   if(task&&a.startsWith('dial:')){const i=+a.slice(5);if(i>=0&&i<4){task.dials[i]=(task.dials[i]+1)%4;task.err=false;renderTask();sound(360)}return}
   if(task&&a==='calibrate'){if(task.dials.join(',')===task.pattern.join(','))finishTask(task.dials);else{task.err=true;renderTask();sound(200)}return}
   if(a.startsWith('answer:')&&task){
@@ -373,6 +415,7 @@ function nereidGame(){
  function update(dt){
   clock+=dt;
   if(mode==='setup')return;
+  soundscape();
   if(mode==='lobby'){if(room&&Math.floor(clock*2)!==Math.floor((clock-dt)*2))lobby();return}
   if(!snap)return;
   fx=fx.filter(f=>clock-f.t<1.4);
@@ -390,6 +433,7 @@ function nereidGame(){
   }else if(phase!==snap.ph){phase=snap.ph;task=null;panel='';touch=null;overlayKey='';sound(260)}
   if(host&&state){E.step(state,dt);snap=E.publicState(state);secret=E.privateState(state,my);if(mode==='host'&&clock>=publishAt){publishAt=clock+.20;publish()}}
   if(snap.ph!=='run')meetingUI();
+  if(snap.ph==='end')stopAmbience();
   if(task&&(!me()||!E.near(me(),E.stations[task.id]))){task=null;hide()}
   if(task&&E.stations[task.id].kind==='pulse'&&clock-task.start>=2.6&&clock-task.start-dt<2.6)renderTask();
  }
@@ -415,15 +459,26 @@ function nereidGame(){
   if(name==='WERKSTATT'){const px=x+w-65,py=y+70;box(px-48,py-24,96,48,6,'#172b36');box(px-42,py-19,84,37,5,'#637171');for(let i=0;i<4;i++){box(px-33+i*20,py-8,12,15,3,'#263b47');line(px-27+i*20,py-10,px-27+i*20,py+11,'#b1bab4',2)}}
   if(name==='ENERGIEKERN'){circle(x+w-50,y+70,30,'#141e3c');circle(x+w-50,y+70,21,'#645eaa');circle(x+w-50,y+70,11,'#c6c0ff')}
   if(name==='TAUCHDOCK'){box(x+26,y+45,w-52,31,13,'#183e4b');for(let i=0;i<6;i++)line(x+40+i*30,y+49,x+52+i*30,y+70,'#64c9ce',2)}
+  if(name==='OBSERVATORIUM'){
+   const px=x+w*.5,py=y+83;box(px-103,py-35,206,70,21,'#111f31');
+   const sea=c.createLinearGradient(px,py-30,px,py+30);sea.addColorStop(0,'#124858');sea.addColorStop(1,'#081c31');box(px-96,py-29,192,58,17,sea);
+   for(let i=0;i<4;i++){const xx=px-77+(clock*(6+i)+i*49)%153,yy=py+Math.sin(clock*.5+i)*18;circle(xx,yy,2+i%2,'#88bcbf70');line(xx-9,yy,xx,yy,'#8fc4ce50',1)}
+   c.save();c.translate(px,py);c.rotate(clock*.23);line(-35,0,35,0,'#9ef2db30',1);line(0,-27,0,27,'#9ef2db30',1);c.restore();for(const dx of [-60,0,60])line(px+dx,py-29,px+dx,py+29,'#4c748599',3);
+   for(let i=0;i<3;i++){const xx=px-68+i*68;box(xx-18,py+45,36,23,5,'#132c3e');box(xx-14,py+49,28,12,3,'#507d91');circle(xx+10,py+63,2,'#a0ffe7')}
+  }
+  if(name==='ALGENZUCHT'){
+   for(let i=0;i<4;i++){const px=x+40+i*64,py=y+77;box(px-25,py-38,50,76,13,'#163c40');box(px-20,py-31,40,62,10,'#337263');for(let k=0;k<4;k++){const a=px-12+k*8;c.beginPath();c.moveTo(a,py+22);c.quadraticCurveTo(a+Math.sin(clock+k)*9,py-6,a+Math.sin(clock*.8+k)*5,py-22);c.strokeStyle='#9bd7a49c';c.lineWidth=3;c.stroke();circle(a,py+21-((clock*12+k*14)%42),2,'#dbfbdca0')}box(px-15,py+33,30,8,2,'#91b59c')}
+  }
  }
  let art=null;
  function mapArt(){
   if(art)return art;art=document.createElement('canvas');art.width=E.MW;art.height=E.MH;
-  const old=c; // Use the game's canvas for reusable drawing helpers, then capture it with a dedicated renderer below.
   const d=art.getContext('2d');
-  d.fillStyle='#061923';d.fillRect(0,0,E.MW,E.MH);
+  const sea=d.createLinearGradient(0,0,E.MW,E.MH);sea.addColorStop(0,'#0b2b3a');sea.addColorStop(1,'#06141f');d.fillStyle=sea;d.fillRect(0,0,E.MW,E.MH);
+  for(let i=0;i<145;i++){const x=(i*149)%E.MW,y=(i*97)%E.MH;d.fillStyle='#72afc314';d.beginPath();d.ellipse(x,y,2+i%6,1+i%3,0,0,Math.PI*2);d.fill()}
   for(let y=0;y<E.R;y++)for(let x=0;x<E.C;x++)if(E.floor[y][x]){
    const px=x*E.T,py=y*E.T;
+   if(!E.rooms.some(([,rx,ry,rw,rh])=>x>=rx&&x<rx+rw&&y>=ry&&y<ry+rh)){d.fillStyle='#76b4b44d';d.fillRect(px+16,py+18,8,4)}
    const grad=d.createLinearGradient(px,py,px+E.T,py+E.T);grad.addColorStop(0,(x+y)%2?'#263e4c':'#293f4e');grad.addColorStop(1,'#1f3543');d.fillStyle=grad;d.fillRect(px,py,E.T,E.T);d.strokeStyle='#759aaa22';d.strokeRect(px+.5,py+.5,E.T-1,E.T-1);d.fillStyle='#7ba0ac40';for(const [a,b] of [[4,4],[36,4],[4,36],[36,36]])d.fillRect(px+a,py+b,1.4,1.4);
    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]])if(!E.floor[y+dy]?.[x+dx]){
     d.fillStyle='#101e29';d.fillRect(px+(dx===1?E.T-5:0),py+(dy===1?E.T-5:0),dx?5:E.T,dy?5:E.T);
@@ -458,7 +513,7 @@ function nereidGame(){
   if(!camReady){camera={x:targetX,y:targetY};camReady=true}else{camera.x+=(targetX-camera.x)*.17;camera.y+=(targetY-camera.y)*.17}
   c.save();c.scale(scale,scale);c.translate(-camera.x,-camera.y);
   c.drawImage(mapArt(),0,0);
-  for(const q of E.rooms)roomDecor(...q);
+  for(const q of E.rooms)if((q[1]+q[3])*E.T>camera.x&&q[1]*E.T<camera.x+w/scale&&(q[2]+q[4])*E.T>camera.y&&q[2]*E.T<camera.y+h/scale)roomDecor(...q);
   // Animated ocean, viewport lights and station activity.
   for(let i=0;i<28;i++){const x=(i*137+clock*8)%E.MW,y=(i*83-clock*13%E.MH+E.MH)%E.MH;if(!E.floor[Math.floor(y/E.T)]?.[Math.floor(x/E.T)])circle(x,y,2+i%3,'#7dd3fc26')}
   for(const [i,q] of E.stations.entries()){
@@ -467,7 +522,7 @@ function nereidGame(){
    line(q.x-9,q.y-4,q.x+9,q.y-4,'#cafafa',2);circle(q.x+12,q.y+5,2,active?'#d8f779':'#7bb4c0');
    if(active){c.strokeStyle='rgba(173,244,179,'+(.5+.3*Math.sin(clock*4))+')';c.lineWidth=2;c.beginPath();c.arc(q.x,q.y,25+Math.sin(clock*3)*3,0,Math.PI*2);c.stroke()}
   }
-  for(const q of E.ports){box(q.x-17,q.y-13,34,26,5,'#183641');for(let i=-10;i<=10;i+=5)line(q.x-12,q.y+i,q.x+12,q.y+i,'#66818c',2)}
+  for(const [i,q] of E.ports.entries()){box(q.x-17,q.y-13,34,26,5,'#183641');text('T'+(i+1),q.x,q.y-20,10,'#9bcbd2','center',800);for(let i=-10;i<=10;i+=5)line(q.x-12,q.y+i,q.x+12,q.y+i,'#66818c',2)}
   const range=snap.alert?.kind==='signal'?130:320,visible=q=>!p.alive||E.sight(p,q,range);
   for(const f of fx){const age=clock-f.t;c.save();c.globalAlpha=Math.max(0,1-age/1.4);c.strokeStyle='#a9f6e9';c.lineWidth=2;c.beginPath();c.arc(f.x,f.y,12+age*39,0,Math.PI*2);c.stroke();for(let i=0;i<9;i++){const a=i*Math.PI*2/9;circle(f.x+Math.cos(a)*age*36,f.y+Math.sin(a)*age*36,2,'#b7fff0')}c.restore()}
   for(const m of snap.markers)if(visible(m)){box(m.x-15,m.y-9,30,18,6,'#38434b');box(m.x-10,m.y-5,20,10,4,C[m.id]);circle(m.x+8,m.y,3,'#ffb66e');text('AUSFALL',m.x,m.y-20,10,'#ffd2a0','center',800)}
@@ -481,10 +536,14 @@ function nereidGame(){
   box(10,10,w-20,49,11,'#102633ec');
   const role=secret?.rn===snap.rn?(secret.role==='glitch'?'STÖREINHEIT':'TECHNIKER'):'ROLLE WIRD GELADEN';
   text(role,22,23,12,secret?.role==='glitch'?'#ffc69b':'#a3f1de','left',850);
-  text(p.alive?'N-17 / '+snap.players.filter(q=>q.alive).length+' aktiv':'BEOBACHTERMODUS',22,43,11,'#a1b7c6');
+  text(p.alive?E.location(p)+' · '+snap.players.filter(q=>q.alive).length+' aktiv':'BEOBACHTERMODUS',22,43,11,'#a1b7c6');
   const barW=Math.min(220,w*.29),bx=w-barW-24;box(bx,22,barW,10,5,'#243a47');box(bx,22,barW*cl(snap.done/Math.max(1,snap.total),0,1),10,5,'#79ddc4');text('STABILISIERUNG '+snap.done+'/'+snap.total,bx+barW/2,44,10,'#bce4dd','center',750);
   if(snap.alert){box(w*.22,65,w*.56,35,7,'#7b3f31ed');text((snap.alert.kind==='pressure'?'SYSTEMDRUCK':'SIGNALSTÖRUNG')+' · '+E.stations[snap.alert.station].name+' · '+Math.max(0,Math.ceil(snap.alert.until-snap.t))+' s',w/2,82,12,'#ffe1be','center',800)}
   if(secret?.tasks){const tw=Math.min(165,w*.34),th=26+secret.tasks.length*18;box(10,105,tw,th,9,'#0c2531e6');text('DEINE AUFTRÄGE',20,117,10,'#98d9df','left',800);secret.tasks.forEach((i,j)=>text((secret.done.includes(i)?'✓  ':'○  ')+E.stations[i].name,20,136+j*18,10,secret.done.includes(i)?'#83bba3':'#e0edf1'))}
+  if(guideOn&&secret?.tasks&&secret.rn===snap.rn&&!panel){
+   const key=[Math.floor(p.x/E.T),Math.floor(p.y/E.T),secret.done.join(','),secret.tasks.join(',')].join(':');if(!guideCache||guideCache.key!==key)guideCache={key,data:E.guidance(p,secret.tasks,secret.done)};
+   const guide=guideCache.data;if(guide){const angle=Math.atan2(guide.point.y-p.y,guide.point.x-p.x),gx=w/2,gy=h-29;box(gx-79,gy-17,158,34,9,'#0d2b37ed');c.save();c.translate(gx-61,gy);c.rotate(angle);c.beginPath();c.moveTo(10,0);c.lineTo(-5,-6);c.lineTo(-2,0);c.lineTo(-5,6);c.closePath();c.fillStyle='#d0f9a1';c.fill();c.restore();text(E.stations[guide.id].name,gx-44,gy-4,10,'#d9f6ef','left',750);text('Nächster Auftrag',gx-44,gy+8,8,'#9cb6bf')}
+  }
   if(roleUntil>clock&&secret?.rn===snap.rn){box(w*.20,h*.39,w*.60,65,13,'#102a38f5');text(secret.role==='glitch'?'STÖREINHEIT':'TECHNIKER',w/2,h*.39+20,20,secret.role==='glitch'?'#ffc69b':'#a3f1de','center',900);text(secret.role==='glitch'?'Täusche die anderen Einheiten.':'Erfülle Aufträge und beobachte die Station.',w/2,h*.39+45,12,'#e3f5f4','center',600)}
   if(taskFlash>clock){box(w*.33,h*.26,w*.34,31,9,'#205347ed');text('Auftrag übermittelt',w/2,h*.26+15,12,'#d4ffec','center',800)}
   const bw=Math.min(112,w*.22),y=h-47;
@@ -493,6 +552,7 @@ function nereidGame(){
   const report=p.alive&&snap.markers.some(q=>E.near(p,q,76));
   b('Melden',w-bw*2-17,y,bw,37,()=>send({k:'report'}),report);
   b('Karte',w-bw-10,65,bw,31,()=>{panel=panel==='map'?'':'map';send({k:'move',x:0,y:0})});
+  b(guideOn?'Nav: an':'Nav: aus',w-bw-10,102,bw,27,()=>{guideOn=!guideOn;guideCache=null});
   const canMeet=p.alive&&secret?.meeting>0&&!snap.alert&&snap.t>=snap.meetingCool&&E.near(p,E.meeting,80);
   if(canMeet)b('Besprechung',w-bw*2-17,y-44,bw,37,()=>send({k:'meeting'}),true,'#725334');
   if(snap.alert&&p.alive&&E.near(p,E.stations[snap.alert.station],76))b('Reparieren',w-bw-10,y-44,bw,37,()=>send({k:'repair'}),true,'#23796e');
@@ -511,6 +571,8 @@ function nereidGame(){
     c.save();c.translate(ox,oy);c.scale(z,z);c.drawImage(mapArt(),0,0);
     for(const q of E.rooms){box(q[1]*E.T+4,q[2]*E.T+4,q[3]*E.T-8,q[4]*E.T-8,7,q[5]);text(q[0],(q[1]+q[3]/2)*E.T,(q[2]+q[4]/2)*E.T,14,'#e6f1f4','center')}
     for(const i of secret?.tasks||[])if(!secret.done.includes(i))circle(E.stations[i].x,E.stations[i].y,15,'#d4f98a');
+    if(snap.alert){const q=E.stations[snap.alert.station];circle(q.x,q.y,20,'#f4a180');text('!',q.x,q.y,23,'#3e1c20','center',900)}
+    circle(E.meeting.x,E.meeting.y,12,'#8dd5ea');
     circle(p.x,p.y,16,'#fff');c.restore();
    }else if(panel==='alarm'){
     text('SYSTEMSTÖRUNGEN',w/2,h*.23,18,'#ffc0a1','center',850);
@@ -535,6 +597,6 @@ function nereidGame(){
   if(k==='KeyR')send({k:'report'});
   if(k==='KeyF'){if(secret?.role==='glitch'){const q=snap.players.find(q=>q.alive&&q.id!==my&&!secret.allies.includes(q.id)&&E.near(p,q,60));if(q)send({k:'disable',v:q.id})}else send({k:'meeting'})}
  }
- const api={showSetup:setup,canJoin:()=>mode==='setup'&&!busy,joinCode:v=>openOnline(v),draw,update,click,key,dragMove(x,y,_p,id){if(touch?.id===id){touch.x=x;touch.y=y}},dragEnd(_x,_y,_p,id){if(touch?.id===id)touch=null},dragCancel(_p,id){if(touch?.id===id)touch=null},leave(){alive=false;roleRef?.off();if(ref){LUN.left=1;luCleanup()}window.gameChat?.stop();task=null;touch=null;state=null;snap=null;secret=null}};
+ const api={showSetup:setup,canJoin:()=>mode==='setup'&&!busy,joinCode:v=>openOnline(v),draw,update,click,key,dragMove(x,y,_p,id){if(touch?.id===id){touch.x=x;touch.y=y}},dragEnd(_x,_y,_p,id){if(touch?.id===id)touch=null},dragCancel(_p,id){if(touch?.id===id)touch=null},leave(){stopAmbience();alive=false;roleRef?.off();if(ref){LUN.left=1;luCleanup()}window.gameChat?.stop();task=null;touch=null;state=null;snap=null;secret=null}};
  return api;
 }
