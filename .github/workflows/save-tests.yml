@@ -5,6 +5,9 @@ on:
       - 'factory-empire/**'
       - 'factory-empire.test.cjs'
       - 'save-progress.test.cjs'
+      - 'pulse-arena.js'
+      - 'pulse-arena.test.cjs'
+      - 'firebase/database.rules.json'
       - 'index.html'
       - 'service-worker.js'
       - '.github/workflows/save-tests.yml'
@@ -14,6 +17,9 @@ on:
       - 'factory-empire/**'
       - 'factory-empire.test.cjs'
       - 'save-progress.test.cjs'
+      - 'pulse-arena.js'
+      - 'pulse-arena.test.cjs'
+      - 'firebase/database.rules.json'
       - 'index.html'
       - 'service-worker.js'
       - '.github/workflows/save-tests.yml'
@@ -30,3 +36,4 @@ jobs:
           node-version: '22'
       - run: node factory-empire.test.cjs
       - run: node save-progress.test.cjs
+      - run: node --test pulse-arena.test.cjs
