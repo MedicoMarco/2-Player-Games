@@ -17,3 +17,7 @@ Four distinct assignment interfaces, animated room equipment, wall-limited visio
 
 ## Version 3
 Two connected eastern station rooms, 10 rooms total and 9 assignment consoles. Six task types including spectral analysis and nutrient dosing. Redesigned lobby with ten slots, host settings and friend status. Optional next-task navigation, area label, repair markers on map, original synthesized ambient sound and alerts. Host task count supports 2–5. No new Firebase paths or rules required; all participants should reload to the current version before joining.
+
+
+## Version 4
+Walkable synchronized online preparation deck, four shell styles, optional readiness indicators and optional analyst/systemwart specialties. Station diagnostic console returns aggregate room counts only for a few seconds, never names/roles. Analyst can request a scan remotely; systemwart extends a fictional pressure alert once by 12 seconds. These roles remain on the technician team and are private until the end. A round token rejects old inputs. **Deploy the updated Firebase database rules before using synchronized lobby movement.** The rules allow only room participants to update their own bounded lobby state while in the lobby; the host can clear it. Readiness is advisory, not a start requirement. Real browser and two-account verification still required.

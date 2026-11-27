@@ -43,3 +43,9 @@ assert.equal(E.location(E.stations[7]),'OBSERVATORIUM');assert.equal(E.location(
 assert.equal(E.guidance(E.meeting,[0,1],[0]).id,1);assert.equal(E.guidance(E.meeting,[0],[0]),null);
 for(const id of [7,8]){const s=E.newRound(seats,{tasks:5},()=>.4),p=s.players.find(q=>q.role==='tech');p.tasks=[id];Object.assign(p,E.stations[id]);assert(E.apply(s,p.id,{k:'task',v:id,answer:E.challenge(s,p,id)}));assert.equal(p.done[0],id);}
 console.log('Nereid v3 expanded map, guidance and new task types passed.');
+
+const lobby=E.normalizeLobby({x:9999,y:-20,style:8,ready:true});assert.equal(lobby.x,930);assert.equal(lobby.y,130);assert.equal(lobby.style,0);assert.equal(lobby.ready,true);
+const spec=E.newRound(Array.from({length:8},(_,i)=>({k:'p',style:i%4})),{two:true,special:true},()=>.4);const analyst=spec.players.find(p=>p.special==='analyst'),support=spec.players.find(p=>p.special==='support');assert(analyst&&support);assert.equal(E.publicState(spec).players.some(p=>Object.hasOwn(p,'special')),false);assert.equal(E.privateState(spec,analyst.id).special,'analyst');
+assert(E.apply(spec,analyst.id,{k:'scan'}));assert.equal(E.privateState(spec,analyst.id).scan.counts.length,10);assert(!E.apply(spec,analyst.id,{k:'scan'}));assert(!Object.hasOwn(E.publicState(spec),'scan'));
+spec.alert={kind:'pressure',station:6,until:50};assert(E.apply(spec,support.id,{k:'stabilize'}));assert.equal(spec.alert.until,62);assert(!E.apply(spec,support.id,{k:'stabilize'}));assert.equal(E.privateState(spec,support.id).specialUsed,true);
+const plain=E.newRound(seats,{special:false},()=>.4);assert(plain.players.every(p=>!p.special));console.log('Nereid v4 lobby bounds, cosmetic states, private roles, scan cooldown and one-use support passed.');

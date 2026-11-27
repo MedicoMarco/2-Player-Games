@@ -26,6 +26,7 @@ const Nereid=(()=>{
   {name:'Observatorium',...at(34,3),kind:'spectral'},
   {name:'Algenzucht',...at(34,11),kind:'balance'}
  ];
+ const diagnostic=at(16,11);
  const meeting=at(14,9),ports=[at(6,2),at(26,11),at(6,18),at(26,18)];
  const sectors=['West / Nord','Ost / Nord','West / Mitte','Zentrale','Ost / Mitte','West / Süd','Zentrale / Süd','Ost / Süd','Außenring / Nord','Außenring / Süd'];
  function location(p){const i=rooms.findIndex(([,x,y,w,h])=>p.x>=x*T&&p.y>=y*T&&p.x<(x+w)*T&&p.y<(y+h)*T);return i<0?'Verbindungsgang':rooms[i][0]}
@@ -38,11 +39,15 @@ const Nereid=(()=>{
  const near=(a,b,r=65)=>distance(a,b)<=r&&sight(a,b);
  function shuffle(a,rand=Math.random){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
  function spawn(p){const a=p.id*2.399; p.x=meeting.x+Math.cos(a)*82;p.y=meeting.y+Math.sin(a)*82;p.dx=p.dy=0;p.inputUntil=0;p.waypoint=null;p.workUntil=0}
+ const specialName=p=>p?.special==='analyst'?'Analyst':p?.special==='support'?'Systemwart':p?.role==='glitch'?'Störeinheit':'Techniker';
+ function normalizeLobby(v={},id=0){return {x:Number.isFinite(v.x)?Math.max(70,Math.min(930,Math.round(v.x))):170+(id%5)*165,y:Number.isFinite(v.y)?Math.max(130,Math.min(510,Math.round(v.y))):220+Math.floor(id/5)*155,style:[0,1,2,3].includes(v.style)?v.style:0,ready:v.ready===true}}
  function newRound(seats,opts={},rand=Math.random){
-  const players=seats.map((q,i)=>q&&['p','cpu'].includes(q.k)?{id:i,name:q.name||'Drohne '+(i+1),bot:q.k==='cpu',alive:true,role:'tech',tasks:shuffle(stations.map((_,j)=>j),rand).slice(0,[2,3,4,5].includes(opts.tasks)?opts.tasks:3),done:[],cool:18,meeting:1,dx:0,dy:0,inputUntil:0,botWait:0}:null).filter(Boolean);
+  const players=seats.map((q,i)=>q&&['p','cpu'].includes(q.k)?{id:i,name:q.name||'Drohne '+(i+1),bot:q.k==='cpu',alive:true,role:'tech',style:normalizeLobby(q,i).style,special:'',specialUsed:false,scanCool:0,scan:null,tasks:shuffle(stations.map((_,j)=>j),rand).slice(0,[2,3,4,5].includes(opts.tasks)?opts.tasks:3),done:[],cool:18,meeting:1,dx:0,dy:0,inputUntil:0,botWait:0}:null).filter(Boolean);
   if(players.length<4||players.length>10)throw Error('4–10 Teilnehmer erforderlich');
   const glitches=shuffle(players,rand).slice(0,players.length>=7&&opts.two?2:1);
-  glitches.forEach(p=>p.role='glitch');players.forEach(spawn);
+  glitches.forEach(p=>p.role='glitch');
+  if(opts.special!==false&&players.length>=5){const crew=shuffle(players.filter(p=>p.role==='tech'),rand);crew[0].special='analyst';if(players.length>=7&&crew[1])crew[1].special='support'}
+  players.forEach(spawn);
   return {ph:'run',rn:Date.now(),players,t:0,seq:0,markers:[],alert:null,sabCool:25,meetingCool:12,meetingEnd:0,votes:{},notes:[],cause:'',result:'',total:players.filter(p=>p.role==='tech').reduce((n,p)=>n+p.tasks.length,0),opts:{discussion:opts.discussion===45?45:30},rand};
  }
  const player=(s,id)=>s.players.find(p=>p.id===id);
@@ -64,7 +69,7 @@ const Nereid=(()=>{
   const ranked=Object.entries(tally).sort((a,b)=>b[1]-a[1]);let out=null;
   if(ranked.length&&ranked[0][0]!=='-1'&&(!ranked[1]||ranked[0][1]>ranked[1][1]))out=player(s,+ranked[0][0]);
   if(out)out.alive=false;
-  s.players.forEach(p=>{p.evidence=null;p.lastSeen=null;p.workUntil=0});
+  s.players.forEach(p=>{p.evidence=null;p.lastSeen=null;p.workUntil=0;p.scan=null});
   s.cause=out?out.name+' wurde isoliert.':'Keine eindeutige Mehrheit.';
   s.ph='result';s.meetingEnd=s.t+5;s.meetingCool=s.t+20;checkWin(s);
  }
@@ -102,6 +107,12 @@ const Nereid=(()=>{
   if(a.k==='report'&&s.markers.some(m=>near(p,m,76))){beginMeeting(s,p,'Ausfall gemeldet');return true}
   if(a.k==='meeting'&&p.meeting>0&&s.t>=s.meetingCool&&!s.alert&&near(p,meeting,80)){p.meeting--;beginMeeting(s,p,'Notbesprechung');return true}
   if(a.k==='repair'&&s.alert&&near(p,stations[s.alert.station],76)){s.alert=null;s.sabCool=s.t+26;return true}
+  if(a.k==='scan'&&s.t>=p.scanCool&&!s.alert&&(near(p,diagnostic,70)||p.special==='analyst')){
+   p.scan={until:s.t+9,counts:rooms.map(([name])=>s.players.filter(q=>q.alive&&location(q)===name).length)};p.scanCool=s.t+30;return true
+  }
+  if(a.k==='stabilize'&&p.special==='support'&&!p.specialUsed&&s.alert?.kind==='pressure'){
+   p.specialUsed=true;s.alert.until+=12;return true
+  }
   if(p.role!=='glitch')return false;
   if(a.k==='disable'&&s.t>=p.cool){
    const q=player(s,a.v);if(!q||!q.alive||q.role==='glitch'||!near(p,q,60))return false;
@@ -183,14 +194,14 @@ const Nereid=(()=>{
  }
  function gone(s,id){const p=player(s,id);if(p){p.bot=true;p.dx=p.dy=0}}
  function publicState(s){
-  return {ph:s.ph,rn:s.rn,seq:++s.seq,t:Math.round(s.t*10)/10,players:s.players.map(p=>({id:p.id,name:p.name,bot:p.bot,alive:p.alive,x:Math.round(p.x),y:Math.round(p.y),dx:Math.round(p.dx*10)/10,dy:Math.round(p.dy*10)/10,...(s.ph==='end'?{role:p.role}:{})})),markers:s.markers,alert:s.alert,meetingEnd:s.meetingEnd,meetingCool:s.meetingCool,meetingVotes:Object.keys(s.votes).map(Number),notes:s.notes,cause:s.cause,result:s.result,done:progress(s),total:s.total};
+  return {ph:s.ph,rn:s.rn,seq:++s.seq,t:Math.round(s.t*10)/10,players:s.players.map(p=>({id:p.id,name:p.name,bot:p.bot,style:p.style,alive:p.alive,x:Math.round(p.x),y:Math.round(p.y),dx:Math.round(p.dx*10)/10,dy:Math.round(p.dy*10)/10,...(s.ph==='end'?{role:p.role,special:p.special}:{})})),markers:s.markers,alert:s.alert,meetingEnd:s.meetingEnd,meetingCool:s.meetingCool,meetingVotes:Object.keys(s.votes).map(Number),notes:s.notes,cause:s.cause,result:s.result,done:progress(s),total:s.total};
  }
- function privateState(s,id){const p=player(s,id);return p?{rn:s.rn,role:p.role,tasks:p.tasks,done:p.done,cool:p.cool,meeting:p.meeting,sabCool:s.sabCool,portCool:p.portCool||0,...(p.role==='glitch'?{allies:s.players.filter(q=>q.role==='glitch').map(q=>q.id)}:{})}:null}
- return {T,C,R,MW,MH,rooms,halls,floor,stations,meeting,ports,colors,phrases,at,near,sight,fits,newRound,apply,step,gone,publicState,privateState,challenge,sortValues,routePath,vision,route,player,location,guidance,sectors};
+ function privateState(s,id){const p=player(s,id);return p?{rn:s.rn,role:p.role,tasks:p.tasks,done:p.done,cool:p.cool,meeting:p.meeting,sabCool:s.sabCool,portCool:p.portCool||0,special:p.special,specialUsed:p.specialUsed,scanCool:p.scanCool,...(p.scan&&p.scan.until>s.t?{scan:p.scan}:{}),...(p.role==='glitch'?{allies:s.players.filter(q=>q.role==='glitch').map(q=>q.id)}:{})}:null}
+ return {T,C,R,MW,MH,rooms,halls,floor,stations,meeting,ports,colors,phrases,at,near,sight,fits,newRound,apply,step,gone,publicState,privateState,challenge,sortValues,routePath,vision,route,player,location,guidance,sectors,diagnostic,normalizeLobby,specialName};
 })();
 function nereidGame(){
  const E=Nereid,esc=s=>String(s??'').replace(/[&<>"']/g,a=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[a]));
- let mode='setup',state=null,snap=null,secret=null,room=null,ref=null,roleRef=null,code='',my=0,host=false,alive=true,busy=false,opts={bots:6,two:true,tasks:3,discussion:30},clock=0,publishAt=0,sendAt=0,seq=0,seen={},privateCache={},panel='',task=null,touch=null,buttons=[],smooth={},camera={x:0,y:0},camReady=false,phase='',overlayKey='',lastText='',lobbyStamp='',lastMotion=-10,pending=0,moveKey='',roleUntil=0,visionCache=null,fx=[],seenMarkers=new Set(),taskFlash=0,guideCache=null,guideOn=true,lastStepSound=-10,lastAlertSound=-10,lastAmbience=-10,previousAlert='',audio=null;
+ let mode='setup',state=null,snap=null,secret=null,room=null,ref=null,roleRef=null,code='',my=0,host=false,alive=true,busy=false,opts={bots:6,two:true,tasks:3,discussion:30,special:true},clock=0,publishAt=0,sendAt=0,seq=0,seen={},privateCache={},panel='',task=null,touch=null,buttons=[],smooth={},camera={x:0,y:0},camReady=false,phase='',overlayKey='',lastText='',lobbyStamp='',lastMotion=-10,pending=0,moveKey='',roleUntil=0,visionCache=null,fx=[],seenMarkers=new Set(),taskFlash=0,guideCache=null,guideOn=true,lastStepSound=-10,lastAlertSound=-10,lastAmbience=-10,previousAlert='',audio=null,lobbyUnit=null,lobbyGoal=null,lobbySmooth={},lobbyLast='',lobbySendAt=0,lobbyWriting=false,lobbyWarning=false,localStyle=0;
  const C=E.colors,cl=(n,a,b)=>Math.max(a,Math.min(b,n)), me=()=>snap?.players?.find(p=>p.id===my), width=()=>V.pw||800,height=()=>V.ph||480;
  const box=(x,y,w,h,r,col)=>{c.fillStyle=col;c.beginPath();c.roundRect(x,y,w,h,r);c.fill()};
  const line=(x,y,a,b,col,w=1)=>{c.strokeStyle=col;c.lineWidth=w;c.beginPath();c.moveTo(x,y);c.lineTo(a,b);c.stroke()};
@@ -226,27 +237,27 @@ function nereidGame(){
  }
  const button=(action,label,disabled=false)=>'<button class="nr-btn" data-nr="'+action+'" '+(disabled?'disabled':'')+'>'+esc(label)+'</button>';
  const header=(eyebrow,title,copy)=>'<div class="nr-eyebrow">'+esc(eyebrow)+'</div><h2>'+esc(title)+'</h2><p>'+esc(copy)+'</p>';
- function bind(root){root.querySelectorAll('[data-nr]').forEach(el=>el.onclick=()=>action(el.dataset.nr));}
+ function bind(root){root.querySelectorAll('[data-nr]').forEach(el=>el.onclick=()=>action(el.dataset.nr));const canvas=root.querySelector('#nr-hangar');if(canvas){canvas.onpointerdown=e=>{const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return;lobbyGoal=E.normalizeLobby({x:(e.clientX-r.left)*1000/r.width,y:(e.clientY-r.top)*600/r.height},my);canvas.focus();e.preventDefault()};canvas.onkeydown=e=>{const dirs={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],KeyW:[0,-1],KeyS:[0,1],KeyA:[-1,0],KeyD:[1,0]};const d=dirs[e.code];if(d&&lobbyUnit){e.preventDefault();e.stopPropagation();const p=lobbyGoal||lobbyUnit;lobbyGoal=E.normalizeLobby({x:p.x+d[0]*90,y:p.y+d[1]*90},my)}};drawHangar()}}
  function setup(){
-  stopAmbience();host=false;mode='setup';state=snap=secret=null;camReady=false;phase='';overlayKey='';
-  overlay('setup'+opts.bots,header('NEREIDENPROTOKOLL / 2049','Stille unter der Oberfläche','Eine Forschungsstation. Autonome Wartungseinheiten. Ein verborgenes Störsignal.')+
+  stopAmbience();host=false;mode='setup';lobbyUnit=null;lobbyGoal=null;lobbySmooth={};state=snap=secret=null;camReady=false;phase='';overlayKey='';
+  overlay('setup'+opts.bots+':'+localStyle+':'+opts.special,header('NEREIDENPROTOKOLL / 2049','Stille unter der Oberfläche','Eine Forschungsstation. Autonome Wartungseinheiten. Ein verborgenes Störsignal.')+
    '<div class="nr-feature"><span>01 / AUFTRÄGE</span><span>02 / VERDACHT</span><span>03 / ABSTIMMUNG</span></div><p>Techniker stabilisieren die Station. Störeinheiten täuschen, lösen Systemalarme aus und setzen andere Roboter außer Betrieb. Keine Seite kennt alle Rollen.</p>'+
-   '<div class="nr-row">'+button('local','Training mit Bots')+button('create','Online-Raum erstellen')+button('localopts','Training: '+opts.bots+' Einheiten')+'</div><div class="nr-row"><input id="nr-code" maxlength="20" placeholder="20-stelliger Raumcode" autocomplete="off" autocapitalize="characters">'+button('join','Beitreten')+'</div><p class="nr-small">4–10 Teilnehmer · WASD / Pfeile · Touch-Joystick · E: Aufgabe · R: Meldung · M: Karte</p>',bind);
+   '<div class="nr-row">'+button('local','Training mit Bots')+button('create','Online-Raum erstellen')+button('localopts','Training: '+opts.bots+' Einheiten')+button('localstyle','Gehäuse: '+['Standard','Explorer','Aqua','Industrie'][localStyle])+button('localspecial','Spezialrollen: '+(opts.special?'An':'Aus'))+'</div><div class="nr-row"><input id="nr-code" maxlength="20" placeholder="20-stelliger Raumcode" autocomplete="off" autocapitalize="characters">'+button('join','Beitreten')+'</div><p class="nr-small">4–10 Teilnehmer · WASD / Pfeile · Touch-Joystick · E: Aufgabe · R: Meldung · M: Karte</p>',bind);
  }
  function lobby(){
   if(!room)return;
   const seats=Object.entries(room.seats||{}), humans=seats.filter(([,q])=>q.k==='p'),isHost=host;
   const target=Math.max(humans.length,opts.bots),friends=Object.keys(OL.F||{}).filter(u=>!humans.some(([,q])=>q.uid===u)&&olAllowed(u));
-  const sig=JSON.stringify([humans,opts,host,code,busy,friends.map(u=>[u,olNameOf(u),!!OL.P[u],!!OL.P[u]?.g,LUN.inv[u]]),guideOn]);
-  const slots=Array.from({length:10},(_,i)=>{const q=room.seats?.[i],person=q?.k==='p',planned=isHost&&!person&&i<target,tag=person?(i===0?'HOST':i===my?'DU':'VERBUNDEN'):planned?'BOT GEPLANT':'OFFEN';return '<div class="nr-slot '+(person?'nr-occupied':'')+'" style="--unit:'+C[i]+'"><div class="nr-unit"><i></i><em></em></div><span><b>'+esc(person?q.name:planned?'Drohne '+(i+1):'Freier Platz')+'</b><small>'+tag+'</small></span></div>'}).join('');
-  const options=isHost?'<div class="nr-settings">'+[['bots','Teilnehmer',target+' / 10'],['tasks','Aufträge pro Einheit',opts.tasks],['two','Störeinheiten ab 7',opts.two?'2':'1'],['discussion','Besprechung',opts.discussion+' s']].map(([a,n,v])=>'<button class="nr-setting" data-nr="'+a+'"><small>'+n+'</small><b>'+v+'</b></button>').join('')+'</div>':'';
+  const sig=JSON.stringify([humans.map(([i,q])=>[i,q.uid,q.name,room.lobbyUnits?.[q.uid]?.style,room.lobbyUnits?.[q.uid]?.ready]),opts,host,code,busy,friends.map(u=>[u,olNameOf(u),!!OL.P[u],!!OL.P[u]?.g,LUN.inv[u]]),guideOn,lobbyUnit?.style,lobbyUnit?.ready]);
+  const slots=Array.from({length:10},(_,i)=>{const q=room.seats?.[i],person=q?.k==='p',planned=isHost&&!person&&i<target,unit=i===my?lobbyUnit:room.lobbyUnits?.[q?.uid],tag=person?(i===0?'HOST':i===my?'DU':'VERBUNDEN')+(unit?.ready?' · BEREIT':''):planned?'BOT GEPLANT':'OFFEN';return '<div class="nr-slot '+(person?'nr-occupied':'')+'" style="--unit:'+C[i]+'"><div class="nr-unit nr-style-'+(unit?.style||0)+'"><i></i><em></em></div><span><b>'+esc(person?q.name:planned?'Drohne '+(i+1):'Freier Platz')+'</b><small>'+tag+'</small></span></div>'}).join('');
+  const options=isHost?'<div class="nr-settings">'+[['bots','Teilnehmer',target+' / 10'],['tasks','Aufträge pro Einheit',opts.tasks],['two','Störeinheiten ab 7',opts.two?'2':'1'],['discussion','Besprechung',opts.discussion+' s'],['special','Spezialrollen',opts.special?'An':'Aus']].map(([a,n,v])=>'<button class="nr-setting" data-nr="'+a+'"><small>'+n+'</small><b>'+v+'</b></button>').join('')+'</div>':'';
   overlay('lobby'+sig,header('BASIS N-17 / VERBINDUNG','Einsatzlobby','Teile den Raumcode oder lade bestätigte Freunde ein.')+
-   '<div class="nr-code"><code>'+esc(code)+'</code>'+button('copy','Kopieren')+'</div><div class="nr-lobbystatus"><span><i></i> '+humans.length+' / 10 verbunden</span><small>'+(!isHost?'Warte auf den Host':busy?'Einsatz wird vorbereitet':'Bereit für den Einsatz')+'</small></div><div class="nr-slotgrid">'+slots+'</div>'+options+
+   '<div class="nr-code"><code>'+esc(code)+'</code>'+button('copy','Kopieren')+'</div><div class="nr-lobbystatus"><span><i></i> '+humans.length+' / 10 verbunden</span><small>'+(!isHost?'Warte auf den Host':busy?'Einsatz wird vorbereitet':'Bereit für den Einsatz')+ '</small></div><div class="nr-hangarwrap"><canvas id="nr-hangar" width="1000" height="600" tabindex="0" aria-label="Begehbare Lobby, klicken oder Pfeiltasten zum Bewegen"></canvas><div class="nr-hangarhint">BASIS N-17 · Klicken oder Pfeiltasten zum Bewegen</div></div><div class="nr-row">'+button('style','Gehäuse: '+['Standard','Explorer','Aqua','Industrie'][lobbyUnit?.style||0])+button('ready',lobbyUnit?.ready?'Bereit ✓':'Bereit melden')+'</div><div class="nr-slotgrid">'+slots+'</div>'+options+
    (isHost?'<p class="nr-small">Freie Plätze bis zur Zielgröße werden beim Start mit Bots besetzt.</p><div class="nr-friends"><b>Freunde einladen</b>'+ (friends.length?friends.slice(0,18).map(u=>'<div><i class="'+(OL.P[u]?'nr-online':'')+'"></i><span>'+esc(olNameOf(u))+'<small>'+(OL.P[u]?.g?'Im Spiel':OL.P[u]?'Online':'Offline')+'</small></span>'+button('invite:'+u,LUN.inv[u]?'Gesendet':'Einladen',!!LUN.inv[u])+'</div>').join(''):'<p>Keine weiteren bestätigten Freunde.</p>')+'</div>':'')+
    '<div class="nr-row">'+(isHost?button('start','Einsatz starten',busy):'')+button('leave','Lobby verlassen')+'</div>',bind);
 
  }
- function local(){startAmbience();host=true;mode='local';my=0;state=E.newRound(Array.from({length:opts.bots},(_,i)=>i===0?{k:'p',name:'Du'}:{k:'cpu',name:['','Mira','Kelp','Orion','Lumen','Vela','Nix','Echo','Delta','Nova'][i]}),opts);beginRound()}
+ function local(){startAmbience();host=true;mode='local';my=0;state=E.newRound(Array.from({length:opts.bots},(_,i)=>i===0?{k:'p',name:'Du',style:localStyle}:{k:'cpu',name:['','Mira','Kelp','Orion','Lumen','Vela','Nix','Echo','Delta','Nova'][i]}),opts);beginRound()}
  function beginRound(){snap=E.publicState(state);secret=E.privateState(state,my);camReady=false;smooth={};phase='';task=null;touch=null;moveKey='';seenMarkers.clear();fx=[];roleUntil=clock+4;guideCache=null;previousAlert='';hide();startAmbience();sound(660)}
  async function openOnline(joinCode){
   if(busy||mode!=='setup')return false;busy=true;
@@ -266,7 +277,7 @@ function nereidGame(){
     if(!alive){ref.remove().catch(()=>{});return false}
    }
    Object.assign(LUN,{code,role:host?'host':'guest',seat:my,ref,left:0,g:api,lastAct:{},actN:0,lastSeq:0,inv:{},endedAt:0});
-   mode='lobby';roleRef=OL.db.ref('hands/'+code+'/'+OL.me);
+   mode='lobby';lobbyUnit=E.normalizeLobby({style:localStyle},my);lobbyGoal=null;lobbySmooth={};lobbyLast='';lobbyWarning=false;roleRef=OL.db.ref('hands/'+code+'/'+OL.me);
    if(!host)roleRef.on('value',s=>{try{const q=JSON.parse(s.val()||'null');if(q)secret=q}catch(_){}},()=>{});
    ref.on('value',onRoom,e=>{if(alive){toast(luErr(e));toMenu()}});
    return true;
@@ -280,18 +291,18 @@ function nereidGame(){
   if(v.status==='lobby'){
    if(Object.values(v.seats||{}).some(q=>q.uid&&q.uid!==OL.me&&OL.BL?.[q.uid])){toast('Der Raum enthält einen blockierten Spieler.');toMenu();return}
    if(host&&!busy){const fix={};Object.entries(v.seats||{}).forEach(([i,q])=>{if(q.k==='gone')fix['seats/'+i]={k:'open'}});if(Object.keys(fix).length){ref.update(fix).catch(()=>{});return}}
-   if(mode!=='lobby'){state=null;snap=null;secret=null;overlayKey='';task=null;panel=''}
-   mode='lobby';lobby();return
+   if(mode!=='lobby'){state=null;snap=null;secret=null;overlayKey='';task=null;panel='';lobbyUnit=E.normalizeLobby({style:localStyle},my);lobbyGoal=null;lobbySmooth={};lobbyLast='';lobbyWarning=false}
+   mode='lobby';if(!lobbyUnit)lobbyUnit=E.normalizeLobby({style:localStyle},my);lobby();return
   }
   if(host&&state){
    Object.entries(v.seats||{}).forEach(([i,q])=>{if(q.k==='gone')E.gone(state,+i)});
    for(const [u,raw] of Object.entries(v.act||{})){let a;try{a=JSON.parse(raw)}catch(_){continue}
     const i=Object.keys(v.seats||{}).find(i=>v.seats[i].k==='p'&&v.seats[i].uid===u);
-    if(i===undefined||!Number.isSafeInteger(a.n)||a.n<=(seen[u]||0))continue;seen[u]=a.n;E.apply(state,+i,a)
+    if(i===undefined||a.rn!==state.rn||!Number.isSafeInteger(a.n)||a.n<=(seen[u]||0))continue;seen[u]=a.n;E.apply(state,+i,a)
    }
   }else if(!host&&v.snap){try{
    const q=JSON.parse(v.snap).snap;if(!q||!Array.isArray(q.players))return;
-   if(!snap||q.rn!==snap.rn){camReady=false;smooth={};phase='';task=null;moveKey='';seenMarkers.clear();fx=[];roleUntil=clock+4;hide()}
+   if(!snap||q.rn!==snap.rn){seq=0;camReady=false;smooth={};phase='';task=null;moveKey='';seenMarkers.clear();fx=[];roleUntil=clock+4;hide()}
    if(!snap||q.rn!==snap.rn||q.seq>snap.seq)snap=q;
    mode='guest';
   }catch(_){}}
@@ -304,9 +315,9 @@ function nereidGame(){
    const fresh=(await ref.once('value')).val(),seats={...fresh.seats};
    let count=Object.values(seats).filter(q=>q.k==='p').length;
    const target=Math.max(4,count,opts.bots);
-   const updates={status:'play'};
+   const updates={status:'play',lobbyUnits:null};
    for(let i=1;i<10;i++){if(seats[i]?.k==='p')continue;seats[i]={k:count<target?'cpu':'off'};if(seats[i].k==='cpu')count++;updates['seats/'+i]=seats[i]}
-   state=E.newRound(Array.from({length:10},(_,i)=>seats[i]),opts);seen={};privateCache={};seq=0;
+   state=E.newRound(Array.from({length:10},(_,i)=>({...seats[i],style:i===my?lobbyUnit?.style:E.normalizeLobby(fresh.lobbyUnits?.[seats[i]?.uid],i).style})),opts);seen={};privateCache={};seq=0;
    await ref.update(updates);
    if(!alive)return;
    const changes={};for(const p of state.players){const q=seats[p.id];if(q.k==='p'&&p.id!==my){const raw=JSON.stringify(E.privateState(state,p.id));changes['hands/'+code+'/'+q.uid]=raw;privateCache[q.uid]=raw}}
@@ -327,7 +338,7 @@ function nereidGame(){
   if(!snap||!secret||secret.rn!==snap.rn)return;
   if(host&&state){const ok=E.apply(state,my,a);if(ok&&a.k!=='move')sound(540);return ok}
   if(mode==='guest'&&ref){if(a.k!=='move')sendAt=clock+.3;
-   return ref.child('act/'+OL.me).set(JSON.stringify({...a,n:++seq})).catch(e=>toast(luErr(e)))}
+   return ref.child('act/'+OL.me).set(JSON.stringify({...a,n:++seq,rn:snap.rn})).catch(e=>toast(luErr(e)))}
  }
  function taskOpen(id){
   if(task||panel||!secret||!E.stations[id]||!secret.tasks.includes(id)||secret.done.includes(id)||!E.near(me(),E.stations[id]))return;
@@ -364,6 +375,11 @@ function nereidGame(){
  function action(a){
   if(a==='local')return local();
   if(a==='localopts'){opts.bots=opts.bots>=10?4:opts.bots+1;setup();return}
+  if(a==='localstyle'){localStyle=(localStyle+1)%4;setup();return}
+  if(a==='localspecial'){opts.special=!opts.special;setup();return}
+  if(a==='special'&&host&&mode==='lobby'){opts.special=!opts.special;lobby();return}
+  if(a==='style'&&mode==='lobby'&&lobbyUnit){lobbyUnit.style=(lobbyUnit.style+1)%4;localStyle=lobbyUnit.style;lobby();return}
+  if(a==='ready'&&mode==='lobby'&&lobbyUnit){lobbyUnit.ready=!lobbyUnit.ready;lobby();return}
   if(a==='create')return openOnline('');
   if(a==='join'){const v=$('#nr-code')?.value||'';if(!v.trim()){toast('Bitte einen Raumcode eingeben.');return}return openOnline(v)}
   if(a==='leave')return toMenu();
@@ -397,9 +413,9 @@ function nereidGame(){
  async function rematch(){
   if(busy||!ref||!room)return;busy=true;
   try{
-   const changes={['rooms/'+code+'/status']:'lobby',['rooms/'+code+'/snap']:null,['rooms/'+code+'/act']:null,['rooms/'+code+'/chat']:null,['hands/'+code]:null};
+   const changes={['rooms/'+code+'/status']:'lobby',['rooms/'+code+'/snap']:null,['rooms/'+code+'/act']:null,['rooms/'+code+'/chat']:null,['rooms/'+code+'/lobbyUnits']:null,['hands/'+code]:null};
    Object.entries(room.seats||{}).forEach(([i,q])=>{if(i!=='0'&&q.k!=='p')changes['rooms/'+code+'/seats/'+i]={k:'open'}});
-   await OL.db.ref().update(changes);state=snap=secret=null;mode='lobby';overlayKey='';lobby();
+   await OL.db.ref().update(changes);state=snap=secret=null;mode='lobby';lobbyUnit=E.normalizeLobby({style:localStyle},my);lobbyLast='';lobbyGoal=null;overlayKey='';lobby();
   }catch(e){toast(luErr(e))}finally{busy=false;if(mode==='lobby')lobby()}
  }
  function meetingUI(){
@@ -410,13 +426,39 @@ function nereidGame(){
    overlay(sig,header('BESPRECHUNG / '+Math.max(0,Math.ceil(s.meetingEnd-s.t))+' s','Wer sendet das Störsignal?',s.cause)+'<div class="nr-votes">'+list+'</div><div class="nr-row">'+button('vote:-1','Überspringen',voted||!p?.alive)+'</div><div class="nr-notes">'+s.notes.map(([i,j])=>'<div><b style="color:'+C[i]+'">'+esc(s.players.find(q=>q.id===i)?.name)+':</b> '+esc(E.phrases[j])+'</div>').join('')+'</div>'+(p?.alive?'<div class="nr-row">'+E.phrases.map((x,i)=>button('say:'+i,x)).join('')+'</div>':'<p>Du beobachtest die Abstimmung.</p>'),bind)
   }else if(s.ph==='result')overlay(sig,header('ABSTIMMUNG / AUSWERTUNG',s.cause,'Der Einsatz wird in wenigen Sekunden fortgesetzt.'),bind)
   else if(s.ph==='end')overlay(sig,header('EINSATZ BEENDET',s.result==='tech'?'Station stabilisiert':'Störsignal erfolgreich',s.result===secret?.role?'Dein Team gewinnt.':'Die Rollen werden aufgedeckt.')+
-   '<div class="nr-roster">'+s.players.map(q=>'<div><i style="background:'+C[q.id]+'"></i>'+esc(q.name)+' · '+(q.role==='glitch'?'Störeinheit':'Techniker')+'</div>').join('')+'</div><div class="nr-row">'+(mode==='local'?button('retry','Neuer Einsatz'):host?button('rematch','Neue Runde in der Lobby'):'')+button('leave','Zurück zum Menü')+'</div>',bind)
+   '<div class="nr-roster">'+s.players.map(q=>'<div><i style="background:'+C[q.id]+'"></i>'+esc(q.name)+' · '+E.specialName(q)+'</div>').join('')+'</div><div class="nr-row">'+(mode==='local'?button('retry','Neuer Einsatz'):host?button('rematch','Neue Runde in der Lobby'):'')+button('leave','Zurück zum Menü')+'</div>',bind)
+ }
+ function drawHangar(){
+  const canvas=$('#nr-hangar');if(!canvas||!room)return;const d=canvas.getContext('2d');if(!d)return;
+  const W=1000,H=600,rect=(x,y,w,h,r,fill)=>{d.fillStyle=fill;d.beginPath();d.roundRect(x,y,w,h,r);d.fill()},dot=(x,y,r,fill)=>{d.fillStyle=fill;d.beginPath();d.arc(x,y,r,0,Math.PI*2);d.fill()},label=(s,x,y,size,color='#a8d0d3')=>{d.fillStyle=color;d.font='700 '+size+'px system-ui';d.textAlign='center';d.textBaseline='middle';d.fillText(s,x,y)};
+  d.fillStyle='#061b2a';d.fillRect(0,0,W,H);const sea=d.createLinearGradient(0,0,0,130);sea.addColorStop(0,'#082938');sea.addColorStop(1,'#23515c');rect(24,22,952,94,22,sea);
+  for(let i=0;i<28;i++){const x=40+(i*113+clock*9)%920,y=35+(i*71)%68;dot(x,y,1+i%3,'#99e8e333')}
+  for(let i=0;i<7;i++)rect(60+i*145,22,8,94,3,'#496e7b');
+  rect(24,122,952,430,20,'#274652');for(let y=135;y<546;y+=45)for(let x=36;x<970;x+=50){rect(x,y,48,43,3,(x+y)%3?'#203b49':'#294754');dot(x+5,y+5,1.6,'#76969e')}
+  rect(365,130,270,60,13,'#102b3b');rect(380,139,240,31,8,'#30646e');label('N-17   /   EINSATZDECK',500,154,19,'#c3fcf1');
+  for(const side of [1,-1]){const x=side>0?42:872;rect(x,194,84,156,12,'#102a39');for(let j=0;j<4;j++){rect(x+11,204+j*35,62,25,6,'#52747b');dot(x+66,216+j*35,3,j===Math.floor(clock)%4?'#b4ffe2':'#213d4e')}}
+  d.strokeStyle='#74a7a950';d.lineWidth=3;d.setLineDash([12,10]);d.strokeRect(145,210,710,286);d.setLineDash([]);
+  const people=Object.entries(room.seats||{}).filter(([,q])=>q.k==='p');
+  for(const [id,q] of people){const i=+id,p=i===my?lobbyUnit:E.normalizeLobby(room.lobbyUnits?.[q.uid],i);if(!p)continue;
+   const v=lobbySmooth[q.uid]||{x:p.x,y:p.y};const dx=p.x-v.x,dy=p.y-v.y;v.x+=dx*.23;v.y+=dy*.23;lobbySmooth[q.uid]=v;const bob=Math.hypot(dx,dy)>4?Math.sin(clock*14+i)*3:Math.sin(clock*2+i);const x=v.x,y=v.y+bob,col=C[i];
+   d.save();d.translate(x,y);d.fillStyle='#071824aa';d.beginPath();d.ellipse(0,20,22,8,0,0,Math.PI*2);d.fill();rect(-16,-18,32,37,9,col);rect(-12,-13,24,16,5,'#102d3b');rect(-8,-9,16,4,2,'#d8ffff');rect(-12,18,9,7,3,'#8ab0bd');rect(3,18,9,7,3,'#8ab0bd');
+   if(p.style===1){rect(-5,-28,10,12,3,'#d4e6ed');dot(0,-29,3,col)}if(p.style===2){rect(-23,-9,7,23,3,'#d2e1e3');rect(16,-9,7,23,3,'#d2e1e3')}if(p.style===3){rect(-18,6,36,8,3,'#dac393')}
+   if(p.ready)dot(19,-19,6,'#aff5bb');if(i===my){d.strokeStyle='#e7ffff';d.lineWidth=2;d.beginPath();d.ellipse(0,23,27,9,0,0,Math.PI*2);d.stroke()}label(q.name.slice(0,16),0,-39,16,'#e1f4f4');d.restore()
+  }
+  if(lobbyGoal){d.strokeStyle='#c4ffdf80';d.lineWidth=2;d.beginPath();d.arc(lobbyGoal.x,lobbyGoal.y,12+Math.sin(clock*5)*3,0,Math.PI*2);d.stroke()}
+ }
+ function tickLobby(dt){
+  if(!room||!lobbyUnit)return;
+  if(lobbyGoal){const dx=lobbyGoal.x-lobbyUnit.x,dy=lobbyGoal.y-lobbyUnit.y,n=Math.hypot(dx,dy),step=250*dt;if(n<=step){lobbyUnit.x=lobbyGoal.x;lobbyUnit.y=lobbyGoal.y;lobbyGoal=null}else{lobbyUnit.x+=dx/n*step;lobbyUnit.y+=dy/n*step}}
+  const unit=E.normalizeLobby(lobbyUnit,my),key=JSON.stringify(unit);
+  if(ref&&!busy&&!lobbyWriting&&clock>=lobbySendAt&&key!==lobbyLast){lobbySendAt=clock+.22;lobbyWriting=true;const activeRef=ref;activeRef.child('lobbyUnits/'+OL.me).set(unit).then(()=>{if(ref===activeRef){lobbyLast=key;lobbyWarning=false}}).catch(()=>{if(mode==='lobby'&&!lobbyWarning){lobbyWarning=true;toast('Lobby-Bewegung konnte nicht synchronisiert werden. Firebase-Regeln prüfen.')}lobbySendAt=clock+3}).finally(()=>lobbyWriting=false)}
+  drawHangar();
  }
  function update(dt){
   clock+=dt;
   if(mode==='setup')return;
   soundscape();
-  if(mode==='lobby'){if(room&&Math.floor(clock*2)!==Math.floor((clock-dt)*2))lobby();return}
+  if(mode==='lobby'){if(room&&Math.floor(clock*2)!==Math.floor((clock-dt)*2))lobby();tickLobby(dt);return}
   if(!snap)return;
   fx=fx.filter(f=>clock-f.t<1.4);
   for(const marker of snap.markers||[])if(!seenMarkers.has(marker.id)){seenMarkers.add(marker.id);if(me()&&E.sight(me(),marker,330))fx.push({...marker,t:clock})}
@@ -433,6 +475,7 @@ function nereidGame(){
   }else if(phase!==snap.ph){phase=snap.ph;task=null;panel='';touch=null;overlayKey='';sound(260)}
   if(host&&state){E.step(state,dt);snap=E.publicState(state);secret=E.privateState(state,my);if(mode==='host'&&clock>=publishAt){publishAt=clock+.20;publish()}}
   if(snap.ph!=='run')meetingUI();
+  if(panel==='scan'&&(!secret?.scan||secret.scan.until<=snap.t))panel='';
   if(snap.ph==='end')stopAmbience();
   if(task&&(!me()||!E.near(me(),E.stations[task.id]))){task=null;hide()}
   if(task&&E.stations[task.id].kind==='pulse'&&clock-task.start>=2.6&&clock-task.start-dt<2.6)renderTask();
@@ -495,6 +538,7 @@ function nereidGame(){
   for(const s of [-1,1]){const f=moving?Math.sin(time*13+s*Math.PI/2)*5:0;box(s*8-4,7+f,8,12,3,'#243b48');box(s*8-5,13+f,10,5,2,col)}
   box(-20,-7,8,20,4,'#162b39');box(12,-7,8,20,4,'#162b39');
   box(-14,-18,28,30,8,'#132c3c');const shell=c.createLinearGradient(-12,-16,12,8);shell.addColorStop(0,'#f2ffff');shell.addColorStop(.26,col);shell.addColorStop(1,'#294858');box(-12,-16,24,23,7,shell);box(-9,-13,18,14,5,'#102d3e');line(-7,-11,7,-11,'#80c1c9',1);
+  if(p.style===1){box(-5,-27,10,11,3,'#d2e8ef');circle(0,-28,2.5,col)}else if(p.style===2){box(-22,-8,6,19,3,'#d2e1e3');box(16,-8,6,19,3,'#d2e1e3')}else if(p.style===3){box(-15,6,30,6,2,'#d9c08b')}
   box(-6+side*2,-10,10,4,2,'#d7ffff');box(-7,5,14,4,2,'#122e3e');circle(0,7,1.8,'#c8fffa');
   line(-4,-18,-9,-25,'#879fa9',2);circle(-9,-25,2.4,col);
   if(p.id===my){c.strokeStyle='#e5ffff';c.lineWidth=1.7;c.beginPath();c.ellipse(0,16,21,9,0,0,Math.PI*2);c.stroke()}
@@ -522,6 +566,7 @@ function nereidGame(){
    line(q.x-9,q.y-4,q.x+9,q.y-4,'#cafafa',2);circle(q.x+12,q.y+5,2,active?'#d8f779':'#7bb4c0');
    if(active){c.strokeStyle='rgba(173,244,179,'+(.5+.3*Math.sin(clock*4))+')';c.lineWidth=2;c.beginPath();c.arc(q.x,q.y,25+Math.sin(clock*3)*3,0,Math.PI*2);c.stroke()}
   }
+  const dg=E.diagnostic;box(dg.x-23,dg.y-15,46,30,6,'#122c40');box(dg.x-18,dg.y-10,36,19,3,'#367b83');for(let j=0;j<5;j++)line(dg.x-13+j*6,dg.y+5,dg.x-13+j*6,dg.y+4-(3+(j*7)%12), '#b4eee0',2);text('DIAGNOSE',dg.x,dg.y-23,10,'#b8e3e6','center',800);
   for(const [i,q] of E.ports.entries()){box(q.x-17,q.y-13,34,26,5,'#183641');text('T'+(i+1),q.x,q.y-20,10,'#9bcbd2','center',800);for(let i=-10;i<=10;i+=5)line(q.x-12,q.y+i,q.x+12,q.y+i,'#66818c',2)}
   const range=snap.alert?.kind==='signal'?130:320,visible=q=>!p.alive||E.sight(p,q,range);
   for(const f of fx){const age=clock-f.t;c.save();c.globalAlpha=Math.max(0,1-age/1.4);c.strokeStyle='#a9f6e9';c.lineWidth=2;c.beginPath();c.arc(f.x,f.y,12+age*39,0,Math.PI*2);c.stroke();for(let i=0;i<9;i++){const a=i*Math.PI*2/9;circle(f.x+Math.cos(a)*age*36,f.y+Math.sin(a)*age*36,2,'#b7fff0')}c.restore()}
@@ -534,7 +579,7 @@ function nereidGame(){
    const g=c.createRadialGradient(px,py,rad*.48,px,py,rad*1.25);g.addColorStop(0,'#06131c00');g.addColorStop(1,'#04111de8');c.fillStyle=g;c.fillRect(0,0,w,h)}
   // Fixed HUD, designed independently from the scene.
   box(10,10,w-20,49,11,'#102633ec');
-  const role=secret?.rn===snap.rn?(secret.role==='glitch'?'STÖREINHEIT':'TECHNIKER'):'ROLLE WIRD GELADEN';
+  const role=secret?.rn===snap.rn?E.specialName(secret).toUpperCase():'ROLLE WIRD GELADEN';
   text(role,22,23,12,secret?.role==='glitch'?'#ffc69b':'#a3f1de','left',850);
   text(p.alive?E.location(p)+' · '+snap.players.filter(q=>q.alive).length+' aktiv':'BEOBACHTERMODUS',22,43,11,'#a1b7c6');
   const barW=Math.min(220,w*.29),bx=w-barW-24;box(bx,22,barW,10,5,'#243a47');box(bx,22,barW*cl(snap.done/Math.max(1,snap.total),0,1),10,5,'#79ddc4');text('STABILISIERUNG '+snap.done+'/'+snap.total,bx+barW/2,44,10,'#bce4dd','center',750);
@@ -544,7 +589,7 @@ function nereidGame(){
    const key=[Math.floor(p.x/E.T),Math.floor(p.y/E.T),secret.done.join(','),secret.tasks.join(',')].join(':');if(!guideCache||guideCache.key!==key)guideCache={key,data:E.guidance(p,secret.tasks,secret.done)};
    const guide=guideCache.data;if(guide){const angle=Math.atan2(guide.point.y-p.y,guide.point.x-p.x),gx=w/2,gy=h-29;box(gx-79,gy-17,158,34,9,'#0d2b37ed');c.save();c.translate(gx-61,gy);c.rotate(angle);c.beginPath();c.moveTo(10,0);c.lineTo(-5,-6);c.lineTo(-2,0);c.lineTo(-5,6);c.closePath();c.fillStyle='#d0f9a1';c.fill();c.restore();text(E.stations[guide.id].name,gx-44,gy-4,10,'#d9f6ef','left',750);text('Nächster Auftrag',gx-44,gy+8,8,'#9cb6bf')}
   }
-  if(roleUntil>clock&&secret?.rn===snap.rn){box(w*.20,h*.39,w*.60,65,13,'#102a38f5');text(secret.role==='glitch'?'STÖREINHEIT':'TECHNIKER',w/2,h*.39+20,20,secret.role==='glitch'?'#ffc69b':'#a3f1de','center',900);text(secret.role==='glitch'?'Täusche die anderen Einheiten.':'Erfülle Aufträge und beobachte die Station.',w/2,h*.39+45,12,'#e3f5f4','center',600)}
+  if(roleUntil>clock&&secret?.rn===snap.rn){box(w*.20,h*.39,w*.60,65,13,'#102a38f5');text(E.specialName(secret).toUpperCase(),w/2,h*.39+20,20,secret.role==='glitch'?'#ffc69b':'#a3f1de','center',900);text(secret.role==='glitch'?'Täusche die anderen Einheiten.':secret.special==='analyst'?'Diagnose auch außerhalb der Konsole.':secret.special==='support'?'Einmal einen Druckalarm verlängern.':'Erfülle Aufträge und beobachte die Station.',w/2,h*.39+45,12,'#e3f5f4','center',600)}
   if(taskFlash>clock){box(w*.33,h*.26,w*.34,31,9,'#205347ed');text('Auftrag übermittelt',w/2,h*.26+15,12,'#d4ffec','center',800)}
   const bw=Math.min(112,w*.22),y=h-47;
   const available=secret?.tasks?.find(i=>!secret.done.includes(i)&&E.near(p,E.stations[i]));
@@ -553,6 +598,10 @@ function nereidGame(){
   b('Melden',w-bw*2-17,y,bw,37,()=>send({k:'report'}),report);
   b('Karte',w-bw-10,65,bw,31,()=>{panel=panel==='map'?'':'map';send({k:'move',x:0,y:0})});
   b(guideOn?'Nav: an':'Nav: aus',w-bw-10,102,bw,27,()=>{guideOn=!guideOn;guideCache=null});
+  if(p.alive&&secret?.rn===snap.rn&&(secret.special==='analyst'||E.near(p,E.diagnostic,70)||secret.scan)){
+   const active=secret.scan?.until>snap.t;b(active?'Diagnose öffnen':snap.t<secret.scanCool?'Scan '+Math.ceil(secret.scanCool-snap.t)+'s':'Diagnose',w-bw-10,135,bw,32,()=>{if(active){panel='scan';send({k:'move',x:0,y:0})}else send({k:'scan'})},active||!snap.alert&&snap.t>=secret.scanCool&&(secret.special==='analyst'||E.near(p,E.diagnostic,70)));
+  }
+  if(p.alive&&secret?.special==='support'&&!secret.specialUsed&&snap.alert?.kind==='pressure')b('Puffer +12s',w-bw-10,y-88,bw,37,()=>send({k:'stabilize'}),true,'#286b66');
   const canMeet=p.alive&&secret?.meeting>0&&!snap.alert&&snap.t>=snap.meetingCool&&E.near(p,E.meeting,80);
   if(canMeet)b('Besprechung',w-bw*2-17,y-44,bw,37,()=>send({k:'meeting'}),true,'#725334');
   if(snap.alert&&p.alive&&E.near(p,E.stations[snap.alert.station],76))b('Reparieren',w-bw-10,y-44,bw,37,()=>send({k:'repair'}),true,'#23796e');
@@ -574,6 +623,9 @@ function nereidGame(){
     if(snap.alert){const q=E.stations[snap.alert.station];circle(q.x,q.y,20,'#f4a180');text('!',q.x,q.y,23,'#3e1c20','center',900)}
     circle(E.meeting.x,E.meeting.y,12,'#8dd5ea');
     circle(p.x,p.y,16,'#fff');c.restore();
+   }else if(panel==='scan'){
+    text('STATIONSDIAGNOSE / Momentaufnahme',w/2,h*.20,15,'#c3efe9','center',800);text('Nur Anzahl aktiver Einheiten je Raum',w/2,h*.25,11,'#a3bfc8','center');
+    const counts=secret?.scan?.counts||[];E.rooms.forEach((q,i)=>{const x=w*.16+(i%2)*w*.35,y=h*.31+Math.floor(i/2)*h*.075;box(x,y,w*.33,h*.064,6,'#173b4a');text(q[0],x+8,y+h*.032,10,'#d0e5e9');text(String(counts[i]??'–'),x+w*.30,y+h*.032,13,'#bcf6d9','right',850)});
    }else if(panel==='alarm'){
     text('SYSTEMSTÖRUNGEN',w/2,h*.23,18,'#ffc0a1','center',850);
     b('Signal stören',w*.22,h*.37,w*.56,42,()=>{send({k:'alert',v:'signal'});panel=''},true,'#704553');
@@ -595,8 +647,9 @@ function nereidGame(){
   if(panel)return;
   if(k==='KeyE'){const i=secret?.tasks?.find(i=>!secret.done.includes(i)&&E.near(p,E.stations[i]));if(i!==undefined)taskOpen(i);else if(snap.alert&&E.near(p,E.stations[snap.alert.station],76))send({k:'repair'})}
   if(k==='KeyR')send({k:'report'});
+  if(k==='KeyQ'&&p.alive&&secret){if(secret.scan?.until>snap.t)panel='scan';else if(secret.special==='support'&&snap.alert?.kind==='pressure'&&!secret.specialUsed)send({k:'stabilize'});else send({k:'scan'})}
   if(k==='KeyF'){if(secret?.role==='glitch'){const q=snap.players.find(q=>q.alive&&q.id!==my&&!secret.allies.includes(q.id)&&E.near(p,q,60));if(q)send({k:'disable',v:q.id})}else send({k:'meeting'})}
  }
- const api={showSetup:setup,canJoin:()=>mode==='setup'&&!busy,joinCode:v=>openOnline(v),draw,update,click,key,dragMove(x,y,_p,id){if(touch?.id===id){touch.x=x;touch.y=y}},dragEnd(_x,_y,_p,id){if(touch?.id===id)touch=null},dragCancel(_p,id){if(touch?.id===id)touch=null},leave(){stopAmbience();alive=false;roleRef?.off();if(ref){LUN.left=1;luCleanup()}window.gameChat?.stop();task=null;touch=null;state=null;snap=null;secret=null}};
+ const api={showSetup:setup,canJoin:()=>mode==='setup'&&!busy,joinCode:v=>openOnline(v),draw,update,click,key,dragMove(x,y,_p,id){if(touch?.id===id){touch.x=x;touch.y=y}},dragEnd(_x,_y,_p,id){if(touch?.id===id)touch=null},dragCancel(_p,id){if(touch?.id===id)touch=null},leave(){stopAmbience();alive=false;lobbyUnit=null;lobbyGoal=null;lobbySmooth={};roleRef?.off();if(ref){LUN.left=1;luCleanup()}window.gameChat?.stop();task=null;touch=null;state=null;snap=null;secret=null}};
  return api;
 }
