@@ -1,6 +1,6 @@
-const CACHE_NAME = "play2gether-pwa-v53";
+const CACHE_NAME = "play2gether-pwa-v54";
 const APP_ROOT = new URL("./", self.registration.scope).href;
-const APP_ASSETS = new Set(["notifications.js", "poker.js?v=2", "card-chip-picker.js", "poker-table.js?v=4", "poker.css?v=2", "blackjack.js?v=2", "blackjack-online.js", "pulse-arena.js?v=4", "blackjack-table.js?v=2", "direct-chat.js?v=3", "direct-chat.css?v=2", "group-chat.js?v=2", "game-chat.js?v=2", "game-chat.css"]
+const APP_ASSETS = new Set(["notifications.js", "poker.js?v=2", "card-chip-picker.js", "poker-table.js?v=4", "poker.css?v=2", "blackjack.js?v=2", "blackjack-online.js", "pulse-arena.js?v=5", "blackjack-table.js?v=2", "direct-chat.js?v=3", "direct-chat.css?v=2", "group-chat.js?v=2", "game-chat.js?v=2", "game-chat.css"]
   .map(name => new URL(name, APP_ROOT).href));
 const FACTORY_ASSETS = new Set([
   "campaign.js?v=2",
