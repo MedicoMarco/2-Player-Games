@@ -1649,7 +1649,7 @@ function cancelAction(){
  if(deleted){analyze();sv(0)}
 }
 function startWorldEdit(press){
- if(press.h||press.blocked||press.started||asg||buildMode)return;
+ if(press.h||press.fish||press.blocked||press.started||asg||buildMode)return;
  press.started=true;
  const [x,y]=tileAt(press.x,press.y);
  hv=[x,y];
@@ -3231,6 +3231,32 @@ function focusLogistics(o){
  cam.x=(o.x+w/2)*TS;cam.y=(o.y+h/2)*TS;
  toast('Wähle einen freien Bauplatz am Standort.');
 }
+function fishHelpNeeded(){
+ if(L.some(o=>!isBelt(o.t)))return false;
+ const costs=Object.entries(MD).filter(([t,m])=>buildType(t)===t&&!m.legacyOnly&&visibleModel(m)&&m.o!=null&&(!m.a||hlv(m.a)>0)&&(!m.unlock||m.unlock())).map(([t])=>cst(t));
+ return costs.length>0&&G.m<Math.min(...costs);
+}
+function focusFish(){
+ const [x,y]=worldArt.fishLake().map(v=>v/TS);
+ focusWorld([x-1.5,y-1.5,x+1.5,y+1.5]);
+}
+function fishScreenPosition(){
+ const fish=worldArt.fishPosition();
+ return fish?worldToView(...fish):null;
+}
+function fishHit(x,y){
+ const fish=fishScreenPosition();
+ if(!fish)return false;
+ const [fx,fy]=fish,scale=TS*cameraZoom();
+ return Math.hypot(x-fx,y-fy)<=Math.max(12,scale*.65)||
+  Math.abs(x-fx)<=Math.max(12,scale*.62)&&Math.abs(y-(fy-.83*scale))<=Math.max(9,scale*.18);
+}
+function rewardFish(){
+ G.m+=1;
+ const [x,y]=worldArt.fishPosition()||worldArt.fishLake();
+ PO.push({x,y,t:0,v:'+1 €'});
+ sfx('click');sv(0);
+}
 function ui(){
  drawHeader();
  const opened=openMenu();
@@ -3244,12 +3270,14 @@ function ui(){
  }
  drawWorldControls();
  const pendingLogistics=L.find(o=>o.needsRelocation);
- if(msg||pendingLogistics){
+ const fishHelp=fishHelpNeeded();
+ if(msg||pendingLogistics||fishHelp){
   const box=warningBox(),{x,y,w,h}=box;
   if(pendingLogistics)uiButton(box,()=>focusLogistics(pendingLogistics),'#7f1d1dee','move_saved_logistics');
+  else if(fishHelp)uiButton(box,focusFish,'#164e63ee','fish_help');
   else rr(x,y,w,h,7,bn?'#7f1d1dee':'#0b0f14df');
-  const warning=pendingLogistics?'Logistik pausiert · Antippen zum Versetzen':msg;
-  fitText(warning,x+8,y+h/2+4,w-16,12*view.labelScale,bn||pendingLogistics?'#fecaca':'#cbd5e1','left',600);
+  const warning=pendingLogistics?'Logistik pausiert · Antippen zum Versetzen':fishHelp?'Zu wenig Geld? Fisch antippen: +1 € · Zum See':msg;
+  fitText(warning,x+8,y+h/2+4,w-16,12*view.labelScale,pendingLogistics||bn&&!fishHelp?'#fecaca':fishHelp?'#a5f3fc':'#cbd5e1','left',600);
  }
  if(tool==='hand'&&sel&&L.includes(sel))drawPanel(sel,objectPanelBox(sel),()=>panel(sel),()=>{sel=null},true);
  else panelScroll={id:null,x:0,y:0};
@@ -4168,7 +4196,7 @@ click(x,y,_player,id,pointerType){
  if(pdn&&pdn.id!==id)return;
  const scroll=panelSurface&&FactoryLayout.contains(panelSurface.clip,x,y);
  const dockScroll=dockAt(x,y);
- pdn={h,x,y,lastX:x,lastY:y,id,touch,blocked,scroll,dockScroll};
+ pdn={h,x,y,lastX:x,lastY:y,id,touch,blocked,scroll,dockScroll,fish:!h&&!blocked&&fishHit(x,y)};
  mv=0;lt=null;
  if(h?.drag&&!touch)h.drag(x);
  if(!touch)startWorldEdit(pdn);
@@ -4192,6 +4220,10 @@ dragMove(x,y,_player,id,ending=false){
   return;
  }
  if(pdn.h||pdn.blocked||!mv)return;
+ if(pdn.fish){
+  cam.x-=(x-pdn.lastX)/cameraZoom();cam.y-=(y-pdn.lastY)/cameraZoom();
+  pdn.lastX=x;pdn.lastY=y;clampCam();lastCameraMotion=tm;guideAction('pan');return;
+ }
  startWorldEdit(pdn);
  if(tool=='del'){const[a,b]=tileAt(x,y);hv=[a,b];if(!lt||a!=lt[0]||b!=lt[1]){if(delAt(a,b))pdn.dl=1;lt=[a,b]}}
  else if(tool=='mov'&&pdn.pick&&mvO){hv=tileAt(x,y)}
@@ -4229,6 +4261,7 @@ dragEnd(x,y,_player,id){
   return;
  }
  if(p.blocked)return;
+ if(p.fish){if(!mv)rewardFish();return}
  if(tool=='del'&&p.dl){analyze();sv(0);return}
  if(tool=='mov'&&ready&&!asg){movEnd(p);return}if(mv||!ready)return;
  const [a,b]=tileAt(p.x,p.y);
@@ -4281,4 +4314,4 @@ update(dt){
  for(const o of L){if(o.bt<1)o.bt=Math.min(1,o.bt+dt*3);if(o.fl>0)o.fl=Math.max(0,o.fl-dt*1.6);o.dv+=(o.ew-o.dv)*.1}
  for(const k in afl)afl[k]=Math.max(0,afl[k]-dt*1.2);for(const k in rflash)rflash[k]=Math.max(0,rflash[k]-dt*1.5);pfl=Math.max(0,pfl-dt*1.2);PO=PO.filter(p=>(p.t+=dt)<1.2);tl+=dt;if(tl>1){tl=0;analyze();warnChk()}at+=dt;if(at>20){at=0;sv(0)}if(storyOnScreen()&&!ff)updateStory(dt);tuUpd(dt);stShow();if(!storyOnScreen())audMach(dt);audCloudSync();},
 draw:drawFrame,pointerPosition,
-dbg:()=>({AUD:audio.getContext,ASg:()=>AS,audStart:audioStart,audTick:musTick,musFill,audMach,sfxAt:sfx,mshot,SFX,MS,MOODS,audSetK:(k,v)=>{AS[k]=v;audApply();audSave()},aud,audCloudSync,audFlush:audio.clearPending,pcfSet:v=>{pcf=v},fTabSet:v=>{fTab=v},del,xp,setLv,lv:()=>LV,AC,chkAc,acOpen:v=>{acO=v},pnOpen:v=>{pnO=v},RN,rOK,buyR,rfx,RH,rsOpen:v=>{rsO=v},rsel:id=>{rsel=id},fx:()=>({STC,BTv,SPm,RM,PM,OS,WG,OFFE,KOF,RCm,KUC}),MG,hireE,setCrew,hireM,lvlM,specM,recalc,cap,assignTo:(id,x,y)=>assignManager(G.mg.find(q=>q.id===id),areaAt(x,y),cell(x,y)),salePrice,rawCost,mkOpen:v=>{mkO=v},ITEMS,MD,acc2,view:(x,y,z)=>{cam={x:x*TS,y:y*TS,z}},fm,cst,nf,uc,tme,rrLeft,fillOrders,get ff(){return ff},get lr(){return lr},HL,PH,STX,hlv,hReq,hNext,buyHall,bchk,delAt,sellAll,moveObj,prjIn,phaseDone,get stQ(){return stQ},bProg,dLeft,hallOf,hrect,areaAt,inG,jtick,put,setTool:t=>{tool=t},mvSet:o=>{mvO=o},hselGet:()=>hsel,togP,rotObj,storyIntro,beginNextChapter,currentStoryId,finishStory,replayStory,updateStory,feed,itemPos,rate,G,L,g,tick,analyze,place,plan,buy,sb,give,sv,init,inputCap,currentStats,pairTunnels,unpairTunnel,tunnelExit,tunnelRange,lineMetrics,allProductionLines,lostConnections,recipeTree,beltCapacity,cell,footprint,placement,makePlan,previewPlan,commitBuild,planRoute,checkBuild,connectedLine,REGIONS,SITE,FLEET,projectTrucks,get industrial(){return industrial},switchSite,companyValue,cloud,flushCloud,chooseSave,applySave,get msg(){return msg},get bn(){return bn},sel:o=>{sel=o},tuD:()=>({HB,view,panelSurface,panelScroll,dockTracks,dockOffsets,cur:tuCur(),TU,TOUR,HNT,tuHn,tuTour,tuTI,tuG,rot,tool,pg,sel,cam,fTab,acO,hlO,bkO,mkO,mvO,delAsk})})}};
+dbg:()=>({fishHelpNeeded,focusFish,fishScreenPosition,AUD:audio.getContext,ASg:()=>AS,audStart:audioStart,audTick:musTick,musFill,audMach,sfxAt:sfx,mshot,SFX,MS,MOODS,audSetK:(k,v)=>{AS[k]=v;audApply();audSave()},aud,audCloudSync,audFlush:audio.clearPending,pcfSet:v=>{pcf=v},fTabSet:v=>{fTab=v},del,xp,setLv,lv:()=>LV,AC,chkAc,acOpen:v=>{acO=v},pnOpen:v=>{pnO=v},RN,rOK,buyR,rfx,RH,rsOpen:v=>{rsO=v},rsel:id=>{rsel=id},fx:()=>({STC,BTv,SPm,RM,PM,OS,WG,OFFE,KOF,RCm,KUC}),MG,hireE,setCrew,hireM,lvlM,specM,recalc,cap,assignTo:(id,x,y)=>assignManager(G.mg.find(q=>q.id===id),areaAt(x,y),cell(x,y)),salePrice,rawCost,mkOpen:v=>{mkO=v},ITEMS,MD,acc2,view:(x,y,z)=>{cam={x:x*TS,y:y*TS,z}},fm,cst,nf,uc,tme,rrLeft,fillOrders,get ff(){return ff},get lr(){return lr},HL,PH,STX,hlv,hReq,hNext,buyHall,bchk,delAt,sellAll,moveObj,prjIn,phaseDone,get stQ(){return stQ},bProg,dLeft,hallOf,hrect,areaAt,inG,jtick,put,setTool:t=>{tool=t},mvSet:o=>{mvO=o},hselGet:()=>hsel,togP,rotObj,storyIntro,beginNextChapter,currentStoryId,finishStory,replayStory,updateStory,feed,itemPos,rate,G,L,g,tick,analyze,place,plan,buy,sb,give,sv,init,inputCap,currentStats,pairTunnels,unpairTunnel,tunnelExit,tunnelRange,lineMetrics,allProductionLines,lostConnections,recipeTree,beltCapacity,cell,footprint,placement,makePlan,previewPlan,commitBuild,planRoute,checkBuild,connectedLine,REGIONS,SITE,FLEET,projectTrucks,get industrial(){return industrial},switchSite,companyValue,cloud,flushCloud,chooseSave,applySave,get msg(){return msg},get bn(){return bn},sel:o=>{sel=o},tuD:()=>({HB,view,panelSurface,panelScroll,dockTracks,dockOffsets,cur:tuCur(),TU,TOUR,HNT,tuHn,tuTour,tuTI,tuG,rot,tool,pg,sel,cam,fTab,acO,hlO,bkO,mkO,mvO,delAsk})})}};

@@ -274,7 +274,11 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
    });
   }
  }
+ let drawnFish=null;
+ const fishLake=()=>{const lake=lakes.find(l=>l.fish);return [lake.x*tile,lake.y*tile]};
+ const fishPosition=()=>drawnFish;
  function paintWater(visible,time,detail){
+  drawnFish=null;
   for(const stream of riverArt){
    if(!pathVisible(stream,visible))continue;
    const {w,paint,bright,ripples}=stream;
@@ -293,7 +297,7 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
    const water=c.createLinearGradient(x-7,y-8,x+4,y+9);
    water.addColorStop(0,'#326c78');water.addColorStop(.55,'#397b85');water.addColorStop(1,'#589197');
    shape(shore.map(([a,b])=>[x+(a-x)*.87,y+(b-y)*.88]),water);
-   if(fish&&detail)paintLakeFish(x,y,time);
+   if(fish)paintLakeFish(x,y,time);
    if(detail)for(let i=0;i<15;i++){
     const u=x+(hash(i,x|0,8)-.5)*7,v=y+(hash(i,y|0,9)-.5)*6,d=1+Math.sin(time*.45+i)*.3;
     if(!visible(u,v,1.5,.1))continue;
@@ -344,9 +348,10 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
   oval(-.005,.196,.079,.017,'#edb09866',-.025);
  }
  function paintLakeFish(x,y,time){
-  const phase=time*.52;
+  const phase=time*.52,px=x+Math.cos(phase)*1.15,py=y+Math.sin(phase)*.62;
+  drawnFish=[px*tile,py*tile];
   withState(()=>{
-   c.translate(x+Math.cos(phase)*1.15,y+Math.sin(phase)*.62);
+   c.translate(px,py);
    // Head, body and tail share a heading. Only the name tag faces the screen.
    withState(()=>{
     c.rotate(Math.atan2(Math.cos(phase)*.62,-Math.sin(phase)*1.15));
@@ -657,5 +662,5 @@ function createFactoryTerrain(c,tile,columns,rows,bunker,{rr,withState,polygon,l
    }
   });
  }
- return {terrain,protectedTile,driveway,deliveryRoute,deliveryVehicles};
+ return {terrain,protectedTile,driveway,deliveryRoute,deliveryVehicles,fishLake,fishPosition};
 }

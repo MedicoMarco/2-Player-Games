@@ -48,7 +48,13 @@ function save() {
  return JSON.parse(data.get('2pg_fe_demo'));
 }
 
-let d = load([
+let d = load([], { m: 0 });
+assert.equal(d.fishHelpNeeded(),true,'An empty factory with insufficient cash gets a fish hint');
+d.G.m=d.cst('src');
+assert.equal(d.fishHelpNeeded(),false,'The hint disappears once a starter machine is affordable');
+d=load([[7,6,'src',0,1]],{m:0});
+assert.equal(d.fishHelpNeeded(),false,'An existing building suppresses the hint');
+d = load([
  [7, 6, 'src', 0, 1], [8, 6, 'belt', 0, 1], [9, 6, 'saw', 0, 1],
  [10, 6, 'belt', 0, 1], [11, 6, 'shp', 0, 1]
 ], { m: 120 });
