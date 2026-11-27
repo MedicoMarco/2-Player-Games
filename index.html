@@ -4857,7 +4857,7 @@ GAMES.push({id:'kristall',soloOnly:true,solo:true,n:'Kristallfeld',ic:'💎',d:'
 
 /* ===== Höllenwacht: Tower Defense (nur Solo) =====
    Du bist der Höllenfürst und hältst Kreuzritter und Engel vom Höllenherz fern.
-   7 Türme, zwei Meisterpfade, 8 Gegnertypen und individuelle Bossphasen, 5 handgestaltete Karten. */
+   7 Türme, zwei Meisterpfade, 11 Gegnertypen und individuelle Bossphasen, 8 handgestaltete Karten. */
 const tdefense=()=>{
 const FONT='"Avenir Next","Segoe UI",system-ui,sans-serif',thumb=!!window.NOFIN;
 const GW=20,GH=13,CS=40,MW=GW*CS,MH=GH*CS,TAU=Math.PI*2,GOLD='#ffd166';
@@ -4867,19 +4867,19 @@ const rng=s=>()=>(s=s*16807%2147483647)/2147483647;
 /* ---------- Türme ---------- */
 const TW=[
  {id:'imp',n:'Imp-Nest',cost:60,up:[50,90,160],d:'Schnelle Feuerbälle auf ein Ziel. Billig und vielseitig.',
-  lv:[{d:10,r:105,f:.55},{d:17,r:115,f:.48},{d:28,r:125,f:.40},{d:46,r:140,f:.32}]},
+  lv:[{d:11,r:105,f:.55},{d:18,r:115,f:.48},{d:30,r:125,f:.40},{d:48,r:140,f:.34}]},
  {id:'bal',n:'Knochenballista',cost:120,up:[110,190,320],d:'Große Reichweite, mächtige Bolzen, ignoriert Rüstung.',
   lv:[{d:55,r:190,f:1.7},{d:92,r:205,f:1.6},{d:150,r:220,f:1.5},{d:260,r:240,f:1.35}]},
  {id:'mor',n:'Lavamörser',cost:150,up:[130,210,350],d:'Lavageschosse mit Flächenschaden gegen Gruppen.',
-  lv:[{d:30,r:150,f:2.1,s:48},{d:48,r:160,f:2.0,s:56},{d:76,r:170,f:1.9,s:64},{d:125,r:185,f:1.8,s:76}]},
+  lv:[{d:34,r:150,f:2.0,s:50},{d:53,r:160,f:1.95,s:58},{d:82,r:170,f:1.85,s:66},{d:132,r:185,f:1.8,s:76}]},
  {id:'chn',n:'Seelenkette',cost:90,up:[70,120,200],d:'Fesselt alle Feinde in Reichweite und verlangsamt sie.',
-  lv:[{d:3,r:95,f:.5,sl:.30},{d:5,r:105,f:.5,sl:.38},{d:8,r:115,f:.5,sl:.46},{d:14,r:125,f:.5,sl:.55}]},
+  lv:[{d:3,r:95,f:.5,sl:.28},{d:5,r:105,f:.5,sl:.35},{d:8,r:115,f:.5,sl:.43},{d:14,r:125,f:.5,sl:.50}]},
  {id:'blt',n:'Dunkelblitz',cost:180,up:[150,240,400],d:'Kettenblitz springt auf mehrere Feinde über.',
   lv:[{d:24,r:120,f:1.2,c:3},{d:36,r:130,f:1.1,c:4},{d:54,r:140,f:1.0,c:5},{d:84,r:150,f:.9,c:7}]},
  {id:'ptn',n:'Pestturm',cost:130,up:[110,180,300],d:'Gift ignoriert Rüstung und wirkt weiter, auch nach dem Treffer.',
   lv:[{d:3,r:115,f:.9,p:9,pt:4},{d:4,r:125,f:.85,p:15,pt:4.5},{d:6,r:135,f:.8,p:26,pt:5},{d:8,r:150,f:.75,p:44,pt:5.5}]},
- {id:'alt',n:'Opferaltar',cost:100,up:[100,170,280],d:'Erzeugt Seelen (Gold) – ein Investment für lange Level.',
-  lv:[{g:.9,r:0},{g:1.6,r:0},{g:2.6,r:0},{g:4,r:0}]}
+ {id:'alt',n:'Opferaltar',cost:125,up:[110,180,300],d:'Erzeugt Seelen. Maximal 3 Altäre je Karte.',
+  lv:[{g:.48,r:0},{g:.85,r:0},{g:1.35,r:0},{g:2.1,r:0}]}
 ];
 const SHORT=['Schnell · günstig','Weit · Rüstungsbrecher','Flächenschaden','Verlangsamt alle','Kettenblitz','Gift · ignoriert Rüstung','Seelen pro Sekunde'];
 const TMODE=['Erster','Letzter','Stärkster','Schwächster'];
@@ -4894,10 +4894,13 @@ const UN={
  ramme:{n:'Rammbock',hp:520,sp:23,ar:8,g:32,u:8,gp:3,r:13,l:4},
  schild:{n:'Schildwächter',hp:125,sp:30,ar:3,g:13,u:3,gp:1.4,r:11,l:2,shield:0.45},
  chor:{n:'Chorwächter',hp:100,sp:37,ar:1,g:15,u:3,gp:1.4,r:10,l:2,aura:true},
+ aegis:{n:'Aegis-Golem',hp:390,sp:29,ar:12,g:28,u:6,gp:1.9,r:13,l:3,shield:.55},
+ phantom:{n:'Phantom',hp:95,sp:79,ar:1,g:11,u:2,gp:.75,r:8,l:2,sr:.28},
+ herald:{n:'Sternenherold',hp:240,sp:34,ar:3,g:22,u:5,gp:1.8,r:12,l:3,heal:1.5,aura:true},
  boss:{n:'Erzengel',hp:2600,sp:26,ar:10,g:250,u:0,r:17,l:10,sr:.6}
 };
-const WEIGHT={knappe:5,spaeher:3,ritter:2.2,priester:1.3,engel:1.6,ramme:.6,schild:1.4,chor:1.1};
-const ORDER=['spaeher','knappe','priester','ritter','engel','schild','chor','ramme'];
+const WEIGHT={knappe:5,spaeher:3,ritter:2.2,priester:1.3,engel:1.6,ramme:.6,schild:1.4,chor:1.1,aegis:1.1,phantom:1.7,herald:.8};
+const ORDER=['spaeher','phantom','knappe','priester','ritter','engel','schild','chor','herald','aegis','ramme'];
 
 /* ---------- Level ---------- */
 const LEVELS=[
@@ -4920,12 +4923,30 @@ const LEVELS=[
  {n:'Thron des Fürsten',sub:'Die letzte Zitadelle',waves:18,gap:43,hp:1.9,cm:1.16,gold:430,seed:67,boss:'Der Reine',trait:'Drei Phasen',
  paths:[[[-1,2],[5,2],[5,9],[10,9],[10,5],[15,5],[15,10],[20,10]],[[9,-1],[9,2],[13,2],[13,7],[17,7],[17,10],[20,10]]],pool:{knappe:1,spaeher:1,ritter:2,priester:3,engel:4,schild:5,chor:6,ramme:8},
  decor:[[0,0,"pillar"],[2,0,"pillar"],[4,0,"pillar"],[6,0,"pillar"],[12,0,"pillar"],[14,0,"pillar"],[16,0,"pillar"],[18,0,"pillar"],[1,5,"lava"],[2,5,"lava"],[1,6,"lava"],[2,6,"lava"],[0,7,"spikes"],[1,8,"ruin"],[2,8,"obelisk"],[3,8,"ruin"],[7,4,"pillar"],[8,4,"brazier"],[7,5,"obelisk"],[8,5,"pillar"],[16,3,"pillar"],[17,3,"brazier"],[18,3,"pillar"],[16,4,"ruin"],[18,4,"ruin"],[2,12,"pillar"],[4,12,"pillar"],[6,12,"pillar"],[8,12,"pillar"],[11,12,"pillar"],[13,12,"pillar"],[16,12,"pillar"],[18,12,"pillar"]],runes:[[4,3,"power"],[6,8,"tempo"],[9,6,"range"],[12,6,"power"],[14,8,"tempo"],[16,9,"range"]],
- th:{g1:'#301c25',g2:'#422632',path:'#8a666e',glow:'#f47791',pool:'#e33b64'}}
+ th:{g1:'#301c25',g2:'#422632',path:'#8a666e',glow:'#f47791',pool:'#e33b64'}},
+ {n:'Frostgruft',sub:'Zwei Pfade durch das Kristalleis',waves:18,gap:41,hp:2.02,cm:1.13,gold:490,seed:79,boss:'Eisarchon',trait:'Aegis · Frostpanzer',
+ paths:[[[-1,2],[4,2],[4,6],[9,6],[9,3],[15,3],[15,7],[20,7]],[[-1,10],[6,10],[6,8],[12,8],[12,11],[17,11],[17,7],[20,7]]],
+ pool:{knappe:1,spaeher:1,ritter:2,schild:3,engel:4,priester:5,phantom:6,chor:8,aegis:10,ramme:12},
+ decor:[[0,0,'crystal'],[1,0,'rock'],[2,0,'crystal'],[6,0,'crystal'],[7,0,'pillar'],[8,0,'crystal'],[12,0,'ruin'],[13,0,'ruin'],[17,1,'crystal'],[18,1,'rock'],[19,1,'crystal'],[1,4,'lava'],[2,4,'lava'],[1,5,'lava'],[2,5,'lava'],[6,4,'crystal'],[7,4,'crystal'],[11,5,'pillar'],[12,5,'brazier'],[13,5,'pillar'],[1,8,'ruin'],[2,8,'pillar'],[3,8,'ruin'],[8,11,'crystal'],[9,11,'lava'],[9,12,'lava'],[10,12,'crystal'],[18,12,'ruin'],[19,12,'pillar']],
+ runes:[[3,3,'power'],[5,5,'tempo'],[10,7,'range'],[14,4,'power'],[13,10,'tempo'],[18,8,'range']],
+ th:{g1:'#202c3b',g2:'#354754',path:'#849aa7',glow:'#9dddfc',pool:'#52a9dc'}},
+ {n:'Sternenbruch',sub:'Drei Portale am Rand des Abgrunds',waves:18,gap:42,hp:2.16,cm:1.17,gold:530,seed:97,boss:'Astralrichter',trait:'Herolde · Heilung',
+ paths:[[[-1,1],[5,1],[5,5],[10,5],[10,2],[15,2],[15,6],[20,6]],[[-1,11],[4,11],[4,7],[9,7],[9,10],[14,10],[14,6],[20,6]],[[8,-1],[8,3],[12,3],[12,8],[17,8],[17,6],[20,6]]],sp:'012',
+ pool:{knappe:1,spaeher:1,ritter:2,engel:3,schild:4,phantom:5,priester:6,chor:7,aegis:9,herald:11,ramme:12},
+ decor:[[0,3,'crystal'],[1,3,'obelisk'],[2,3,'crystal'],[0,4,'lava'],[1,4,'lava'],[2,4,'lava'],[6,7,'pillar'],[7,7,'brazier'],[7,8,'pillar'],[10,0,'crystal'],[11,0,'crystal'],[17,0,'ruin'],[18,0,'pillar'],[19,0,'ruin'],[18,2,'lava'],[19,2,'lava'],[18,3,'lava'],[19,3,'lava'],[1,9,'rock'],[2,9,'rock'],[6,11,'crystal'],[7,11,'crystal'],[11,12,'obelisk'],[12,12,'crystal'],[16,11,'ruin'],[17,11,'pillar'],[18,11,'ruin'],[19,12,'crystal']],
+ runes:[[4,2,'power'],[6,4,'tempo'],[8,6,'range'],[13,5,'power'],[13,9,'tempo'],[16,7,'range']],
+ th:{g1:'#221f39',g2:'#3c3354',path:'#837698',glow:'#c9afff',pool:'#9265df'}},
+ {n:'Ewige Zitadelle',sub:'Das letzte Tor der Heerscharen',waves:19,gap:40,hp:2.30,cm:1.22,gold:570,seed:113,boss:'Ewiger Seraph',trait:'Schild · Verstärkung · Tempo',
+ paths:[[[-1,3],[4,3],[4,8],[8,8],[8,4],[13,4],[13,9],[17,9],[17,5],[20,5]],[[10,-1],[10,2],[16,2],[16,5],[20,5]],[[-1,11],[6,11],[6,6],[11,6],[11,11],[19,11],[19,5],[20,5]]],sp:'012',
+ pool:{knappe:1,spaeher:1,ritter:2,phantom:3,schild:4,engel:5,priester:6,aegis:7,chor:8,herald:10,ramme:11},
+ decor:[[0,0,'pillar'],[2,0,'pillar'],[4,0,'pillar'],[6,0,'pillar'],[8,0,'pillar'],[12,0,'pillar'],[14,0,'pillar'],[16,0,'pillar'],[18,0,'pillar'],[0,6,'lava'],[1,6,'lava'],[2,6,'lava'],[1,7,'lava'],[2,7,'lava'],[6,3,'obelisk'],[7,3,'brazier'],[8,3,'obelisk'],[14,6,'pillar'],[15,6,'brazier'],[16,6,'pillar'],[14,7,'ruin'],[15,7,'ruin'],[2,12,'pillar'],[4,12,'pillar'],[8,12,'pillar'],[10,12,'pillar'],[14,12,'pillar'],[16,12,'pillar'],[18,12,'pillar']],
+ runes:[[3,4,'power'],[5,9,'tempo'],[9,5,'range'],[12,7,'power'],[15,4,'tempo'],[18,8,'range']],
+ th:{g1:'#302b28',g2:'#4a4236',path:'#a18b70',glow:'#ffd187',pool:'#e4a044'}}
 ];
 const RUNES={power:{n:'Kraft',col:'#ffae62',desc:'+20% Schaden / Ertrag'},range:{n:'Weitsicht',col:'#75dcd4',desc:'+18% Angriffsreichweite'},tempo:{n:'Tempo',col:'#bca0ff',desc:'+18% Feuerrate / Ertrag'}};
 const runeAt=(x,y)=>CL?.runes.find(q=>q[0]===x&&q[1]===y)?.[2];
 /* ---------- Zustand ---------- */
-let scene='select',lvI=0,CL=null,P=[],grid=null,mapImg=null,lavaC=[];
+let selectPage=-1,scene='select',lvI=0,CL=null,P=[],grid=null,mapImg=null,lavaC=[];
 let gold=0,lives=0,maxLives=0,wave=0,timer=0,spawnQ=[],E=[],TS=[],PR=[],FX=[],TXT=[],tm=0,mana=0,spell=null,spellMode=false;
 let sel=null,shop=0,speed=1,paused=false,res=null,msg='',msgT=0,kills=0,leaked=0,stTime=0,ptype='mouse',ui=[],shake=0,flash=0,bonusAll=0;
 let sinceTap=0,cleared=new Set(),guide=false,guidePage=0,guideWeapon=-1;
@@ -5010,7 +5031,7 @@ function genWave(Lv,k){
  while(units>0){let tot=0;av.forEach(t=>tot+=WEIGHT[t]*(1+(Lv.pool[t]>k-3&&Lv.pool[t]>1?.6:0)));let q=r()*tot,t=av[0];for(const a of av){q-=WEIGHT[a]*(1+(Lv.pool[a]>k-3&&Lv.pool[a]>1?.6:0));if(q<=0){t=a;break}}
   if(UN[t].u>units)t='knappe';cnt[t]=(cnt[t]||0)+1;units-=UN[t].u}
  let t=0;const evs=[];let n=0;const spp=Lv.sp||(Lv.paths.length>1?'01':'0');
- const ord=k%3===0?['ritter','schild','chor','priester','knappe','ramme','engel','spaeher']:k%2?ORDER:ORDER.slice().reverse();
+ const ord=k%3===0?['ritter','schild','aegis','chor','herald','priester','knappe','ramme','engel','phantom','spaeher']:k%2?ORDER:ORDER.slice().reverse();
  for(const ty of ord){for(let j=0;j<(cnt[ty]||0);j++){evs.push({t,ty,p:+spp[n++%spp.length],mod});t+=UN[ty].gp*(mod==='Formation'?.68:1)}t+=1.2}
  const tot=t;if(tot>34)evs.forEach(e=>e.t*=34/tot);
  if(last)evs.push({t:(evs.length?evs[evs.length-1].t:0)+3,ty:'boss',p:0});
@@ -5029,14 +5050,15 @@ function spawn(ev){const u=UN[ev.ty],hp=hpOf(ev.ty,ev.w)*(ev.mod==='Elite'&&ev.t
 
 /* ---------- Türme ---------- */
 const st=t=>{const s={...TW[t.i].lv[t.lv]},r=runeAt(t.gx,t.gy),id=TW[t.i].id;
- if(t.lv===3&&t.branch==='master'){if(s.d)s.d=Math.round(s.d*.82);if(s.f)s.f*=.72;if(s.r)s.r=Math.round(s.r*1.15);if(s.sl)s.sl=Math.min(.72,s.sl+.12);if(s.s)s.s+=12;if(s.c)s.c+=2;if(s.p)s.p*=.82;if(s.g)s.g*=.72}
+ if(t.lv===3&&t.branch==='master'){if(s.d)s.d=Math.round(s.d*.82);if(s.f)s.f*=.72;if(s.r)s.r=Math.round(s.r*1.15);if(s.sl)s.sl=Math.min(.65,s.sl+.10);if(s.s)s.s+=12;if(s.c)s.c+=2;if(s.p)s.p*=.82;if(s.g)s.g*=.72}
  else if(t.lv===3&&t.branch==='power'){if(s.d)s.d=Math.round(s.d*1.18);if(s.p)s.p*=1.18;if(s.g)s.g*=1.18}
  if(r==='power'){if(s.d)s.d*=1.2;if(s.p)s.p*=1.2;if(s.g)s.g*=1.2}if(r==='range'&&s.r)s.r*=1.18;if(r==='tempo'){if(s.f)s.f/=1.18;else if(s.g)s.g*=1.18}
- if(id!=='alt'&&TS.some(q=>q!==t&&TW[q.i].id==='alt'&&q.branch==='master'&&dist(q.x,q.y,t.x,t.y)<=100)){if(s.d)s.d*=1.15;if(s.p)s.p*=1.15}
+ if(id!=='alt'&&TS.some(q=>q!==t&&TW[q.i].id==='alt'&&q.branch==='master'&&dist(q.x,q.y,t.x,t.y)<=100)){if(s.d)s.d*=1.10;if(s.p)s.p*=1.10}
  return s};
 const costOf=i=>TW[i].cost;
 function canBuild(gx,gy){return gx>=0&&gy>=0&&gx<GW&&gy<GH&&grid[gy*GW+gx]==0&&!TS.some(t=>t.gx==gx&&t.gy==gy)}
-function build(i,gx,gy,free){if(!canBuild(gx,gy))return false;if(!free){if(gold<costOf(i)){say('Nicht genug Seelen',1.6);snd(150,.1,'sawtooth');return false}gold-=costOf(i)}
+const ALT_MAX=3,altarCount=()=>TS.filter(t=>TW[t.i].id==='alt').length;
+function build(i,gx,gy,free){if(!canBuild(gx,gy))return false;if(TW[i].id==='alt'&&altarCount()>=ALT_MAX){say('Maximal 3 Opferaltäre pro Karte',2);return false}if(!free){if(gold<costOf(i)){say('Nicht genug Seelen',1.6);snd(150,.1,'sawtooth');return false}gold-=costOf(i)}
  const t={i,gx,gy,x:gx*CS+CS/2,y:gy*CS+CS/2,lv:0,cd:.3,tg:0,ang:-1.57,spent:costOf(i),t0:tm,pu:0,tick:0,fl:0};TS.push(t);
  FX.push({k:'ring',x:t.x,y:t.y,r:6,R:28,t:0,life:.4,col:'#ffb36b'});snd(300,.06,'triangle');setTimeout(()=>snd(420,.08,'triangle'),60);return t}
 function upgrade(t,branch='power'){if(!t||t.lv>=3||res||paused||guide)return;const c=TW[t.i].up[t.lv];if(gold<c){say('Nicht genug Seelen',1.6);snd(150,.1,'sawtooth');return}gold-=c;t.spent+=c;t.lv++;if(t.lv===3)t.branch=branch;
@@ -5047,7 +5069,7 @@ function pickTarget(t,r){let b=null,bv=0;const mode=t.tg;
  for(const e of E){if(e.dead||e.x<-5||e.y<-5||e.x>MW+5||e.y>MH+5)continue;if(dist(t.x,t.y,e.x,e.y)>r+e.u.r*.6)continue;
   const remaining=P[e.p].len-e.d;const v=mode==0?-remaining:mode==1?remaining:mode==2?e.hp+(e.shield||0):-e.hp;if(!b||v>bv){b=e;bv=v}}return b}
 function hurt(e,dmg,pierce){if(e.dead)return;const a=pierce?0:e.ar;dmg=Math.max(dmg*.25,dmg-a);
- if(!pierce&&e.ty!=='chor'&&E.some(q=>q!==e&&!q.dead&&q.u.aura&&dist(q.x,q.y,e.x,e.y)<64))dmg*=.78;
+ if(!pierce&&!e.u.aura&&E.some(q=>q!==e&&!q.dead&&q.u.aura&&dist(q.x,q.y,e.x,e.y)<64))dmg*=.78;
  if(e.shield>0){const used=Math.min(e.shield,dmg);e.shield-=used;dmg-=used;if(e.shield<=0)FX.push({k:'ring',x:e.x,y:e.y,r:8,R:25,t:0,life:.35,col:'#8bdcff'})}
  e.hp-=dmg;e.fl=.08;if(e.hp<=0)die(e)}
 function die(e){if(e.dead)return;e.dead=true;kills++;const gv=Math.round(e.u.g*(1+.03*e.w));gold+=gv;mana=Math.min(100,mana+(e.ty=='boss'?30:2.2));
@@ -5076,12 +5098,12 @@ function step(dt){
  for(const e of E){if(e.dead)continue;e.slT-=dt;if(e.slT<=0)e.sl=0;e.fl=Math.max(0,(e.fl||0)-dt);
   if(e.pz){e.pz.t-=dt;hurt(e,e.pz.dps*dt,true);if(e.pz.t<=0)e.pz=null;if(e.dead)continue}
   if(e.ty==='boss'){const f=e.hp/e.mx;const phase=f<=.32?2:f<=.65?1:0;if(phase>e.phase){e.phase=phase;
-  if(lvI===0||lvI===4){e.sp=e.u.sp*(1+.18*phase)}
-  if(lvI===1||lvI===4){e.shield=e.mx*.10;e.shieldMax=e.shield}
-  if(lvI===2||lvI===4){for(let j=0;j<2;j++){spawn({ty:'ritter',p:e.p,w:e.w});const q=E[E.length-1];q.d=Math.max(0,e.d-25-j*23);[q.x,q.y,q.ang]=posAt(P[q.p],q.d)}}
-  if(lvI===3){e.hp=Math.min(e.mx,e.hp+e.mx*.08)}
+  if(lvI===0||lvI===4||lvI===7){e.sp=e.u.sp*(1+.18*phase)}
+  if(lvI===1||lvI===4||lvI===5||lvI===7){e.shield=e.mx*.10;e.shieldMax=e.shield}
+  if(lvI===2||lvI===4||lvI===6||lvI===7){for(let j=0;j<2;j++){spawn({ty:lvI===6?'herald':lvI===7?'aegis':'ritter',p:e.p,w:e.w});const q=E[E.length-1];q.d=Math.max(0,e.d-25-j*23);[q.x,q.y,q.ang]=posAt(P[q.p],q.d)}}
+  if(lvI===3||lvI===6){e.hp=Math.min(e.mx,e.hp+e.mx*.08)}
   say(CL.boss+' · Phase '+(phase+1),3);FX.push({k:'ring',x:e.x,y:e.y,r:10,R:75,t:0,life:.6,col:GOLD})}}
- if(e.u.heal){e.heal-=dt;if(e.heal<=0){e.heal=2;let any=0;for(const q of E){if(!q.dead&&q.hp<q.mx&&dist(e.x,e.y,q.x,q.y)<85){q.hp=Math.min(q.mx,q.hp+Math.min(32,q.mx*.055));any=1}}if(any)FX.push({k:'ring',x:e.x,y:e.y,r:6,R:85,t:0,life:.5,col:'#8ef08a'})}}
+ if(e.u.heal){e.heal-=dt;if(e.heal<=0){e.heal=2;let any=0;for(const q of E){if(!q.dead&&q.hp<q.mx&&dist(e.x,e.y,q.x,q.y)<85){q.hp=Math.min(q.mx,q.hp+Math.min(32*e.u.heal,q.mx*.055*e.u.heal));any=1}}if(any)FX.push({k:'ring',x:e.x,y:e.y,r:6,R:85,t:0,life:.5,col:'#8ef08a'})}}
   const sp=e.sp*(1-Math.min(.8,e.sl*(e.u.sr||1)));e.d+=sp*dt;const pa=P[e.p];
   if(e.d>=pa.len){e.dead=true;e.leak=1;lives-=e.u.l;leaked+=e.u.l;shake=Math.max(shake,6);flash=.35;snd(100,.25,'sawtooth');TXT.push({x:Math.min(MW-14,e.x),y:Math.min(MH-14,e.y),s:'-'+e.u.l,col:'#ff5a5a',t:0,life:1.1,big:1});if(lives<=0){lives=0;endLevel(false);return}continue}
   const q=posAt(pa,e.d);e.x=q[0];e.y=q[1];e.ang=q[2]}
@@ -5261,7 +5283,7 @@ function drawWorld(l){
 /* ---------- Zeichnen: Oberfläche ---------- */
 function drawBg(l){const g=c.createLinearGradient(0,0,0,l.PH);g.addColorStop(0,'#242633');g.addColorStop(.45,'#121822');g.addColorStop(1,'#090d16');c.fillStyle=g;c.fillRect(0,0,l.PW,l.PH)}
 function statsOf(i,lv,s=TW[i].lv[lv]){const id=TW[i].id,o=[];const num=v=>Number(v.toFixed(1));
- if(id=='alt')o.push(['Seelen / Sek.',s.g.toFixed(1)]);
+ if(id=='alt')o.push(['Seelen / Sek.',s.g.toFixed(2)]);
  else{o.push(['Schaden',id=='chn'?num(s.d*TW[i].lv[lv].f/s.f)+' / Sek.':id=='mor'?num(s.d)+' (Fläche)':id=='blt'?num(s.d)+' ×'+s.c:String(num(s.d))]);
   if(id!='chn')o.push(['Tempo',(1/s.f).toFixed(1)+'/s']);o.push(['Reichweite',String(num(s.r))]);
   if(id=='mor')o.push(['Radius',String(s.s)]);if(id=='chn')o.push(['Verlangsamung',Math.round(s.sl*100)+'%']);if(id=='ptn')o.push(['Gift',num(s.p)+'/s · '+s.pt+'s']);if(id=='bal')o.push(['Besonderheit','Ignoriert Rüstung'])}
@@ -5269,11 +5291,11 @@ function statsOf(i,lv,s=TW[i].lv[lv]){const id=TW[i].id,o=[];const num=v=>Number
 function drawShop(px,py,pw,ph,por){
  rrs(px,py,pw,ph,0,tdGrad(py,ph,'#222636','#101520'));c.fillStyle='#72615e';c.fillRect(px,py,1,ph);tx('ARSENAL  /  TÜRME',px+pw/2,py+16,12,'#e6ccab','800','center');
  const cols=por?2:1,rows=Math.ceil(TW.length/cols),top=py+24,rh=Math.min(por?69:44,(ph-72)/rows),rw=(pw-12)/cols;
- TW.forEach((t,i)=>{const cx=px+6+(i%cols)*rw,cy=top+Math.floor(i/cols)*rh,can=gold>=t.cost,on=shop===i;
+ TW.forEach((t,i)=>{const cx=px+6+(i%cols)*rw,cy=top+Math.floor(i/cols)*rh,can=gold>=t.cost&&(t.id!=='alt'||altarCount()<ALT_MAX),on=shop===i;
   rrs(cx,cy,rw-4,rh-4,5,tdGrad(cy,rh,on?'#554037':'#303545',on?'#302622':'#1a202e'),on?GOLD:'#505665',on?1.8:1);c.fillStyle=TCOL[i];c.fillRect(cx+2,cy+5,2,rh-14);
   ui.push({x:cx,y:cy,w:rw-4,h:rh-4,fn:()=>{shop=on?-1:i;sel=null;spellMode=false;if(!on)say(t.n+' – '+t.d,3.4)}});
   drawTower(i,cx+(por?28:24),cy+(rh-4)/2+9,0,-1.57,por?.75:.62,tm+i,0);
-  const lx=cx+(por?56:48);tx(t.n,lx,cy+(por?24:20),por?15:12.5,'#ffe9d2','800','left',0,rw-(por?66:60));
+  const lx=cx+(por?56:48);tx(t.id==='alt'?t.n+' '+altarCount()+'/'+ALT_MAX:t.n,lx,cy+(por?24:20),por?15:12.5,'#ffe9d2','800','left',0,rw-(por?66:60));
   icoSoul(lx+6,cy+(por?43:31),5.5);tx(String(t.cost),lx+16,cy+(por?48:35.5),por?15:13,can?GOLD:'#ff6a5a','800','left');
   if(por)tx(SHORT[i],lx,cy+61,11,'#a8877c','600','left',0,rw-lx+cx-33)
   tx(String(i+1),cx+rw-14,cy+13,10,'#a8877c','700','right');btn(cx+rw-31,cy+rh-25,23,18,'?',{col:'#443745',fs:12},()=>openGuide(i))});
@@ -5294,7 +5316,7 @@ function drawUpgrade(t,px,py,pw,ph,por){
  const full=tm-t.t0<6&&t.spent===costOf(t.i),back=full?t.spent:Math.floor(t.spent*.7);
  btn(bx,place(bh),bw,bh,full?'Abreißen':'Verkaufen',{col:'#5a2a2a',sub:'+'+back+' Seelen',fs:14},()=>sell(t));
  if(!['alt','chn'].includes(TW[t.i].id))btn(bx,place(bh-6),bw,bh-6,'Ziel: '+TMODE[t.tg],{col:'#3a2a4a',fs:13},()=>{t.tg=(t.tg+1)%4});
- if(nx){const c1=T.up[t.lv],yy=place(bh+4);if(t.lv===2){const w=(bw-5)/2;btn(bx,yy,w,bh+4,'Kraft',{col:'#864623',sub:c1+' · U',fs:13,dis:gold<c1},()=>upgrade(t,'power'));btn(bx+w+5,yy,w,bh+4,'Meister',{col:'#474073',sub:c1+' · Q',fs:13,dis:gold<c1},()=>upgrade(t,'master'));tx(T.id==='alt'?'Mehr Seelen / Aura +15%':'+18% Schaden / schneller & weiter',px+pw/2,yy-8,10,'#d8c7ba','700','center',0,pw-20)}else btn(bx,yy,bw,bh+4,'Verbessern',{col:gold>=c1?'#a8541a':'#4a2a20',sub:c1+' Seelen',sc:gold>=c1?GOLD:'#ff6a5a',fs:15},()=>upgrade(t))} 
+ if(nx){const c1=T.up[t.lv],yy=place(bh+4);if(t.lv===2){const w=(bw-5)/2;btn(bx,yy,w,bh+4,'Kraft',{col:'#864623',sub:c1+' · U',fs:13,dis:gold<c1},()=>upgrade(t,'power'));btn(bx+w+5,yy,w,bh+4,'Meister',{col:'#474073',sub:c1+' · Q',fs:13,dis:gold<c1},()=>upgrade(t,'master'));tx(T.id==='alt'?'Mehr Seelen / Aura +10%':'+18% Schaden / schneller & weiter',px+pw/2,yy-8,10,'#d8c7ba','700','center',0,pw-20)}else btn(bx,yy,bw,bh+4,'Verbessern',{col:gold>=c1?'#a8541a':'#4a2a20',sub:c1+' Seelen',sc:gold>=c1?GOLD:'#ff6a5a',fs:15},()=>upgrade(t))} 
  else tx(t.branch==='master'?'Meisterpfad':'Kraftpfad',px+pw/2,yb-14,14,GOLD,'800','center')}
 
 function drawHud(l){
@@ -5326,7 +5348,7 @@ const WEAPON_INFO=[
  ['Kontrolle und Flächenschaden','Verlangsamt alle Gegner in Reichweite und verursacht kleinen rüstungsunabhängigen Schaden.','Gut an Kurven und neben anderen Türmen. Engel und Bosse widerstehen der Verlangsamung teilweise.','Kraft: mehr Schaden. Meister: stärkere Verlangsamung, größere Reichweite.'],
  ['Springender Kettenangriff','Blitze springen auf nahe Gegner über. Jeder weitere Treffer verursacht 12% weniger Schaden als der vorherige.','Gut gegen: dicht stehende Gegner. Bei weit auseinanderstehenden Gegnern springen weniger Blitze.','Kraft: mehr Schaden. Meister: zwei zusätzliche Ziele, mehr Tempo und Reichweite.'],
  ['Anhaltender Giftschaden','Ein Treffer vergiftet den Gegner. Gift ignoriert Rüstung; erneute Treffer erneuern die Dauer, stapeln aber nicht den Schaden.','Gut gegen: langlebige, gepanzerte Gegner. Weniger wirksam, wenn Gegner schnell fallen.','Kraft: stärkeres Gift. Meister: schneller und weiter, schwächeres Gift je Sekunde.'],
- ['Wirtschaft und Unterstützung','Erzeugt fortlaufend Seelen, greift aber nicht an. Früher Bau zahlt sich in langen Leveln aus.','Gut auf freien Feldern abseits der Wege. Nicht zu früh zu viel in Wirtschaft investieren.','Kraft: höherer Ertrag. Meister: weniger Ertrag, +15% Schaden für nahe Türme; Auren stapeln nicht.']
+ ['Wirtschaft und Unterstützung','Erzeugt fortlaufend Seelen, greift aber nicht an. Maximal drei Altäre pro Karte.','Gut auf freien Feldern abseits der Wege. Nicht zu früh zu viel in Wirtschaft investieren.','Kraft: höherer Ertrag. Meister: weniger Ertrag, +10% Schaden für nahe Türme; Auren stapeln nicht.']
 ];
 function wrapGuide(str,x,y,w,size,col,lh=15){c.font='600 '+size+'px '+FONT;let line='';for(const word of str.split(' ')){const next=line?line+' '+word:word;if(line&&c.measureText(next).width>w){tx(line,x,y,size,col,'600','left');y+=lh;line=word}else line=next}if(line){tx(line,x,y,size,col,'600','left');y+=lh}return y}
 function drawGuide(l){ui=[];const w=Math.min(700,l.PW-24),h=l.por?720:452,x=(l.PW-w)/2,y=(l.PH-h)/2;
@@ -5337,8 +5359,8 @@ function drawGuide(l){ui=[];const w=Math.min(700,l.PW-24),h=l.por?720:452,x=(l.P
  tx('GRUNDWERTE · STUFE 1',x+20,yy,12,GOLD,'800','left');yy+=18;wrapGuide(statsOf(i,0,s).map(q=>q.join(': ')).join('   ·   '),x+20,yy,w-40,12,'#e7d8ce',16);
  btn(x+12,y+h-78,w-24,29,'Alle Waffen anzeigen',{col:'#443745'},()=>guideWeapon=-1);
  }else{const rh=l.por?83:46;for(let i=0;i<TW.length;i++){const xx=x+12,yy=y+76+i*rh;rrs(xx,yy,w-24,rh-4,7,'#2c2630','#4e404d');drawTower(i,xx+26,yy+(rh-4)/2+9,0,-1.57,.65,tm,0);tx(TW[i].n,xx+50,yy+17,13,'#fff0dd','800','left');tx(TW[i].cost+' Seelen',x+w-28,yy+17,12,GOLD,'800','right');wrapGuide(l.por?WEAPON_INFO[i][1]:WEAPON_INFO[i][0]+' · '+TW[i].d,xx+50,yy+34,w-91,l.por?12:11,'#d5c5bf',14);ui.push({x:xx,y:yy,w:w-24,h:rh-4,fn:()=>guideWeapon=i})}}
- }else{const notes={knappe:'Standardgegner',spaeher:'Sehr schnell',ritter:'Hohe Rüstung',priester:'Heilt nahe Verbündete',engel:'Resistent gegen Verlangsamung',ramme:'Viele Leben · hoher Durchbruchschaden',schild:'Zusätzlicher Schutzschild',chor:'Nahen Verbündeten 22% Schadensschutz',boss:'Neue Kräfte bei 65% und 32% Leben'};
- const cols=l.por?1:2,rh=l.por?47:40,cw=(w-24)/cols;Object.keys(UN).forEach((k,i)=>{const xx=x+12+i%cols*cw,yy=y+76+Math.floor(i/cols)*rh;rrs(xx,yy,cw-5,rh-4,6,'#2c2630');drawEnemy({ty:k,u:{...UN[k],r:Math.min(10,UN[k].r)},x:xx+26,y:yy+27,hp:100,mx:100,ph:0,ang:0,iconOnly:true},tm);tx(UN[k].n,xx+49,yy+16,12,'#fff0dd','800','left');tx(notes[k],xx+49,yy+30,10,'#c8b7b3','600','left',0,cw-56)});
+ }else{const notes={knappe:'Standardgegner',spaeher:'Sehr schnell',ritter:'Hohe Rüstung',priester:'Heilt nahe Verbündete',engel:'Resistent gegen Verlangsamung',ramme:'Viele Leben · hoher Durchbruchschaden',schild:'Zusätzlicher Schutzschild',chor:'Nahen Verbündeten 22% Schadensschutz',aegis:'Starker Schild und schwere Rüstung',phantom:'Sehr schnell · geringe Verlangsamung',herald:'Verstärkte Heilung und Schutz-Aura',boss:'Neue Kräfte bei 65% und 32% Leben'};
+ const cols=l.por?1:2,rh=l.por?40:36,cw=(w-24)/cols;Object.keys(UN).forEach((k,i)=>{const xx=x+12+i%cols*cw,yy=y+76+Math.floor(i/cols)*rh;rrs(xx,yy,cw-5,rh-4,6,'#2c2630');drawEnemy({ty:k,u:{...UN[k],r:Math.min(10,UN[k].r)},x:xx+26,y:yy+27,hp:100,mx:100,ph:0,ang:0,iconOnly:true},tm);tx(UN[k].n,xx+49,yy+16,12,'#fff0dd','800','left');tx(notes[k],xx+49,yy+30,10,'#c8b7b3','600','left',0,cw-56)});
  let yy=y+76+Math.ceil(Object.keys(UN).length/cols)*rh+14;tx('RUNENFELDER',x+16,yy,12,GOLD,'800','left');yy+=18;Object.values(RUNES).forEach((r,i)=>{const xx=l.por?x+16:x+16+i*(w-32)/3;const y2=l.por?yy+i*16:yy;tx(r.n+' · '+r.desc,xx,y2,11,r.col,'700','left')});yy+=l.por?60:25;tx('Elite: +22% LP · Ansturm: +15% Tempo · Formation: dichter.',x+16,yy,11,'#d0b7e9','600','left',0,w-32);tx('Wellen starten automatisch; bis zu 8 Sekunden früher möglich.',x+16,yy+18,11,'#e1d1c5','600','left',0,w-32)}
  btn(x+12,y+h-40,w-24,30,'Zurück zum Spiel',{col:'#6b465c'},()=>guide=false)}
 function drawResult(l){
@@ -5353,15 +5375,15 @@ function drawResult(l){
  const bw=w-40,bh=38;let by=y+146;
  if(res.win&&lvI<LEVELS.length-1){btn(x+20,by,bw,bh,'Nächstes Level',{col:'#a8541a'},()=>startLevel(lvI+1));by+=bh+8}
  else if(res.win){tx('Alle Level geschafft – du bist der Höllenfürst!',x+w/2,by+20,14,GOLD,'800','center');by+=bh+8}
- btn(x+20,by,(bw-8)/2,bh-4,'Nochmal',{col:'#3a2a4a'},()=>startLevel(lvI));btn(x+20+(bw-8)/2+8,by,(bw-8)/2,bh-4,'Levelwahl',{col:'#2a3040'},()=>{scene='select'});
+ btn(x+20,by,(bw-8)/2,bh-4,'Nochmal',{col:'#3a2a4a'},()=>startLevel(lvI));btn(x+20+(bw-8)/2+8,by,(bw-8)/2,bh-4,'Levelwahl',{col:'#2a3040'},()=>{selectPage=Math.floor(lvI/5);scene='select'});
  c.globalAlpha=1}
 
 function drawSelect(l){
  drawBg(l);const por=l.por,W2=l.PW;
  tx('HÖLLENWACHT',W2/2,por?64:60,por?40:44,'#f2c091','900','center',1);tx('Verteidige das Höllenherz gegen die Heerscharen des Lichts',W2/2,por?88:84,por?12.5:14,'#c98a7a','700','center');
- const n=LEVELS.length,pr=prog();
- LEVELS.forEach((Lv,i)=>{const lock=i>pr;let x,y,w,h;
-  if(por){w=W2-36;h=118;x=18;y=108+i*(h+10)}else{w=140;h=270;x=(W2-(n*w+(n-1)*10))/2+i*(w+10);y=112}
+ const pr=prog();if(selectPage<0)selectPage=Math.min(1,Math.floor(pr/5));const offset=selectPage*5,shown=LEVELS.slice(offset,offset+5),n=shown.length;
+ shown.forEach((Lv,j)=>{const i=offset+j,lock=i>pr;let x,y,w,h;
+  if(por){w=W2-36;h=108;x=18;y=108+j*(h+8)}else{w=140;h=270;x=(W2-(n*w+(n-1)*10))/2+j*(w+10);y=112}
   rrs(x,y,w,h,7,tdGrad(y,h,lock?'#20222e':'#353746','#161a26'),lock?'#47414f':Lv.th.glow,lock?1:1.5);
   const pw=por?132:w-16,ph=por?86:81,px=x+8,py=y+8;rrs(px,py,pw,ph,8,Lv.th.g1);
   if(!Lv._m)buildMap(Lv);c.save();c.beginPath();c.roundRect(px,py,pw,ph,8);c.clip();c.fillStyle='#111521';c.fillRect(px,py,pw,ph);const fit=Math.min(pw/MW,ph/MH);c.translate(px+(pw-MW*fit)/2,py+(ph-MH*fit)/2);c.scale(fit,fit);c.transform(tdA,0,tdB,tdD,tdX,tdY);c.drawImage(tdTerrain(Lv),0,0,MW,MH);const prevCL=CL;CL=Lv;tdWorld=true;for(const [gx,gy,k] of Lv.decor.filter(([gx,gy,k])=>k!=='lava'&&Lv._m.grid[gy*GW+gx]===2).sort((a,b)=>a[1]-b[1]))tdDecor(gx*40+20,gy*40+20,k);tdWorld=false;CL=prevCL;c.restore();
@@ -5372,6 +5394,7 @@ function drawSelect(l){
   const s0=stars(i);for(let k=0;k<3;k++){const sx=por?tx0+10+k*22:x+w/2-22+k*22,sy=por?y+h-18:y+h-24;c.fillStyle=k<s0?GOLD:'#3a2a2a';c.beginPath();for(let q=0;q<10;q++){const a=-1.57+q*Math.PI/5,r=q%2?4:9;c.lineTo(sx+Math.cos(a)*r,sy+Math.sin(a)*r)}c.closePath();c.fill()}
   if(lock){c.fillStyle='rgba(8,2,4,.55)';c.beginPath();c.roundRect(x,y,w,h,14);c.fill();const ly=por?y+h-30:y+h-62;tx('Gesperrt',por?x+w-70:x+w/2,ly,15,'#a8877c','800','center');tx('Level '+i+' abschließen',por?x+w-70:x+w/2,ly+17,11,'#7d6a6a','600','center',0,por?120:w-12)}
   else ui.push({x,y,w,h,fn:()=>startLevel(i)})});
+ const navY=por?700:400;btn(W2/2-170,navY,115,34,'‹ Kapitel 1',{col:'#443745',dis:selectPage===0},()=>selectPage=0);tx((selectPage+1)+'/2',W2/2,navY+22,14,GOLD,'800');btn(W2/2+55,navY,115,34,'Kapitel 2 ›',{col:'#443745',dis:selectPage===1},()=>selectPage=1);
  tx('Schwierigkeit: '+['Einfach','Normal','Schwer','Adaptiv'][S.d]+' · im Menü änderbar',W2/2,l.PH-(por?22:20),12,'#8f6a60','700','center')}
 
 function draw(){
@@ -5399,7 +5422,7 @@ function tdBlock(x,y,w,d,h,top='#777781',front='#42414e',right='#292a35'){const 
 function tdCrystal(x,y,r,h,col){tdGlow(x,y-h*.5,r*2,col);tdPoly([[x-r,y-h*.35],[x-r*.6,y-h*.8],[x,y-h],[x+r*.7,y-h*.75],[x+r,y-h*.35],[x,y]],col);tdPoly([[x-r,y-h*.35],[x-r*.6,y-h*.8],[x,y-h],[x,y]],'#effaff85',null);tdPoly([[x,y-h],[x+r*.7,y-h*.75],[x+r,y-h*.35],[x,y]],'#16243c65',null);line([[x-r*.6,y-h*.8],[x,y-h],[x+r*.7,y-h*.75]],'#ffffffb0',.8)}
 function tdColumn(x,y,r,h,col){oval(x,y,r,r*.36,'#1b1b25','#090a0f');rrs(x-r,y-h,r*2,h,1,tdGrad(y-h,h,'#716c79','#2a2934'),'#15141b');const g=c.createLinearGradient(x-r,0,x+r,0);g.addColorStop(0,'#b5b0b955');g.addColorStop(.45,'#ffffff13');g.addColorStop(1,'#00000077');rrs(x-r,y-h,r*2,h,1,g);oval(x,y-h,r,r*.38,col,'#16151d')}
 function tdFlame(x,y,s,t,col='#ff9b46'){tdGlow(x,y-s*.5,s*1.8,col);const a=Math.sin(t*8+x)*s*.15;tdPoly([[x-s*.52,y],[x-s*.45,y-s*.65],[x+a,y-s*1.5],[x+s*.15,y-s*.65],[x+s*.52,y-s*.45],[x+s*.42,y]],col,null);tdPoly([[x-s*.24,y],[x+a*.5,y-s*.8],[x+s*.24,y]],'#fff0b6',null)}
-function tdTerrain(Lv){if(Lv._25)return Lv._25;const oc=document.createElement('canvas');oc.width=MW*2;oc.height=MH*2;const o=oc.getContext('2d');o.scale(2,2);const r=rng(Lv.seed*919),th=Lv.th,mi=LEVELS.indexOf(Lv);const pal=[['#30292c','#50403b','#8e7560'],['#2e252b','#473038','#a17b5a'],['#292a38','#454353','#8e8796'],['#183332','#304a45','#80978a'],['#302536','#4f3544','#a17b80']][mi];
+function tdTerrain(Lv){if(Lv._25)return Lv._25;const oc=document.createElement('canvas');oc.width=MW*2;oc.height=MH*2;const o=oc.getContext('2d');o.scale(2,2);const r=rng(Lv.seed*919),th=Lv.th,mi=LEVELS.indexOf(Lv);const pal=[['#30292c','#50403b','#8e7560'],['#2e252b','#473038','#a17b5a'],['#292a38','#454353','#8e8796'],['#183332','#304a45','#80978a'],['#302536','#4f3544','#a17b80'],['#263746','#405664','#a6bfcd'],['#27243e','#433959','#9d89b9'],['#37302a','#55483d','#b39b7c']][mi];
  o.fillStyle=pal[0];o.fillRect(0,0,MW,MH);
  for(let y=0;y<GH;y++)for(let x=0;x<GW;x++){const X=x*CS,Y=y*CS,k=Lv._m.grid[y*GW+x];o.fillStyle=pal[1];o.globalAlpha=.36+.10*Math.sin(x*.53+y*.37)+r()*.14;o.fillRect(X,Y,40,40);o.globalAlpha=1;
  if((mi===2||mi===4||r()>.84)&&(k===0||k===2)){o.strokeStyle='#10111b77';o.lineWidth=1;for(let z=0;z<2;z++){const yy=Y+z*20;o.strokeRect(X+.5,yy+.5,39,19);o.beginPath();o.moveTo(X+(z%2?12:27),yy);o.lineTo(X+(z%2?12:27),yy+20);o.stroke();o.strokeStyle='#ffffff12';o.beginPath();o.moveTo(X+2,yy+2);o.lineTo(X+38,yy+2);o.stroke();o.strokeStyle='#10111b77'}}
@@ -5427,9 +5450,9 @@ function tdTower(i,x,y,lv,ang,sc,t,fl){c.save();c.translate(x,y);tdUpright();c.s
  if(i===5){for(const a of[-1,1]){tdColumn(a*7,0,6,20+h,'#93ad70');rrs(a*7-3,-16-h,6,12,3,tdGrad(-16-h,12,'#c0e79a','#446e4c'),'#22382b');for(let j=0;j<3;j++)oval(a*7+Math.sin(j*5)*2,-6-h-(t*10+j*4)%10,1,1,'#d5f8a9')}tdBlock(0,-20-h,18,8,4,'#839879')}
  if(i===6){tdBlock(0,0,24,13,11+h,'#a58a79','#635469');for(const a of[-1,1])tdCrystal(a*10,-9-h,4,14,col);tdCrystal(0,-12-h,9,23+Math.sin(t*3)*2,col)}
  if(lv===3){gem(-13,6,3,col,'#fff3cf');gem(13,6,3,col,'#fff3cf')}if(fl>0)tdGlow(0,-15-h,19,col);c.restore()}
-function tdEnemy(e,t){const ty=e.ty,boss=ty==='boss',r=e.u.r,sc=r/10,walk=Math.sin(t*11+(e.ph||0)),fly=ty==='engel'||boss,col=({knappe:'#c38c80',spaeher:'#76a9ce',ritter:'#c3cbdc',priester:'#e5c88d',engel:'#c8e1f8',ramme:'#aaa1af',schild:'#82cce9',chor:'#bca0e8',boss:['#e9b376','#94d6ed','#bc9aeb','#97e4c5','#f19bb7'][lvI]})[ty];c.save();c.translate(e.x,e.y);tdUpright();c.scale(sc,sc);tdShadow(10);if(e.sl>0||e.shield>0||e.u.aura||e.u.heal)oval(0,1,13,5,'#ffffff08',e.shield>0?'#85d9ff':e.sl>0?'#bba0ff':col);c.translate(0,fly?-5+walk:0);c.scale(Math.cos(e.ang||0)<-.1?-1:1,1);
- if(ty==='ramme'){tdBlock(-1,3,23,13,14,'#ada6af','#625c6b');for(const a of[-1,1]){oval(a*8,4,4,4,'#282632','#11111a');oval(a*8,4,2,2,'#b6a89a')}tdCrystal(4,-8,4,8,col)}else{if(fly)for(const a of[-1,1]){const w=walk*2;tdPoly([[a*3,-6],[a*10,-20+w],[a*20,-24+w],[a*17,-12],[a*12,-3],[a*5,0]],tdGrad(-24,24,boss?'#f3d8a3':'#e6efff','#65718f'));for(let j=0;j<4;j++)line([[a*5,-7],[a*(9+j*2),-17-j*1.3+w]],'#ffffff85',.8)}
- line([[-3,-1],[-4+walk*2,5]],'#3f3c4c',3.6);line([[3,-1],[4-walk*2,5]],'#555365',3.6);oval(-4+walk*2,5,3,1.4,'#282631');oval(4-walk*2,5,3,1.4,'#282631');tdPoly([[-6,-12],[-8,-2],[0,3],[8,-2],[6,-12]],tdGrad(-12,15,col,'#3b3a50'));tdPoly([[-5,-11],[0,-13],[6,-10],[4,-4],[0,-2],[-5,-4]],tdGrad(-13,11,'#e8e5e4','#747c91'));oval(0,-15,5.8,6,tdGrad(-21,12,'#eee9db','#73798a'),'#343442');line([[-4,-14],[4,-14]],'#292b39',1.5);if(ty==='ritter'){tdPoly([[-5,-19],[0,-26],[4,-22],[2,-19]],'#c77b70');oval(-5,-10,3,3,col,'#3d4354')}if(ty==='spaeher')tdPoly([[-3,-11],[-12,-6],[-9,2],[-3,-3]],col);if(ty==='ritter'||ty==='schild'){tdPoly([[6,-12],[12,-10],[12,-3],[8,1],[5,-4]],tdGrad(-12,13,col,'#43576e'));gem(9,-6,2.5,'#7bc9ed','#f1faff')}if(ty==='priester'||ty==='chor'){line([[9,4],[9,-20]],'#b9a487',2);tdCrystal(9,-18,3.5,8,col)}if(fly){oval(0,-23,7,2.4,'#ffffff08',col);if(boss)tdCrystal(0,-4,4,9,col)}}c.restore();if(!e.iconOnly&&(e.hp<e.mx||boss||e.shield>0)){c.save();c.translate(e.x,e.y);tdUpright();const w=boss?43:20,y=-r*2.5-(fly?10:3);rrs(-w/2-1,y-1,w+2,5,2,'#10131d');rrs(-w/2,y,w*Math.max(0,e.hp/e.mx),3,1,'#92d4a7');if(e.shield>0)rrs(-w/2,y-3,w*e.shield/e.shieldMax,2,1,'#80c9ef');if(boss)tx('PHASE '+((e.phase||0)+1)+'/3',0,y-6,8,col,'800','center',1);c.restore()}}
+function tdEnemy(e,t){const ty=e.ty,boss=ty==='boss',r=e.u.r,sc=r/10,walk=Math.sin(t*11+(e.ph||0)),fly=ty==='engel'||ty==='phantom'||ty==='herald'||boss,col=({knappe:'#c38c80',spaeher:'#76a9ce',ritter:'#c3cbdc',priester:'#e5c88d',engel:'#c8e1f8',ramme:'#aaa1af',schild:'#82cce9',chor:'#bca0e8',aegis:'#89cbe8',phantom:'#b4a5ff',herald:'#e4ba85',boss:['#e9b376','#94d6ed','#bc9aeb','#97e4c5','#f19bb7','#9dddfc','#c9afff','#ffd187'][lvI]})[ty];c.save();c.translate(e.x,e.y);tdUpright();c.scale(sc,sc);tdShadow(10);if(e.sl>0||e.shield>0||e.u.aura||e.u.heal)oval(0,1,13,5,'#ffffff08',e.shield>0?'#85d9ff':e.sl>0?'#bba0ff':col);c.translate(0,fly?-5+walk:0);c.scale(Math.cos(e.ang||0)<-.1?-1:1,1);
+ if(ty==='aegis'){tdBlock(0,4,22,14,24,'#a4ccdf','#4f7189');tdCrystal(0,-10,7,17,col);for(const a of[-1,1]){tdBlock(a*13,3,8,10,17,'#83adc6','#3c536a');oval(a*8,6,5,3,'#35475a')}}else if(ty==='ramme'){tdBlock(-1,3,23,13,14,'#ada6af','#625c6b');for(const a of[-1,1]){oval(a*8,4,4,4,'#282632','#11111a');oval(a*8,4,2,2,'#b6a89a')}tdCrystal(4,-8,4,8,col)}else{if(fly)for(const a of[-1,1]){const w=walk*2;tdPoly([[a*3,-6],[a*10,-20+w],[a*20,-24+w],[a*17,-12],[a*12,-3],[a*5,0]],tdGrad(-24,24,boss?'#f3d8a3':'#e6efff','#65718f'));for(let j=0;j<4;j++)line([[a*5,-7],[a*(9+j*2),-17-j*1.3+w]],'#ffffff85',.8)}
+ line([[-3,-1],[-4+walk*2,5]],'#3f3c4c',3.6);line([[3,-1],[4-walk*2,5]],'#555365',3.6);oval(-4+walk*2,5,3,1.4,'#282631');oval(4-walk*2,5,3,1.4,'#282631');tdPoly([[-6,-12],[-8,-2],[0,3],[8,-2],[6,-12]],tdGrad(-12,15,col,'#3b3a50'));tdPoly([[-5,-11],[0,-13],[6,-10],[4,-4],[0,-2],[-5,-4]],tdGrad(-13,11,'#e8e5e4','#747c91'));oval(0,-15,5.8,6,tdGrad(-21,12,'#eee9db','#73798a'),'#343442');line([[-4,-14],[4,-14]],'#292b39',1.5);if(ty==='ritter'){tdPoly([[-5,-19],[0,-26],[4,-22],[2,-19]],'#c77b70');oval(-5,-10,3,3,col,'#3d4354')}if(ty==='phantom'){tdPoly([[-9,-14],[0,-25],[9,-14],[6,-4],[-6,-4]],tdGrad(-25,25,'#d7d1ff','#51477e'));line([[-5,-14],[5,-14]],'#f2efff',2)}if(ty==='spaeher')tdPoly([[-3,-11],[-12,-6],[-9,2],[-3,-3]],col);if(ty==='ritter'||ty==='schild'){tdPoly([[6,-12],[12,-10],[12,-3],[8,1],[5,-4]],tdGrad(-12,13,col,'#43576e'));gem(9,-6,2.5,'#7bc9ed','#f1faff')}if(ty==='priester'||ty==='chor'||ty==='herald'){line([[9,4],[9,-20]],'#b9a487',2);tdCrystal(9,-18,3.5,8,col)}if(fly){oval(0,-23,7,2.4,'#ffffff08',col);if(boss)tdCrystal(0,-4,4,9,col)}}c.restore();if(!e.iconOnly&&(e.hp<e.mx||boss||e.shield>0)){c.save();c.translate(e.x,e.y);tdUpright();const w=boss?43:20,y=-r*2.5-(fly?10:3);rrs(-w/2-1,y-1,w+2,5,2,'#10131d');rrs(-w/2,y,w*Math.max(0,e.hp/e.mx),3,1,'#92d4a7');if(e.shield>0)rrs(-w/2,y-3,w*e.shield/e.shieldMax,2,1,'#80c9ef');if(boss)tx('PHASE '+((e.phase||0)+1)+'/3',0,y-6,8,col,'800','center',1);c.restore()}}
 /* Reuse the established game, hit testing, handbooks and state; only rendering changes. */
 drawTower=tdTower;drawEnemy=tdEnemy;
 
@@ -5443,8 +5466,8 @@ else{try{$('#game').style.background='radial-gradient(ellipse at 50% 40%,#2a0a0c
 return api;
 };
 ICON.tdefense=GI(`<path d="M6 40V20l6-5 5 5 7-7 7 7 5-5 6 5v20z" fill="#49394b"/><path d="M6 40h36M9 32h30" stroke="#a77b74"/><path d="M15 30l9-15 9 15-9 9z" fill="#db6552" stroke="#251a27"/><path d="M24 15v24l-9-9z" fill="#ffb373" stroke="none"/><path d="M24 4l4 6-4 4-4-4z" fill="${Ye}"/>`);
-RULES.tdefense='Verteidige das Höllenherz auf fünf handgestalteten Karten. Sieben Türme mit vier Stufen und zwei Meisterpfaden, Runenfelder mit Standortboni, acht Gegnertypen, Wellenmodifikatoren und fünf Bossvarianten verlangen unterschiedliche Strategien. Level dauern bei Tempo ×1 etwa 10–15 Minuten. Wellen starten automatisch oder bis zu acht Sekunden früher gegen Bonus (erste Welle sofort möglich). Der Abschlussbonus kommt erst nach dem Ende der jeweiligen Welle. Das Höllenfeuer lädt über Zeit und Abschüsse. Das Feldhandbuch (I) erklärt alle Waffen, Gegner, Runen und Spezialisierungen; die Fragezeichen öffnen direkt die jeweilige Waffenbeschreibung. Fortschritt und Sterne bleiben wie bisher gespeichert.';
-GAMES.push({id:'tdefense',soloOnly:true,solo:true,n:'Höllenwacht',ic:'🔥',d:'Strategisches Tower Defense: Runen, Meisterpfade, fünf Karten und Bossphasen.',cat:'Strategie',sub:'Solo · 5 Level',mk:tdefense,
+RULES.tdefense='Verteidige das Höllenherz auf acht handgestalteten Karten. Sieben Türme mit vier Stufen und zwei Meisterpfaden, Runenfelder mit Standortboni, elf Gegnertypen, Wellenmodifikatoren und acht Bossvarianten verlangen unterschiedliche Strategien. Level dauern bei Tempo ×1 etwa 10–15 Minuten. Wellen starten automatisch oder bis zu acht Sekunden früher gegen Bonus (erste Welle sofort möglich). Der Abschlussbonus kommt erst nach dem Ende der jeweiligen Welle. Das Höllenfeuer lädt über Zeit und Abschüsse. Das Feldhandbuch (I) erklärt alle Waffen, Gegner, Runen und Spezialisierungen; die Fragezeichen öffnen direkt die jeweilige Waffenbeschreibung. Fortschritt und Sterne bleiben wie bisher gespeichert.';
+GAMES.push({id:'tdefense',soloOnly:true,solo:true,n:'Höllenwacht',ic:'🔥',d:'Strategisches Tower Defense: Runen, Meisterpfade, acht Karten und Bossphasen.',cat:'Strategie',sub:'Solo · 8 Level',mk:tdefense,
  soloRules:RULES.tdefense,
  h:'Turm wählen, freies Feld antippen · 1–7 Türme · Leertaste Welle · U Kraft/Upgrade · Q Meister (Stufe 3) · X Verkauf · T Ziel · P Pause · F Tempo · H Höllenfeuer · I Handbuch'});
 
