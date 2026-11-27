@@ -1076,7 +1076,7 @@ function readLocal(key){
  let browserSave=null;
  try{browserSave=JSON.parse(localStorage.getItem(key))}catch{}
  const disk=diskSaves.get(key);
- if(disk&&(!browserSave||validSave(browserSave)&&disk.ts>=browserSave.ts))return disk;
+ if(disk&&(!browserSave||validSave(browserSave)&&(disk.ts>browserSave.ts||disk.ts===browserSave.ts&&disk.rev===browserSave.rev)))return disk;
  return browserSave;
 }
 function writeLocal(key,value){
@@ -1274,7 +1274,7 @@ function sv(force){
  cloud.pending=data;
  if(cloud.status!='conflict'&&cloud.status!='invalid'){
   if(cloud.status!='offline'&&cloud.status!='recovered')cloud.status='pending';
-  if(force||Date.now()-cloud.last>=20000)flushCloud(force);
+  if(force||Date.now()-cloud.last>=60000)flushCloud(force);
  }
 }
 async function flushCloud(force=false){
@@ -1295,8 +1295,12 @@ async function flushCloud(force=false){
   if(!stillSignedIn())return;
   const saved=await cloud.ref.transaction(current=>{
    if(cloudRevision(current)===expected||cloudRevision(current)===data.rev)return wire;
+   // The SDK may invoke the callback with an empty cache before checking the server.
+   // A null proposal on an empty cache can only commit against an already empty node.
+   if(current==null&&expected!=='')return null;
    return undefined;
   },undefined,false);
+  if(!stillSignedIn())return;
   const remote=await unpackCloudSave(saved.snapshot.val());
   if(!saved.committed||revision(remote)!==data.rev){
    cloud.remote=remote;cloud.status=validSave(remote)?'conflict':'invalid';return;
@@ -1305,7 +1309,11 @@ async function flushCloud(force=false){
   cloud.rawBytes=byteSize(JSON.stringify(data));cloud.cloudBytes=byteSize(JSON.stringify(wire));
   if(cloud.pending===data){
    cloud.pending=null;cloud.status='synced';storeSnapshot(cloud.localKey||KEY,{...data,base:data.rev});
-  }else cloud.status='pending';
+  }else{
+   cloud.status='pending';
+   cloud.pending={...cloud.pending,base:data.rev};
+   storeSnapshot(cloud.localKey||KEY,cloud.pending);
+  }
  }catch(error){
   cloud.error=cloudFailure(error);cloud.status='offline';cloud.backoff=Date.now()+15000;
  }finally{cloud.busy=false}
